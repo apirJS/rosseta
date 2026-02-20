@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Rosseta",
+  "version": "0.0.0",
+  "description": "Browser extension that translates text from any part of a webpage by selecting the area with your cursor",
+  "{{chrome}}.background": {
+    "service_worker": "src/adapters/primary/background/service-worker.ts",
+    "type": "module"
+  },
+  "{{firefox}}.background": {
+    "scripts": ["src/adapters/primary/background/service-worker.ts"],
+    "type": "module"
+  },
+  "{{firefox}}.browser_specific_settings": {
+    "gecko": {
+      "id": "rosseta@apir.dev",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "action": {
+    "default_popup": "src/adapters/primary/ui/extension/index.html",
+    "default_title": "Rosseta"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png",
+    "256": "icons/icon-256.png",
+    "512": "icons/icon-512.png"
+  },
+  "permissions": ["scripting", "tabs", "activeTab", "storage"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/adapters/primary/content/content-script.ts"],
+      "run_at": "document_start"
+    }
+  ],
+  "host_permissions": ["<all_urls>"],
+  "commands": {
+    "START_EXTENSION": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Space",
+        "mac": "Command+Shift+Space"
+      },
+      "description": "Rosseta"
+    }
+  }
+}

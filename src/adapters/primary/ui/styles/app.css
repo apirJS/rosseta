@@ -1,0 +1,13 @@
+@import 'tailwindcss';
+@import './ayu-theme.css';
+
+#app {
+  height: 320px;
+  width: 324px;
+  overflow: hidden;
+}
+
+@theme {
+  --font-sans: 'Inter', 'system-ui', 'sans-serif';
+  --font-mono: 'JetBrains Mono', 'monospace';
+}

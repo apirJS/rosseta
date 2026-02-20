@@ -1,0 +1,51 @@
+{
+  "name": "rosseta",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build:dev:chrome": "NODE_ENV=development TARGET=chrome vite build --watch --mode development",
+    "build:dev:firefox": "NODE_ENV=development TARGET=firefox vite build --watch --mode development",
+    "build:prod:chrome": "NODE_ENV=production TARGET=chrome vite build",
+    "build:prod:firefox": "NODE_ENV=production TARGET=firefox vite build",
+    "build:prod": "bun run build:prod:chrome && bun run build:prod:firefox",
+    "test:logic": "bun test src/shared src/core src/adapters/primary/background src/adapters/primary/content src/adapters/secondary",
+    "test:ui": "vitest run src/adapters/primary/ui",
+    "test": "bun run test:logic && bun run test:ui",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10.3.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@sveltejs/vite-plugin-svelte": "^6.1.1",
+    "@testing-library/svelte": "^5.3.1",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/bun": "^1.3.9",
+    "@types/node": "^24.3.0",
+    "@types/webextension-polyfill": "^0.12.3",
+    "@vitest/coverage-v8": "4.0.18",
+    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "jsdom": "^28.1.0",
+    "semantic-release": "^25.0.3",
+    "svelte": "^5.38.1",
+    "svelte-check": "^4.3.1",
+    "typescript": "~5.8.3",
+    "vite": "^7.1.2",
+    "vite-plugin-static-copy": "^3.1.2",
+    "vite-plugin-web-extension": "^4.4.5",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.12",
+    "clsx": "^2.1.1",
+    "jose": "^6.1.3",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.1.12",
+    "uuid": "^11.1.0",
+    "webextension-polyfill": "^0.12.0",
+    "zod": "^4.1.3",
+    "zod-to-json-schema": "^3.25.1"
+  }
+}

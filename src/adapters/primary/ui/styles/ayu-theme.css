@@ -1,0 +1,94 @@
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+
+  --color-muted: var(--muted);
+
+  --color-destructive: var(--destructive);
+}
+
+/* --- AYU LIGHT (Default) --- */
+:root {
+  /* Background: #fcfcfc (Warm White) */
+  --background: oklch(0.98 0.002 85);
+
+  /* Foreground: #5c6166 (Dark Grey) */
+  --foreground: oklch(0.45 0.02 260);
+
+  /* Surface/Panel: #f3f4f5 (Slightly darker for cards) */
+  --surface: oklch(0.96 0.005 260);
+
+  /* ACCENT: #ff9940 (Ayu Orange/Yellow) -> Vibrant Yellowish-Orange */
+  --primary: oklch(0.75 0.16 65);
+  --primary-fg: oklch(1 0 0); /* White text on yellow button */
+
+  /* Borders: Light Grey */
+  --border: oklch(0.9 0.01 260);
+
+  /* Muted text */
+  --muted: oklch(0.6 0.02 260);
+
+  /* Destructive (red) */
+  --destructive: oklch(0.55 0.22 27);
+
+  /* Selection box frame (Blue accent) */
+  --selection-frame: oklch(54.6% 0.245 262.881);
+}
+
+/* --- AYU DARK (The Classic) --- */
+.dark {
+  /* Background: #0b0e14 (Deep Mirage) */
+  --background: oklch(0.18 0.03 260);
+
+  /* Foreground: #bfbdb6 (Soft Grey-White) */
+  --foreground: oklch(0.85 0.01 260);
+
+  /* Surface: #0f1419 (Slightly lighter panel) */
+  --surface: oklch(0.22 0.035 260);
+
+  /* ACCENT: #e6b450 (Ayu Yellow) -> Golden Yellow */
+  /* We bump the lightness slightly for dark mode contrast */
+  --primary: oklch(0.82 0.14 75);
+  --primary-fg: oklch(0.18 0.03 260); /* Dark text on yellow button */
+
+  /* Borders: Dark Grey */
+  --border: oklch(0.3 0.02 260);
+
+  /* Muted */
+  --muted: oklch(0.55 0.02 260);
+
+  /* Destructive (red) */
+  --destructive: oklch(0.65 0.2 25);
+
+  /* Selection box frame (Blue accent) */
+  --selection-frame: oklch(54.6% 0.245 262.881);
+}
+
+/* --- Scrollbar --- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}

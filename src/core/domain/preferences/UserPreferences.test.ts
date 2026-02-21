@@ -14,6 +14,7 @@ describe('Domain: UserPreferences', () => {
       expect(prefs.theme.value).toBe('system');
       expect(prefs.targetLanguage.code).toBe('en-US');
       expect(prefs.selectedModel.id).toBe('gemini-2.5-flash-lite');
+      expect(prefs.shortcut).toBeNull();
     });
   });
 
@@ -105,6 +106,26 @@ describe('Domain: UserPreferences', () => {
 
       expect(updated.selectedModel.id).toBe('gemini-2.0-flash');
       expect(original.selectedModel.id).toBe('gemini-2.5-flash-lite');
+    });
+
+    test('withShortcut returns new instance with updated shortcut', () => {
+      const original = UserPreferences.createDefault('prefs-1');
+      expect(original.shortcut).toBeNull();
+
+      const updated = original.withShortcut('Ctrl+Shift+Space');
+
+      expect(updated.shortcut).toBe('Ctrl+Shift+Space');
+      expect(original.shortcut).toBeNull(); // original unchanged
+      expect(updated.theme.isSystem).toBe(true); // other fields preserved
+    });
+
+    test('withShortcut preserves shortcut through other with* calls', () => {
+      const prefs = UserPreferences.createDefault('prefs-1')
+        .withShortcut('Ctrl+Shift+Space')
+        .withTheme(Theme.dark());
+
+      expect(prefs.shortcut).toBe('Ctrl+Shift+Space');
+      expect(prefs.theme.isDark).toBe(true);
     });
   });
 

@@ -22,6 +22,9 @@ import type { ITranslationStorage } from '../../core/ports/outbound/ITranslation
 import type { IUserPreferencesStorage } from '../../core/ports/outbound/IUserPreferencesStorage';
 import type { IKeySelectionStorage } from '../../core/ports/outbound/IKeySelectionStorage';
 import type { IApiKeyValidator } from '../../core/ports/outbound/IApiKeyValidator';
+import type { ICommandStorage } from '../../core/ports/outbound/ICommandStorage';
+import { BrowserCommandStorageAdapter } from '../../adapters/secondary/storage/BrowserCommandStorageAdapter';
+import { GetShortcutUseCase } from '../../core/application/command/GetShortcutUseCase';
 
 export function createContainer() {
   const credentialStorage: ICredentialStorage =
@@ -33,6 +36,7 @@ export function createContainer() {
   const keySelectionStorage: IKeySelectionStorage =
     new BrowserKeySelectionStorageAdapter();
   const apiKeyValidator: IApiKeyValidator = new HttpApiKeyValidator();
+  const commandStorage: ICommandStorage = new BrowserCommandStorageAdapter();
 
   return {
     // Adapters
@@ -73,6 +77,9 @@ export function createContainer() {
     clearAllTranslationsUseCase: new ClearAllTranslationsUseCase(
       translationStorage,
     ),
+
+    // Command Use Cases
+    getShortcutUseCase: new GetShortcutUseCase(commandStorage),
   };
 }
 

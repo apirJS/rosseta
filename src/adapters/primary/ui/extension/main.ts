@@ -16,6 +16,7 @@ const authUseCases = {
 const preferencesUseCases = {
   getPreferences: uiContainer.getPreferencesUseCase,
   updatePreferences: uiContainer.updatePreferencesUseCase,
+  getShortcut: uiContainer.getShortcutUseCase,
   onThemeApplied: (theme: 'dark' | 'light') => {
     ExtensionThemeBroadcaster.broadcast(theme);
   },

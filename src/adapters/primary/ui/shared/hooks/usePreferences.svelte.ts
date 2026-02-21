@@ -1,5 +1,6 @@
 import type { IGetPreferencesUseCase } from '../../../../../core/ports/inbound/preferences/IGetPreferencesUseCase';
 import type { IUpdatePreferencesUseCase } from '../../../../../core/ports/inbound/preferences/IUpdatePreferencesUseCase';
+import type { IGetShortcutUseCase } from '../../../../../core/ports/inbound/command/IGetShortcutUseCase';
 import {
   Theme,
   type ThemeValue,
@@ -37,11 +38,13 @@ export class PreferencesState {
   );
   loading = $state(false);
   loaded = $state(false);
+  shortcut = $state<string | null>(null);
 }
 
 export interface PreferencesUseCasesDeps {
   getPreferences: IGetPreferencesUseCase;
   updatePreferences: IUpdatePreferencesUseCase;
+  getShortcut: IGetShortcutUseCase;
   onThemeApplied?: (theme: 'dark' | 'light') => void;
 }
 
@@ -76,6 +79,12 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
       state.theme = result.data.theme;
       state.targetLanguage = result.data.targetLanguage;
       state.selectedModel = result.data.selectedModel;
+    }
+
+    const shortcutResult =
+      await useCases.getShortcut.execute('START_EXTENSION');
+    if (shortcutResult.success) {
+      state.shortcut = shortcutResult.data;
     }
 
     applyTheme(resolveTheme(state.theme));

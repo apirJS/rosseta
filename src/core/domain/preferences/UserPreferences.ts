@@ -19,6 +19,7 @@ export class UserPreferences extends AggregateRoot<string> {
     private readonly _theme: Theme,
     private readonly _targetLanguage: Language,
     private readonly _selectedModel: AiModel,
+    private readonly _shortcut: string | null = null,
   ) {
     super(id);
   }
@@ -33,6 +34,10 @@ export class UserPreferences extends AggregateRoot<string> {
 
   public get selectedModel(): AiModel {
     return this._selectedModel;
+  }
+
+  public get shortcut(): string | null {
+    return this._shortcut;
   }
 
   public toProps(): UserPreferencesProps {
@@ -72,6 +77,7 @@ export class UserPreferences extends AggregateRoot<string> {
         themeResult.data,
         languageResult.data,
         modelResult.data,
+        null,
       ),
     );
   }
@@ -83,6 +89,7 @@ export class UserPreferences extends AggregateRoot<string> {
       Theme.system(),
       Language.create('en-US'),
       AiModel.create(defaultModelId),
+      null,
     );
   }
 
@@ -92,6 +99,7 @@ export class UserPreferences extends AggregateRoot<string> {
       theme,
       this._targetLanguage,
       this._selectedModel,
+      this._shortcut,
     );
   }
 
@@ -101,6 +109,7 @@ export class UserPreferences extends AggregateRoot<string> {
       this._theme,
       language,
       this._selectedModel,
+      this._shortcut,
     );
   }
 
@@ -110,6 +119,17 @@ export class UserPreferences extends AggregateRoot<string> {
       this._theme,
       this._targetLanguage,
       model,
+      this._shortcut,
+    );
+  }
+
+  public withShortcut(shortcut: string | null): UserPreferences {
+    return new UserPreferences(
+      this.id,
+      this._theme,
+      this._targetLanguage,
+      this._selectedModel,
+      shortcut,
     );
   }
 }

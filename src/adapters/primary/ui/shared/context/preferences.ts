@@ -1,6 +1,7 @@
 import { getContext, setContext } from 'svelte';
 import type { IGetPreferencesUseCase } from '../../../../../core/ports/inbound/preferences/IGetPreferencesUseCase';
 import type { IUpdatePreferencesUseCase } from '../../../../../core/ports/inbound/preferences/IUpdatePreferencesUseCase';
+import type { IGetShortcutUseCase } from '../../../../../core/ports/inbound/command/IGetShortcutUseCase';
 
 const PREFERENCES_CONTEXT_KEY = Symbol('preferences');
 const PREFERENCES_STATE_KEY = Symbol('preferencesState');
@@ -8,6 +9,7 @@ const PREFERENCES_STATE_KEY = Symbol('preferencesState');
 export interface PreferencesUseCases {
   getPreferences: IGetPreferencesUseCase;
   updatePreferences: IUpdatePreferencesUseCase;
+  getShortcut: IGetShortcutUseCase;
   onThemeApplied?: (theme: 'dark' | 'light') => void;
 }
 

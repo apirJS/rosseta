@@ -39,12 +39,23 @@ export class PreferencesState {
   loading = $state(false);
   loaded = $state(false);
   shortcut = $state<string | null>(null);
+  proxyUrl = $state<string | null>(null);
 }
 
 export interface PreferencesUseCasesDeps {
   getPreferences: IGetPreferencesUseCase;
   updatePreferences: IUpdatePreferencesUseCase;
   getShortcut: IGetShortcutUseCase;
+  checkProxyHealth: {
+    execute(
+      proxyUrl: string,
+    ): Promise<
+      import('../../../../../shared/types/Result').Result<
+        boolean,
+        import('../../../../../shared/errors').AppError
+      >
+    >;
+  };
   onThemeApplied?: (theme: 'dark' | 'light') => void;
 }
 
@@ -79,6 +90,7 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
       state.theme = result.data.theme;
       state.targetLanguage = result.data.targetLanguage;
       state.selectedModel = result.data.selectedModel;
+      state.proxyUrl = result.data.proxyUrl;
     }
 
     const shortcutResult =
@@ -131,11 +143,24 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
 
   load();
 
+  async function setProxyUrl(proxyUrl: string | null) {
+    state.proxyUrl = proxyUrl;
+    await useCases.updatePreferences.execute({
+      preferences: { proxyUrl },
+    });
+  }
+
+  async function checkProxyHealth(proxyUrl: string) {
+    return useCases.checkProxyHealth.execute(proxyUrl);
+  }
+
   return {
     state,
     setTheme,
     toggleTheme,
     setTargetLanguage,
     setSelectedModel,
+    setProxyUrl,
+    checkProxyHealth,
   };
 }

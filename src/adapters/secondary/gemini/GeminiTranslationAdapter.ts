@@ -101,7 +101,8 @@ export class GeminiTranslationAdapter implements ITranslationService {
 
   private buildRequestUrl(): string {
     const apiKey = this.credential.apiKey.value;
-    return `${GEMINI_URL_ENDPOINT}/${this.userPreferences.selectedModel.id}:generateContent?key=${apiKey}`;
+    const baseUrl = this.userPreferences.proxyUrl ?? GEMINI_URL_ENDPOINT;
+    return `${baseUrl}/${this.userPreferences.selectedModel.id}:generateContent?key=${apiKey}`;
   }
 
   private buildRequestHeaders(): HeadersInit {

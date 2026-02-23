@@ -25,6 +25,9 @@ import type { IApiKeyValidator } from '../../core/ports/outbound/IApiKeyValidato
 import type { ICommandStorage } from '../../core/ports/outbound/ICommandStorage';
 import { BrowserCommandStorageAdapter } from '../../adapters/secondary/storage/BrowserCommandStorageAdapter';
 import { GetShortcutUseCase } from '../../core/application/command/GetShortcutUseCase';
+import { HttpProxyHealthCheckerAdapter } from '../../adapters/secondary/proxy/HttpProxyHealthCheckerAdapter';
+import { CheckProxyHealthUseCase } from '../../core/application/proxy/CheckProxyHealthUseCase';
+import type { IProxyHealthChecker } from '../../core/ports/outbound/IProxyHealthChecker';
 
 export function createContainer() {
   const credentialStorage: ICredentialStorage =
@@ -37,6 +40,8 @@ export function createContainer() {
     new BrowserKeySelectionStorageAdapter();
   const apiKeyValidator: IApiKeyValidator = new HttpApiKeyValidator();
   const commandStorage: ICommandStorage = new BrowserCommandStorageAdapter();
+  const proxyHealthChecker: IProxyHealthChecker =
+    new HttpProxyHealthCheckerAdapter();
 
   return {
     // Adapters
@@ -80,6 +85,9 @@ export function createContainer() {
 
     // Command Use Cases
     getShortcutUseCase: new GetShortcutUseCase(commandStorage),
+
+    // Proxy Use Cases
+    checkProxyHealthUseCase: new CheckProxyHealthUseCase(proxyHealthChecker),
   };
 }
 

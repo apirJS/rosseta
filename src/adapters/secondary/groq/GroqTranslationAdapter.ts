@@ -43,7 +43,9 @@ export class GroqTranslationAdapter implements ITranslationService {
         response_format: { type: 'json_object' },
       });
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const groqBaseUrl =
+        this.userPreferences.proxyUrl ?? 'https://api.groq.com/openai/v1';
+      const response = await fetch(`${groqBaseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${this.credential.apiKey.value}`,

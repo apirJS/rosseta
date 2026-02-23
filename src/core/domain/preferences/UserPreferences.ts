@@ -11,6 +11,7 @@ export interface UserPreferencesProps {
   theme: ThemeValue;
   targetLanguage: LanguageCode;
   selectedModel: string;
+  proxyUrl: string | null;
 }
 
 export class UserPreferences extends AggregateRoot<string> {
@@ -19,6 +20,7 @@ export class UserPreferences extends AggregateRoot<string> {
     private readonly _theme: Theme,
     private readonly _targetLanguage: Language,
     private readonly _selectedModel: AiModel,
+    private readonly _proxyUrl: string | null = null,
     private readonly _shortcut: string | null = null,
   ) {
     super(id);
@@ -36,6 +38,10 @@ export class UserPreferences extends AggregateRoot<string> {
     return this._selectedModel;
   }
 
+  public get proxyUrl(): string | null {
+    return this._proxyUrl;
+  }
+
   public get shortcut(): string | null {
     return this._shortcut;
   }
@@ -46,6 +52,7 @@ export class UserPreferences extends AggregateRoot<string> {
       theme: this._theme.value,
       targetLanguage: this._targetLanguage.code,
       selectedModel: this._selectedModel.id,
+      proxyUrl: this._proxyUrl,
     };
   }
 
@@ -55,6 +62,7 @@ export class UserPreferences extends AggregateRoot<string> {
       theme: string;
       targetLanguage: string;
       selectedModel: string;
+      proxyUrl: string | null;
     }>,
   ): Result<UserPreferences, DomainError> {
     if (!props.id) {
@@ -77,6 +85,7 @@ export class UserPreferences extends AggregateRoot<string> {
         themeResult.data,
         languageResult.data,
         modelResult.data,
+        props.proxyUrl ?? null,
         null,
       ),
     );
@@ -90,6 +99,7 @@ export class UserPreferences extends AggregateRoot<string> {
       Language.create('en-US'),
       AiModel.create(defaultModelId),
       null,
+      null,
     );
   }
 
@@ -99,6 +109,7 @@ export class UserPreferences extends AggregateRoot<string> {
       theme,
       this._targetLanguage,
       this._selectedModel,
+      this._proxyUrl,
       this._shortcut,
     );
   }
@@ -109,6 +120,7 @@ export class UserPreferences extends AggregateRoot<string> {
       this._theme,
       language,
       this._selectedModel,
+      this._proxyUrl,
       this._shortcut,
     );
   }
@@ -119,6 +131,18 @@ export class UserPreferences extends AggregateRoot<string> {
       this._theme,
       this._targetLanguage,
       model,
+      this._proxyUrl,
+      this._shortcut,
+    );
+  }
+
+  public withProxyUrl(proxyUrl: string | null): UserPreferences {
+    return new UserPreferences(
+      this.id,
+      this._theme,
+      this._targetLanguage,
+      this._selectedModel,
+      proxyUrl,
       this._shortcut,
     );
   }
@@ -129,6 +153,7 @@ export class UserPreferences extends AggregateRoot<string> {
       this._theme,
       this._targetLanguage,
       this._selectedModel,
+      this._proxyUrl,
       shortcut,
     );
   }

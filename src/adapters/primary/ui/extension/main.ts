@@ -17,6 +17,7 @@ const preferencesUseCases = {
   getPreferences: uiContainer.getPreferencesUseCase,
   updatePreferences: uiContainer.updatePreferencesUseCase,
   getShortcut: uiContainer.getShortcutUseCase,
+  checkProxyHealth: uiContainer.checkProxyHealthUseCase,
   onThemeApplied: (theme: 'dark' | 'light') => {
     ExtensionThemeBroadcaster.broadcast(theme);
   },

@@ -1,6 +1,10 @@
 import { sendMessageToRuntime } from '../../../../../../shared/messaging';
 
-export type TranslationView = 'main' | 'manage-api-keys' | 'history';
+export type TranslationView =
+  | 'main'
+  | 'manage-api-keys'
+  | 'history'
+  | 'proxy-settings';
 
 class TranslationControllerState {
   currentView = $state<TranslationView>('main');
@@ -38,11 +42,17 @@ export function createHomeController() {
     state.isMenuOpen = false;
   }
 
+  function showProxySettings() {
+    state.currentView = 'proxy-settings';
+    state.isMenuOpen = false;
+  }
+
   return {
     state,
     showMain,
     showManageApiKeys,
     showHistory,
+    showProxySettings,
     toggleMenu,
     closeMenu,
     startTranslation,

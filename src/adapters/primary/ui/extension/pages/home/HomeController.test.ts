@@ -45,6 +45,26 @@ describe('UI Controller: HomeController', () => {
     expect(controller.state.isMenuOpen).toBe(false);
   });
 
+  test('showProxySettings switches to "proxy-settings" and closes menu', () => {
+    const controller = createHomeController();
+    controller.toggleMenu();
+
+    controller.showProxySettings();
+
+    expect(controller.state.currentView).toBe('proxy-settings');
+    expect(controller.state.isMenuOpen).toBe(false);
+  });
+
+  test('showMain resets to "main" from "proxy-settings"', () => {
+    const controller = createHomeController();
+    controller.showProxySettings();
+
+    controller.showMain();
+
+    expect(controller.state.currentView).toBe('main');
+    expect(controller.state.isMenuOpen).toBe(false);
+  });
+
   test('showMain resets to "main" and closes menu', () => {
     const controller = createHomeController();
     controller.showHistory();

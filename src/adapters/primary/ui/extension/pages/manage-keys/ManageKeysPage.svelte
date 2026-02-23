@@ -4,9 +4,9 @@
     getPreferencesStateContext,
   } from '../../../shared/context';
   import { Icon, ThemeToggle } from '../../../shared/components';
-  import type { Credential } from '../../../../../../core/domain/credential/Credential';
   import ApiKeyListItem from './components/ApiKeyListItem.svelte';
   import ApiKeyViewerModal from './components/ApiKeyViewerModal.svelte';
+  import { useProviderCycle } from '../../../shared/hooks/useProviderCycle.svelte';
 
   interface Props {
     onback: () => void;
@@ -15,6 +15,7 @@
   const { onback }: Props = $props();
   const auth = getAuthStateContext();
   const preferences = getPreferencesStateContext();
+  const provider = useProviderCycle();
 
   let apiKeyInput = $state('');
   let duplicateError = $state('');
@@ -82,7 +83,7 @@
       <input
         type="text"
         class="flex-1 px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary"
-        placeholder="Gemini or Groq API Key"
+        placeholder={`${provider.current.name} API Key`}
         bind:value={apiKeyInput}
         onkeydown={(e) => e.key === 'Enter' && handleAdd()}
       />

@@ -12,6 +12,8 @@
     onsubmit: () => void;
     isLoading?: boolean;
     error?: string | null;
+    providerName: string;
+    providerApiKeyUrl: string;
   }
 
   const {
@@ -20,7 +22,11 @@
     onsubmit,
     isLoading = false,
     error = null,
+    providerName,
+    providerApiKeyUrl,
   }: Props = $props();
+
+  const placeholder = $derived(`${providerName} API Key`);
 
   function handleSubmit(e: Event) {
     e.preventDefault();
@@ -35,7 +41,7 @@
     label="API Key"
     {value}
     {oninput}
-    placeholder="Gemini or Groq API Key"
+    {placeholder}
     disabled={isLoading}
   />
 
@@ -54,8 +60,5 @@
 </form>
 
 <p class="text-xs text-muted mt-4 text-center">
-  Get <Link href="https://aistudio.google.com/apikey" external>Gemini</Link> or <Link
-    href="https://console.groq.com/keys"
-    external>Groq</Link
-  > API key →
+  Get <Link href={providerApiKeyUrl} external>{providerName}</Link> API key →
 </p>

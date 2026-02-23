@@ -303,6 +303,12 @@ test(translation): add ClearAllTranslationsUseCase tests
 
 One of the most common contributions is adding support for a new AI provider. Here's the step-by-step:
 
+> [!IMPORTANT]
+> New providers **must** support:
+>
+> 1. **Multilingual image understanding** (vision) — Rosseta sends screenshots of selected regions for translation
+> 2. **Structured outputs** (JSON mode / response schema) — Rosseta expects a typed JSON response from the model
+
 ### 1. Register in `ProviderRegistry`
 
 ```typescript
@@ -316,9 +322,12 @@ ProviderRegistry.register({
     { id: 'gpt-4o', name: 'GPT-4o' },
     { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
   ],
-  supportedLanguages: ['en', 'ja', 'ko', 'zh', ...],
+  supportedLanguages: ['en-US', 'ja-JP', 'ko-KR', 'zh-CN', ...],
 });
 ```
+
+> [!NOTE]
+> Use **BCP 47** language-region codes (e.g. `en-US`, `ja-JP`, not `en`, `ja`). If your provider supports a language not yet in `src/core/domain/translation/LANGUAGE_MAP.ts`, add it there first.
 
 ### 2. Update the `Provider` type
 
@@ -344,6 +353,10 @@ Update `src/shared/di/container-factory.ts` to construct and expose the new adap
 ### 5. Add API key validation
 
 Update `HttpApiKeyValidator` to detect and validate the new provider's key format.
+
+### 6. Register in the provider cycle
+
+Add the new provider to the `PROVIDERS` array in `src/adapters/primary/ui/shared/hooks/useProviderCycle.svelte.ts` with its name and API key URL. This makes the login and manage-keys UI cycle through the new provider automatically.
 
 ---
 

@@ -48,6 +48,8 @@ export default {
       {
         prepareCmd:
           'bun scripts/update-manifest.ts ${nextRelease.version} && bun install && bun run build:prod && (cd dist/chrome && zip -r ../../chrome-v${nextRelease.version}.zip .) && (cd dist/firefox && zip -r ../../firefox-v${nextRelease.version}.zip .)',
+        publishCmd:
+          'npx chrome-webstore-upload-cli@3 upload --source chrome-v${nextRelease.version}.zip && npx web-ext sign --source-dir dist/firefox --channel listed --api-key $AMO_JWT_ISSUER --api-secret $AMO_JWT_SECRET',
       },
     ],
 

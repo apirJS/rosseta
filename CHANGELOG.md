@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/apirJS/rosseta/compare/v1.1.1...v1.2.0) (2026-02-24)
+
+### Features
+
+* **ui:** add retry on error toast, undo delete, view transitions, and proxy indicator ([c34e0b1](https://github.com/apirJS/rosseta/commit/c34e0b1a769b0c7bd3c7f5d7b3cfeb670141fd3a))
+
 ## [1.1.1](https://github.com/apirJS/rosseta/compare/v1.1.0...v1.1.1) (2026-02-24)
 
 ### Bug Fixes

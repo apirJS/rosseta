@@ -26,6 +26,7 @@ jobs:
         run: bun run check
       - name: Run Test
         run: bun run test
+
   release:
     name: Semantic Release
     needs: verify
@@ -55,10 +56,4 @@ jobs:
       - name: Run Semantic Release
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-          EXTENSION_ID: ${{secrets.CHROME_EXTENSION_ID}}
-          CLIENT_ID: ${{secrets.CHROME_CLIENT_ID}}
-          CLIENT_SECRET: ${{secrets.CHROME_CLIENT_SECRET}}
-          REFRESH_TOKEN: ${{secrets.CHROME_REFRESH_TOKEN}}
-          AMO_JWT_ISSUER: ${{secrets.AMO_JWT_ISSUER}}
-          AMO_JWT_SECRET: ${{secrets.AMO_JWT_SECRET}}
         run: npx semantic-release

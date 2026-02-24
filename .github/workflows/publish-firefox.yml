@@ -1,0 +1,40 @@
+name: Publish to Firefox Add-ons
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    name: Sign & Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Firefox zip from release
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+          file: 'firefox-v*.zip'
+          target: './'
+          token: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unzip for web-ext
+        run: |
+          ZIP=$(ls firefox-v*.zip | head -1)
+          mkdir -p dist/firefox
+          unzip "$ZIP" -d dist/firefox
+
+      - name: Sign with AMO
+        env:
+          AMO_JWT_ISSUER: ${{secrets.AMO_JWT_ISSUER}}
+          AMO_JWT_SECRET: ${{secrets.AMO_JWT_SECRET}}
+        run: |
+          npx web-ext sign \
+            --source-dir dist/firefox \
+            --channel listed \
+            --approval-timeout 0 \
+            --api-key "$AMO_JWT_ISSUER" \
+            --api-secret "$AMO_JWT_SECRET"

@@ -1,0 +1,33 @@
+name: Publish to Chrome Web Store
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    name: Upload & Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Chrome zip from release
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+          file: 'chrome-v*.zip'
+          target: './'
+          token: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Upload to Chrome Web Store
+        env:
+          EXTENSION_ID: ${{secrets.CHROME_EXTENSION_ID}}
+          CLIENT_ID: ${{secrets.CHROME_CLIENT_ID}}
+          CLIENT_SECRET: ${{secrets.CHROME_CLIENT_SECRET}}
+          REFRESH_TOKEN: ${{secrets.CHROME_REFRESH_TOKEN}}
+        run: |
+          ZIP=$(ls chrome-v*.zip | head -1)
+          npx chrome-webstore-upload-cli@3 upload --source "$ZIP"
+          npx chrome-webstore-upload-cli@3 publish

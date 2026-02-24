@@ -16,6 +16,7 @@ export class TranslationError extends AppError {
   public static failed(cause?: Error): TranslationError {
     return new TranslationError({
       code: ErrorCode.TRANSLATION_FAILED,
+      message: cause?.message,
       cause,
     });
   }

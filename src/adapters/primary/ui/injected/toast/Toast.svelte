@@ -83,6 +83,19 @@
     {/if}
   </div>
 
+  <!-- Action button (e.g. Retry) -->
+  {#if toast.onAction}
+    <button
+      class="toast-action"
+      onclick={() => {
+        toast.onAction?.();
+        onclose();
+      }}
+    >
+      {toast.actionLabel ?? 'Retry'}
+    </button>
+  {/if}
+
   <!-- Close button -->
   <button class="toast-close" onclick={onclose} aria-label="Close toast">
     <svg

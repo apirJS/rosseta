@@ -89,4 +89,20 @@
       {/each}
     {/if}
   </div>
+
+  <!-- Undo Delete Banner -->
+  {#if controller.state.pendingDelete}
+    <div
+      class="flex items-center justify-between px-3 py-2 bg-surface border-t border-border text-sm"
+    >
+      <span class="text-muted">Translation deleted</span>
+      <button
+        type="button"
+        class="text-primary font-medium hover:underline cursor-pointer"
+        onclick={controller.undoDelete}
+      >
+        Undo
+      </button>
+    </div>
+  {/if}
 </PageShell>

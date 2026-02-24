@@ -247,7 +247,7 @@ describe('UI Controller: HistoryController', () => {
 
   // ── deleteItem() ──────────────────────────────────────────────
 
-  test('deleteItem removes translation from state on success', async () => {
+  test('deleteItem removes translation from state immediately (pending undo)', async () => {
     const items = [
       makeTranslation('t-1', 'keep'),
       makeTranslation('t-2', 'delete'),
@@ -256,39 +256,42 @@ describe('UI Controller: HistoryController', () => {
       success: true,
       data: items,
     });
-    vi.mocked(mockDeleteTranslation.execute).mockResolvedValue({
-      success: true,
-      data: undefined,
-    });
 
     const controller = createHistoryController();
     await controller.load();
     expect(controller.state.translations).toHaveLength(2);
 
-    await controller.deleteItem('t-2');
+    controller.deleteItem('t-2');
 
-    expect(mockDeleteTranslation.execute).toHaveBeenCalledWith('t-2');
+    // Item removed from UI immediately
     expect(controller.state.translations).toHaveLength(1);
     expect(controller.state.translations[0].id).toBe('t-1');
+    // pendingDelete is set
+    expect(controller.state.pendingDelete).not.toBeNull();
+    expect(controller.state.pendingDelete!.translation.id).toBe('t-2');
+    // Actual delete not called yet (waiting for 5s timer)
+    expect(mockDeleteTranslation.execute).not.toHaveBeenCalled();
   });
 
-  test('deleteItem does not remove translation on failure', async () => {
-    const items = [makeTranslation('t-1', 'keep')];
+  test('undoDelete restores the deleted translation', async () => {
+    const items = [
+      makeTranslation('t-1', 'keep'),
+      makeTranslation('t-2', 'to-undo'),
+    ];
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: items,
-    });
-    vi.mocked(mockDeleteTranslation.execute).mockResolvedValue({
-      success: false,
-      error: new AppError({ code: ErrorCode.STORAGE_READ_FAILED }),
     });
 
     const controller = createHistoryController();
     await controller.load();
 
-    await controller.deleteItem('t-1');
-
+    controller.deleteItem('t-2');
     expect(controller.state.translations).toHaveLength(1);
+
+    controller.undoDelete();
+    expect(controller.state.translations).toHaveLength(2);
+    expect(controller.state.pendingDelete).toBeNull();
   });
 
   // ── openItem() ────────────────────────────────────────────────

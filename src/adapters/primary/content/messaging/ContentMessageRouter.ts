@@ -3,7 +3,6 @@ import { MessageSchema } from '../../../../shared/validation/MessageSchema';
 import { OverlayHandler } from '../handlers/OverlayHandler';
 import { TranslationModalHandler } from '../handlers/TranslationModalHandler';
 import { ToastHandler } from '../handlers/ToastHandler';
-import { toastController } from '../../ui/injected/toast/ToastController.svelte';
 import type { ThemeManager } from '../hosts/ThemeManager';
 
 /**
@@ -18,7 +17,7 @@ export class ContentMessageRouter {
   constructor(private readonly themeManager: ThemeManager) {
     this.overlayHandler = new OverlayHandler();
     this.translationModalHandler = new TranslationModalHandler(themeManager);
-    this.toastHandler = new ToastHandler(themeManager, toastController);
+    this.toastHandler = new ToastHandler(themeManager);
   }
 
   /**

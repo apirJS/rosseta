@@ -79,61 +79,109 @@
   });
 </script>
 
-{#if controller.state.currentView === 'manage-api-keys'}
-  <ManageKeysPage onback={controller.showMain} />
-{:else if controller.state.currentView === 'history'}
-  <HistoryPage onback={controller.showMain} />
-{:else if controller.state.currentView === 'proxy-settings'}
-  <ProxySettingsPage onback={controller.showMain} />
-{:else if controller.state.currentView === 'main' && activeCredential}
-  <div class="flex flex-col h-full w-full bg-background">
-    <div class="flex justify-between items-center p-4 pb-0">
-      <div class="relative" bind:this={menuAreaEl}>
-        <ActiveKeyIndicator
-          credential={activeCredential}
-          onMenuToggle={controller.toggleMenu}
-          isMenuOpen={controller.state.isMenuOpen}
-        />
-        {#if controller.state.isMenuOpen}
-          <AppMenu
-            onLogout={handleLogoutClick}
-            onManageKeys={handleManageKeys}
-            onProxySettings={handleProxySettings}
-            onHistory={controller.showHistory}
+<div
+  class="view-container"
+  class:slide-forward={controller.state.slideDirection === 'forward'}
+  class:slide-back={controller.state.slideDirection === 'back'}
+>
+  {#key controller.state.currentView}
+    {#if controller.state.currentView === 'manage-api-keys'}
+      <ManageKeysPage onback={controller.showMain} />
+    {:else if controller.state.currentView === 'history'}
+      <HistoryPage onback={controller.showMain} />
+    {:else if controller.state.currentView === 'proxy-settings'}
+      <ProxySettingsPage onback={controller.showMain} />
+    {:else if controller.state.currentView === 'main' && activeCredential}
+      <div class="flex flex-col h-full w-full bg-background">
+        <div class="flex justify-between items-center p-4 pb-0">
+          <div class="relative" bind:this={menuAreaEl}>
+            <ActiveKeyIndicator
+              credential={activeCredential}
+              onMenuToggle={controller.toggleMenu}
+              isMenuOpen={controller.state.isMenuOpen}
+            />
+            {#if controller.state.isMenuOpen}
+              <AppMenu
+                onLogout={handleLogoutClick}
+                onManageKeys={handleManageKeys}
+                onProxySettings={handleProxySettings}
+                onHistory={controller.showHistory}
+                proxyActive={!!preferences.state.proxyUrl}
+              />
+            {/if}
+          </div>
+          <ThemeToggle
+            isDark={preferences.state.resolvedTheme === 'dark'}
+            onToggle={preferences.toggleTheme}
           />
+        </div>
+
+        {#if preferences.state.loaded}
+          <div class="flex-1 flex flex-col justify-center px-4 pb-4 space-y-4">
+            <ModelSelector
+              value={preferences.state.selectedModel.id}
+              provider={activeProvider}
+              onchange={preferences.setSelectedModel}
+            />
+
+            <LanguageSelector
+              value={preferences.state.targetLanguage.code as LanguageCode}
+              provider={activeProvider}
+              onchange={preferences.setTargetLanguage}
+            />
+
+            <div class="pt-2">
+              <TranslateButton onclick={controller.startTranslation} />
+            </div>
+          </div>
         {/if}
       </div>
-      <ThemeToggle
-        isDark={preferences.state.resolvedTheme === 'dark'}
-        onToggle={preferences.toggleTheme}
-      />
-    </div>
 
-    {#if preferences.state.loaded}
-      <div class="flex-1 flex flex-col justify-center px-4 pb-4 space-y-4">
-        <ModelSelector
-          value={preferences.state.selectedModel.id}
-          provider={activeProvider}
-          onchange={preferences.setSelectedModel}
+      {#if showLogoutModal}
+        <LogoutConfirmModal
+          onconfirm={handleLogoutConfirm}
+          oncancel={handleLogoutCancel}
         />
-
-        <LanguageSelector
-          value={preferences.state.targetLanguage.code as LanguageCode}
-          provider={activeProvider}
-          onchange={preferences.setTargetLanguage}
-        />
-
-        <div class="pt-2">
-          <TranslateButton onclick={controller.startTranslation} />
-        </div>
-      </div>
+      {/if}
     {/if}
-  </div>
+  {/key}
+</div>
 
-  {#if showLogoutModal}
-    <LogoutConfirmModal
-      onconfirm={handleLogoutConfirm}
-      oncancel={handleLogoutCancel}
-    />
-  {/if}
-{/if}
+<style>
+  .view-container {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .view-container.slide-forward > :global(:first-child) {
+    animation: slide-in-left 0.2s ease-out;
+  }
+
+  .view-container.slide-back > :global(:first-child) {
+    animation: slide-in-right 0.2s ease-out;
+  }
+
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(30%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(-30%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+</style>

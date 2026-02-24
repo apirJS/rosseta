@@ -69,7 +69,7 @@ export class ProviderRegistry {
 
 ProviderRegistry.register({
   id: 'gemini',
-  name: 'Google Gemini',
+  name: 'Gemini',
   defaultModelId: 'gemini-2.5-flash-lite',
   models: [
     { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro (Preview)' },

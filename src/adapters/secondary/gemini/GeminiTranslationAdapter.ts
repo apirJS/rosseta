@@ -47,7 +47,21 @@ export class GeminiTranslationAdapter implements ITranslationService {
 
       if (!response.ok) {
         console.error('[GEMINI] Request failed with status:', response.status);
-        return failure(TranslationError.failed());
+        const hint =
+          response.status === 404
+            ? 'check your proxy URL'
+            : response.status === 401
+              ? 'invalid API key'
+              : response.status === 403
+                ? 'access denied'
+                : response.status >= 500
+                  ? 'server error, try again later'
+                  : `HTTP ${response.status}`;
+        return failure(
+          TranslationError.failed(
+            new Error(`Request failed (${response.status}) — ${hint}`),
+          ),
+        );
       }
 
       const responseData = await response.json();

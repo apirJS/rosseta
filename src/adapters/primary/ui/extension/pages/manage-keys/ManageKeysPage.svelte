@@ -20,14 +20,20 @@
   let apiKeyInput = $state('');
   let duplicateError = $state('');
   let viewingKey = $state<string | null>(null);
+  let pendingDeleteId = $state<string | null>(null);
+  let pendingDeleteTimer = $state<ReturnType<typeof setTimeout> | null>(null);
 
   const allKeys = $derived(auth.state.credentials?.items ?? []);
+
+  const visibleKeys = $derived(
+    pendingDeleteId ? allKeys.filter((c) => c.id !== pendingDeleteId) : allKeys,
+  );
 
   // Dynamic search: filter keys as user types
   const filteredKeys = $derived.by(() => {
     const query = apiKeyInput.trim().toLowerCase();
-    if (!query) return allKeys;
-    return allKeys.filter(
+    if (!query) return visibleKeys;
+    return visibleKeys.filter(
       (c) =>
         c.apiKey.value.toLowerCase().includes(query) ||
         c.provider.toLowerCase().includes(query),
@@ -55,6 +61,31 @@
       apiKeyInput = '';
     }
   }
+
+  function commitPendingDelete() {
+    if (!pendingDeleteId) return;
+    if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+    auth.removeApiKey(pendingDeleteId);
+    pendingDeleteId = null;
+    pendingDeleteTimer = null;
+  }
+
+  function handleDelete(credentialId: string) {
+    commitPendingDelete();
+    pendingDeleteId = credentialId;
+    pendingDeleteTimer = setTimeout(() => {
+      auth.removeApiKey(credentialId);
+      pendingDeleteId = null;
+      pendingDeleteTimer = null;
+    }, 5000);
+  }
+
+  function undoDelete() {
+    if (!pendingDeleteId) return;
+    if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+    pendingDeleteId = null;
+    pendingDeleteTimer = null;
+  }
 </script>
 
 <div class="flex flex-col h-full w-full bg-background">
@@ -63,7 +94,10 @@
     <button
       type="button"
       class="flex items-center text-sm text-muted hover:text-foreground cursor-pointer"
-      onclick={onback}
+      onclick={() => {
+        commitPendingDelete();
+        onback();
+      }}
     >
       <Icon name="arrow-left" class="w-4 h-4 mr-1" />
     </button>
@@ -114,7 +148,7 @@
             isActive={auth.state.credentials.activeCredentialId ===
               credential.id}
             onSetActive={() => auth.setActiveKey(credential.id)}
-            onDelete={() => auth.removeApiKey(credential.id)}
+            onDelete={() => handleDelete(credential.id)}
             onView={() => (viewingKey = credential.apiKey.value)}
           />
         {/each}
@@ -124,13 +158,29 @@
         <p class="text-sm text-muted text-center py-4">
           No API keys added yet.
         </p>
-      {:else if filteredKeys.length === 0}
+      {:else if filteredKeys.length === 0 && !pendingDeleteId}
         <p class="text-sm text-muted text-center py-4">
           No keys match your search.
         </p>
       {/if}
     </div>
   </div>
+
+  <!-- Undo banner -->
+  {#if pendingDeleteId}
+    <div
+      class="flex items-center justify-between px-3 py-2 bg-surface border-t border-border text-sm"
+    >
+      <span class="text-muted">API key deleted</span>
+      <button
+        type="button"
+        class="text-primary font-medium hover:underline cursor-pointer"
+        onclick={undoDelete}
+      >
+        Undo
+      </button>
+    </div>
+  {/if}
 </div>
 
 {#if viewingKey}

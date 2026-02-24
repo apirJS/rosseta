@@ -4,10 +4,16 @@
     onManageKeys: () => void;
     onProxySettings: () => void;
     onHistory: () => void;
+    proxyActive?: boolean;
   }
 
-  const { onLogout, onManageKeys, onProxySettings, onHistory }: Props =
-    $props();
+  const {
+    onLogout,
+    onManageKeys,
+    onProxySettings,
+    onHistory,
+    proxyActive = false,
+  }: Props = $props();
 </script>
 
 <div
@@ -26,7 +32,12 @@
       class="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-surface cursor-pointer"
       onclick={onProxySettings}
     >
-      Proxy Settings
+      <span class="inline-flex items-center gap-1.5">
+        Proxy Settings
+        {#if proxyActive}
+          <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+        {/if}
+      </span>
     </button>
     <button
       type="button"

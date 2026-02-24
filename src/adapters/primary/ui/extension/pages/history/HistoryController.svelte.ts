@@ -5,12 +5,19 @@ import type { Translation } from '../../../../../../core/domain/translation/Tran
 
 export type TimeFilter = '24h' | '7d' | 'all';
 
+interface PendingDelete {
+  translation: Translation;
+  index: number;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 class HistoryState {
   translations = $state<Translation[]>([]);
   searchQuery = $state('');
   timeFilter = $state<TimeFilter>('all');
   loading = $state(false);
   error = $state<string | null>(null);
+  pendingDelete = $state<PendingDelete | null>(null);
 }
 
 export function createHistoryController() {
@@ -61,11 +68,40 @@ export function createHistoryController() {
     state.timeFilter = value;
   }
 
-  async function deleteItem(id: string) {
-    const result = await ctx.deleteTranslation.execute(id);
-    if (result.success) {
-      state.translations = state.translations.filter((t) => t.id !== id);
-    }
+  /** Commit any pending delete immediately (fire-and-forget). */
+  function commitPendingDelete() {
+    if (!state.pendingDelete) return;
+    clearTimeout(state.pendingDelete.timer);
+    ctx.deleteTranslation.execute(state.pendingDelete.translation.id);
+    state.pendingDelete = null;
+  }
+
+  function deleteItem(id: string) {
+    // Commit any previously pending delete first
+    commitPendingDelete();
+
+    const idx = state.translations.findIndex((t) => t.id === id);
+    if (idx === -1) return;
+
+    const removed = state.translations[idx];
+    state.translations = state.translations.filter((t) => t.id !== id);
+
+    const timer = setTimeout(() => {
+      ctx.deleteTranslation.execute(id);
+      state.pendingDelete = null;
+    }, 5000);
+
+    state.pendingDelete = { translation: removed, index: idx, timer };
+  }
+
+  function undoDelete() {
+    if (!state.pendingDelete) return;
+    clearTimeout(state.pendingDelete.timer);
+    const { translation, index } = state.pendingDelete;
+    const copy = [...state.translations];
+    copy.splice(Math.min(index, copy.length), 0, translation);
+    state.translations = copy;
+    state.pendingDelete = null;
   }
 
   async function openItem(translation: Translation) {
@@ -86,6 +122,7 @@ export function createHistoryController() {
     setSearchQuery,
     setTimeFilter,
     deleteItem,
+    undoDelete,
     openItem,
   };
 }

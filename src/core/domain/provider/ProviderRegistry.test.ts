@@ -8,7 +8,7 @@ describe('Domain: ProviderRegistry', () => {
     test('returns config for gemini', () => {
       const config = ProviderRegistry.getConfig('gemini');
       expect(config.id).toBe('gemini');
-      expect(config.name).toBe('Google Gemini');
+      expect(config.name).toBe('Gemini');
       expect(config.models.length).toBeGreaterThan(0);
     });
 

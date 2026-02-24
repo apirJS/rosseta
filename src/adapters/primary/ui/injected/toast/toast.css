@@ -158,6 +158,27 @@
   margin-top: 2px;
 }
 
+/* === ACTION BUTTON === */
+.toast-action {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--toast-fg);
+  background: transparent;
+  border: 1px solid var(--toast-border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.toast-action:hover {
+  background: var(--toast-border);
+}
+
 /* === CLOSE BUTTON === */
 .toast-close {
   flex-shrink: 0;

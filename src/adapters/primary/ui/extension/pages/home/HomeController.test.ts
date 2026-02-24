@@ -65,15 +65,14 @@ describe('UI Controller: HomeController', () => {
     expect(controller.state.isMenuOpen).toBe(false);
   });
 
-  test('showMain resets to "main" and closes menu', () => {
+  test('showMain resets to "main" with back direction', () => {
     const controller = createHomeController();
     controller.showHistory();
-    controller.toggleMenu();
 
     controller.showMain();
 
     expect(controller.state.currentView).toBe('main');
-    expect(controller.state.isMenuOpen).toBe(false);
+    expect(controller.state.slideDirection).toBe('back');
   });
 
   // ── Menu Logic ─────────────────────────────────────────────────

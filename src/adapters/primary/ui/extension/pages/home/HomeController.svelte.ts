@@ -8,6 +8,7 @@ export type TranslationView =
 
 class TranslationControllerState {
   currentView = $state<TranslationView>('main');
+  slideDirection = $state<'forward' | 'back'>('forward');
   isMenuOpen = $state(false);
 }
 
@@ -15,11 +16,12 @@ export function createHomeController() {
   const state = new TranslationControllerState();
 
   function showMain() {
+    state.slideDirection = 'back';
     state.currentView = 'main';
-    state.isMenuOpen = false;
   }
 
   function showManageApiKeys() {
+    state.slideDirection = 'forward';
     state.currentView = 'manage-api-keys';
     state.isMenuOpen = false;
   }
@@ -38,11 +40,13 @@ export function createHomeController() {
   }
 
   function showHistory() {
+    state.slideDirection = 'forward';
     state.currentView = 'history';
     state.isMenuOpen = false;
   }
 
   function showProxySettings() {
+    state.slideDirection = 'forward';
     state.currentView = 'proxy-settings';
     state.isMenuOpen = false;
   }

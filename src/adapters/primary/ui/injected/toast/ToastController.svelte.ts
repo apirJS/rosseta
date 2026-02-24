@@ -7,6 +7,8 @@ export interface ToastItem {
   description?: string;
   duration?: number;
   dismissing?: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 interface ShowOptions {
@@ -17,6 +19,10 @@ interface ShowOptions {
   id?: string;
   /** Auto-dismiss duration in ms. 0 = no auto-dismiss. Default: 4000 (loading: 0) */
   duration?: number;
+  /** Label for an action button (e.g. "Retry") */
+  actionLabel?: string;
+  /** Callback when the action button is clicked */
+  onAction?: () => void;
 }
 
 const MAX_TOASTS = 5;
@@ -43,6 +49,8 @@ export class ToastController {
       message: opts.message,
       description: opts.description,
       duration,
+      actionLabel: opts.actionLabel,
+      onAction: opts.onAction,
     };
 
     // Prepend so newest appears at top

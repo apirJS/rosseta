@@ -1,7 +1,8 @@
+import * as browser from 'webextension-polyfill';
 import { mount } from 'svelte';
 import toastStyles from '../../ui/injected/toast/toast.css?inline';
 import ToastContainer from '../../ui/injected/toast/ToastContainer.svelte';
-import type { ToastController } from '../../ui/injected/toast/ToastController.svelte';
+import { toastController } from '../../ui/injected/toast/ToastController.svelte';
 import { createShadowDomHost } from '../hosts/ShadowDomHost';
 import type { ThemeManager } from '../hosts/ThemeManager';
 
@@ -21,47 +22,75 @@ interface ShowToastPayload {
  *
  * Lazily creates a persistent Shadow DOM host for the toast container.
  * Integrates with ThemeManager for dark/light theme tracking.
+ * Error toasts automatically include a Retry action.
  */
 export class ToastHandler {
   private static readonly HOST_ID = 'rosseta-toast-host';
   private host: HTMLElement | null = null;
 
-  constructor(
-    private readonly themeManager: ThemeManager,
-    private readonly toast: ToastController,
-  ) {}
+  constructor(private readonly themeManager: ThemeManager) {}
 
   /**
    * Shows or updates a toast notification.
-   * Lazily creates the toast host on first use.
+   * Error toasts automatically get a Retry button.
    */
   show(payload: ShowToastPayload): void {
     this.ensureHost();
 
     const { id, type, message, description, duration } = payload;
 
+    if (type === 'error') {
+      this.showError(payload);
+      return;
+    }
+
     if (id) {
-      const existing = this.toast.toasts.find((t) => t.id === id);
+      const existing = toastController.toasts.find((t) => t.id === id);
       if (existing) {
-        this.toast.update(id, { type, message, description, duration });
+        toastController.update(id, { type, message, description, duration });
       } else {
-        this.toast.show({ id, type, message, description, duration });
+        toastController.show({ id, type, message, description, duration });
       }
     } else {
-      this.toast.show({ type, message, description, duration });
+      toastController.show({ type, message, description, duration });
+    }
+  }
+
+  /** Dismisses a toast by ID. */
+  dismiss(id: string): void {
+    toastController.dismiss(id);
+  }
+
+  private showError(payload: ShowToastPayload): void {
+    const { id, message, description } = payload;
+    const errorDuration = payload.duration ?? 6000;
+    const onAction = () =>
+      browser.runtime.sendMessage({ action: 'START_OVERLAY' });
+
+    if (id && toastController.toasts.find((t) => t.id === id)) {
+      toastController.update(id, {
+        type: 'error',
+        message,
+        description,
+        duration: errorDuration,
+        actionLabel: 'Retry',
+        onAction,
+      });
+    } else {
+      toastController.show({
+        id,
+        type: 'error',
+        message,
+        description,
+        duration: errorDuration,
+        actionLabel: 'Retry',
+        onAction,
+      });
     }
   }
 
   /**
-   * Dismisses a toast by ID.
-   */
-  dismiss(id: string): void {
-    this.toast.dismiss(id);
-  }
-
-  /**
    * Ensures a persistent Shadow DOM host exists for the toast container.
-   * Created once on first use and reused for all toast notifications.
    */
   private ensureHost(): void {
     if (this.host) return;

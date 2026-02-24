@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/apirJS/rosseta/compare/v1.1.0...v1.1.1) (2026-02-24)
+
+### Bug Fixes
+
+* remove tabs permission and re-enable full publish pipeline ([4d7d4d8](https://github.com/apirJS/rosseta/commit/4d7d4d8a6fbe17a81ccc34e240d6786c4dee399b))
+
 ## [1.1.0](https://github.com/apirJS/rosseta/compare/v1.0.1...v1.1.0) (2026-02-23)
 
 ### Features

@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Rosseta",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Browser extension that translates text from any part of a webpage by selecting the area with your cursor",
   "{{chrome}}.background": {
     "service_worker": "src/adapters/primary/background/service-worker.ts",
     "type": "module"
   },
   "{{firefox}}.background": {
-    "scripts": ["src/adapters/primary/background/service-worker.ts"],
+    "scripts": [
+      "src/adapters/primary/background/service-worker.ts"
+    ],
     "type": "module"
   },
   "{{firefox}}.browser_specific_settings": {
@@ -16,7 +18,9 @@
       "id": "rosseta@echa.dev",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   },
@@ -32,15 +36,25 @@
     "256": "icons/icon-256.png",
     "512": "icons/icon-512.png"
   },
-  "permissions": ["scripting", "activeTab", "storage"],
+  "permissions": [
+    "scripting",
+    "activeTab",
+    "storage"
+  ],
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/adapters/primary/content/content-script.ts"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/adapters/primary/content/content-script.ts"
+      ],
       "run_at": "document_start"
     }
   ],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "commands": {
     "START_EXTENSION": {
       "suggested_key": {

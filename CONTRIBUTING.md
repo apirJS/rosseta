@@ -303,7 +303,7 @@ test(translation): add ClearAllTranslationsUseCase tests
 
 ## Adding a New AI Provider
 
-One of the most common contributions is adding support for a new AI provider. Here's the step-by-step:
+One of the most common contributions is adding support for a new AI provider. The checklist below covers **every file** that needs changes — follow it in order.
 
 > [!IMPORTANT]
 > New providers **must** support:
@@ -311,11 +311,32 @@ One of the most common contributions is adding support for a new AI provider. He
 > 1. **Multilingual image understanding** (vision) — Rosseta sends screenshots of selected regions for translation
 > 2. **Structured outputs** (JSON mode / response schema) — Rosseta expects a typed JSON response from the model
 
-### 1. Register in `ProviderRegistry`
+### Domain layer
+
+#### 1. Add to the `Provider` type and detection
+
+**File:** `src/core/domain/credential/Provider.ts`
+
+- Add your provider ID to the `Provider` union type
+- Add it to the `PROVIDERS` array
+- Add a detection rule in `detectProvider()` — this determines which provider an API key belongs to based on its format (e.g. prefix, length, pattern)
 
 ```typescript
-// src/core/domain/provider/ProviderRegistry.ts
+export type Provider = 'gemini' | 'groq' | 'zai' | 'openai';
+export const PROVIDERS: Provider[] = ['gemini', 'groq', 'zai', 'openai'];
 
+export function detectProvider(rawKey: string): Provider | null {
+  // ... existing checks ...
+  if (rawKey.startsWith('sk-')) return 'openai';
+  return null;
+}
+```
+
+#### 2. Register models and languages in `ProviderRegistry`
+
+**File:** `src/core/domain/provider/ProviderRegistry.ts` — append a new `ProviderRegistry.register()` call at the bottom
+
+```typescript
 ProviderRegistry.register({
   id: 'openai',
   name: 'OpenAI',
@@ -331,34 +352,88 @@ ProviderRegistry.register({
 > [!NOTE]
 > Use **BCP 47** language-region codes (e.g. `en-US`, `ja-JP`, not `en`, `ja`). If your provider supports a language not yet in `src/core/domain/translation/LANGUAGE_MAP.ts`, add it there first.
 
-### 2. Update the `Provider` type
+#### 3. Add auto-balance support
 
-```typescript
-// src/core/domain/credential/Provider.ts
-export type Provider = 'gemini' | 'groq' | 'zai' | 'openai';
-```
+**File:** `src/core/domain/credential/KeySelectionMode.ts`
 
-### 3. Create the adapter
+- Add `'auto-balance:<provider>'` to `KEY_SELECTION_MODES`
+- Add a factory method (e.g. `autoBalanceOpenai()`)
+- Update the `autoBalanceProvider` getter's return type
+
+### Adapter layer
+
+#### 4. Create the translation adapter
+
+Create a new directory under `src/adapters/secondary/<provider>/` with these files:
 
 ```
 src/adapters/secondary/openai/
-├── OpenAiTranslationAdapter.ts    # Implements ITranslationService
-├── OpenAiTranslationAdapter.test.ts
-├── prompt.ts                      # Provider-specific prompt builder
-└── schema.ts                      # Zod response schema
+├── OpenAiTranslationAdapter.ts      # Implements ITranslationService
+├── OpenAiTranslationAdapter.test.ts # Unit tests
+├── prompt.ts                        # Provider-specific prompt builder
+└── schema.ts                        # Zod response schema
 ```
 
-### 4. Wire into the DI container
+Use an existing adapter (e.g. `src/adapters/secondary/groq/` or `src/adapters/secondary/zai/`) as a reference for the structure.
 
-Update `src/shared/di/container-factory.ts` to construct and expose the new adapter.
+#### 5. Wire into the adapter factory
 
-### 5. Add API key validation
+**File:** `src/adapters/secondary/TranslationAdapterFactory.ts` — add a `case` for your provider in the switch statement
 
-Update `HttpApiKeyValidator` to detect and validate the new provider's key format.
+```typescript
+case 'openai':
+  return new OpenAiTranslationAdapter(credential, preferences);
+```
 
-### 6. Register in the provider cycle
+#### 6. Add API key validation
 
-Add the new provider to the `PROVIDERS` array in `src/adapters/primary/ui/shared/hooks/useProviderCycle.svelte.ts` with its name and API key URL. This makes the login and manage-keys UI cycle through the new provider automatically.
+**File:** `src/adapters/secondary/validation/HttpApiKeyValidator.ts`
+
+- Add a condition in `validate()` to route to your validation method
+- Implement a `private async validateOpenaiKey()` method that calls your provider's models/list endpoint
+
+#### 7. Add to the storage schema
+
+**File:** `src/adapters/secondary/storage/BrowserCredentialStorageAdapter.ts`
+
+Add your provider ID to the Zod enum on the `CredentialItemPropsSchema`:
+
+```typescript
+provider: z.enum(['gemini', 'groq', 'zai', 'openai']),
+```
+
+> [!CAUTION]
+> **Missing this step will cause ALL stored credentials to be silently deleted** when the extension loads a credential with an unrecognized provider.
+
+### UI layer
+
+#### 8. Register in the provider cycle
+
+**File:** `src/adapters/primary/ui/shared/hooks/useProviderCycle.svelte.ts`
+
+Add a new entry to the `PROVIDERS` array with the provider name and API key URL:
+
+```typescript
+{ id: 'openai', name: 'OpenAI', apiKeyUrl: 'https://platform.openai.com/api-keys' },
+```
+
+This makes the login and manage-keys pages cycle through your provider automatically.
+
+#### 9. Add auto-balance UI support
+
+These files control the auto-balance dropdown and active key indicator — add your provider alongside the existing entries:
+
+- `src/adapters/primary/ui/extension/pages/home/components/ActiveKeyIndicator.svelte` — add `showOpenaiAutoBalance` prop and handler
+- `src/adapters/primary/ui/extension/pages/home/components/KeySelectorDropdown.svelte` — add your provider to the auto-balance `{#each}` loop and badge color map
+- `src/adapters/primary/ui/extension/pages/home/HomePage.svelte` — wire up the auto-balance props
+
+### Tests & fixtures
+
+#### 10. Update test fixtures
+
+**File:** `tests/test-fixtures.ts` — add a credential factory (e.g. `createOpenaiCredential()`)
+
+**File:** `src/adapters/secondary/TranslationAdapterFactory.test.ts` — add a test case for the new adapter
 
 ---
 

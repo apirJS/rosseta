@@ -1,6 +1,6 @@
 # <img src="public/icons/icon-48.png" width="32" height="32" alt="Rosseta icon" style="vertical-align: middle;"> Rosseta
 
-[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/flbdkalgeiekpnchpakdpaabcehpnlln?style=flat&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/rosseta/flbdkalgeiekpnchpakdpaabcehpnlln) [![Firefox Add-ons](https://img.shields.io/badge/Firefox%20Add--ons-available-FF7139?style=flat&logo=firefox&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/rosseta/)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/flbdkalgeiekpnchpakdpaabcehpnlln?style=flat&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/rosseta/flbdkalgeiekpnchpakdpaabcehpnlln) [![Firefox Add-ons](https://img.shields.io/amo/v/rosseta?style=flat&logo=firefox&logoColor=white&label=Firefox%20Add-ons)](https://addons.mozilla.org/en-US/firefox/addon/rosseta/)
 
 A browser extension that translates text from any region of a webpage. Select an area on screen, and the extension captures, extracts, and translates the text using AI — all without leaving the page.
 
@@ -14,6 +14,8 @@ Built with **Svelte 5**, **TypeScript**, **Tailwind CSS v4**, and a **DDD + Hexa
 
 ## Demo
 
+**▶️ YouTube Demo: [COMING SOON](#)**
+
 ![Translation result — Japanese text translated to Indonesian with romanization](demo/usage_sample_1.png)
 
 ![Translation result — selecting a region on a webpage](demo/usage_sample_2.png)
@@ -26,11 +28,22 @@ Built with **Svelte 5**, **TypeScript**, **Tailwind CSS v4**, and a **DDD + Hexa
 
 - 🖱️ **Region select** — Draw a box on any part of a page, including images, and get an instant translation overlay with romanization
 - 🤖 **Multi-provider** — Switch between Gemini, Groq, and Z.ai models on the fly
-- 🌍 **110+ languages** — [Gemini supports 110 languages](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models?hl=id#expandable-1), [Groq (Llama 4) supports 12](https://github.com/marketplace/models/azureml-meta/Llama-4-Scout-17B-16E-Instruct), [Z.ai (GLM-4V) supports 26](https://replicate.com/cuuupid/glm-4v-9b/readme) — auto-filtered per provider
 - 🔑 **Key management** — Multiple API keys per provider with auto-rotation
 - 🌐 **Proxy support** — Route all API calls through your own relay server
 - 📜 **History** — Every translation saved locally, searchable
 - 🌙 **Dark mode** — System-aware with manual toggle
+
+### Supported languages
+
+Language availability depends on the provider:
+
+| Provider       | Languages | Reference                                                                                        |
+| -------------- | --------- | ------------------------------------------------------------------------------------------------ |
+| Gemini         | 110+      | [Supported languages](https://cloud.google.com/vertex-ai/generative-ai/docs/models#expandable-1) |
+| Groq (Llama 4) | 12        | [Model card](https://github.com/marketplace/models/azureml-meta/Llama-4-Scout-17B-16E-Instruct)  |
+| Z.ai (GLM-4V)  | 26        | [Model card](https://replicate.com/cuuupid/glm-4v-9b/readme)                                     |
+
+The extension auto-filters the language list based on the active provider.
 
 ---
 
@@ -49,27 +62,25 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, architecture deta
 
 ## Proxy Setup (Optional)
 
-Rosseta can route all API requests through a proxy server instead of calling the AI provider directly.
+Rosseta can route all API requests through a proxy server instead of calling the AI provider directly. Useful when your network blocks provider domains, you want to hide your IP, or you need request logging on your own server.
 
-**Why use a proxy?**
-
-- Your network blocks `generativelanguage.googleapis.com`, `api.groq.com`, or `api.z.ai`
-- You want to hide your IP address from the API provider
-- You need request logging, rate limiting, or caching on your own server
-
-### How it works
+<details>
+<summary><strong>How it works</strong></summary>
 
 The proxy URL **replaces the base URL** of the API. Rosseta appends the original path and query string to your proxy URL:
 
-| Provider | Without proxy                                                                             | With proxy `https://my-proxy.com`                      |
-| -------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Gemini   | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key=...` | `https://my-proxy.com/{model}:generateContent?key=...` |
-| Groq     | `https://api.groq.com/openai/v1/chat/completions`                                         | `https://my-proxy.com/chat/completions`                |
-| Z.ai     | `https://api.z.ai/api/paas/v4/chat/completions`                                           | `https://my-proxy.com/chat/completions`                |
+| Provider | Original URL                                                                      | Proxied URL (`https://my-proxy.com`)           |
+| -------- | --------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Gemini   | `generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key=...` | `my-proxy.com/{model}:generateContent?key=...` |
+| Groq     | `api.groq.com/openai/v1/chat/completions`                                         | `my-proxy.com/chat/completions`                |
+| Z.ai     | `api.z.ai/api/paas/v4/chat/completions`                                           | `my-proxy.com/chat/completions`                |
 
-> **Important:** Your API key is still included in the request (as a query param for Gemini, as an `Authorization` header for Groq and Z.ai). Make sure you trust your proxy server.
+> **Note:** Your API key is still included in the request (as a query param for Gemini, as an `Authorization` header for Groq and Z.ai). Make sure you trust your proxy server.
 
-### Configuration
+</details>
+
+<details>
+<summary><strong>Configuration</strong></summary>
 
 1. Open the extension popup → **☰ menu** → **Proxy Settings**
 2. Enter your proxy server URL
@@ -78,15 +89,14 @@ The proxy URL **replaces the base URL** of the API. Rosseta appends the original
 
 To go back to direct connections, click **Clear**.
 
-### Example: Cloudflare Worker
+</details>
+
+<details>
+<summary><strong>Example: Cloudflare Worker</strong></summary>
 
 A minimal reverse proxy that forwards requests to the original API:
 
 ```js
-// The path after your worker URL is the AI provider's path.
-// Your proxy URL should be set to: https://your-worker.workers.dev/v1beta/models
-// (for Gemini) or https://your-worker.workers.dev/openai/v1 (for Groq).
-
 const PROVIDERS = {
   '/v1beta/': 'https://generativelanguage.googleapis.com',
   '/openai/': 'https://api.groq.com',
@@ -97,7 +107,6 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
-    // Determine target based on path prefix
     let target;
     for (const [prefix, origin] of Object.entries(PROVIDERS)) {
       if (url.pathname.startsWith(prefix)) {
@@ -119,9 +128,13 @@ export default {
 };
 ```
 
-With this worker deployed at `https://your-worker.workers.dev`, set your proxy URL to `https://your-worker.workers.dev/v1beta/models` for Gemini, `https://your-worker.workers.dev/openai/v1` for Groq, or `https://your-worker.workers.dev/api/paas/v4` for Z.ai.
+Set your proxy URL to:
 
-> **Tip:** Since each provider uses a different base URL, you'll only be proxying whichever provider you configure. To proxy multiple, you'll need one proxy URL per provider — or a single proxy that inspects the path to determine the target (like the example above).
+- **Gemini:** `https://your-worker.workers.dev/v1beta/models`
+- **Groq:** `https://your-worker.workers.dev/openai/v1`
+- **Z.ai:** `https://your-worker.workers.dev/api/paas/v4`
+
+</details>
 
 ---
 

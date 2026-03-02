@@ -48,7 +48,7 @@ jobs:
           bun-version: latest
 
       - name: Install Dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Install Zip Tool
         run: sudo apt-get install -y zip

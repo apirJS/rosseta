@@ -2,6 +2,10 @@ name: Publish to Firefox Add-ons
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v1.2.1). Leave empty for latest.'
+        required: false
   release:
     types: [published]
 
@@ -16,6 +20,7 @@ jobs:
       - name: Download Firefox zip from release
         uses: dsaltares/fetch-gh-release-asset@master
         with:
+          version: ${{ github.event.release.id || 'latest' }}
           file: 'firefox-v*.zip'
           target: './'
           token: ${{secrets.GITHUB_TOKEN}}

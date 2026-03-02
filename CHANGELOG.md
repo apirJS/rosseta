@@ -1,3 +1,11 @@
+## [1.2.1](https://github.com/apirJS/rosseta/compare/v1.2.0...v1.2.1) (2026-03-02)
+
+### Bug Fixes
+
+* correct error codes, remove deprecated model, and refactor domain objects ([05c48a6](https://github.com/apirJS/rosseta/commit/05c48a6cb5de8b0775a61676c3694fc07c5e7d66))
+* harden secondary adapters with timeouts, logging, and validation ([6c517ca](https://github.com/apirJS/rosseta/commit/6c517ca3d94f2e87471442e052a4abf1da85f01f))
+* resolve race conditions, correct content script path, and share OverlayService ([b7efac8](https://github.com/apirJS/rosseta/commit/b7efac8729acbb004e9d2ba2b32840be29739460))
+
 ## [1.2.0](https://github.com/apirJS/rosseta/compare/v1.1.0...v1.2.0) (2026-02-24)
 
 ### Features

@@ -17,13 +17,27 @@ jobs:
     name: Upload & Publish
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
+              | jq -r '.tag_name')
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download Chrome zip from release
         uses: dsaltares/fetch-gh-release-asset@master
         with:
-          version: ${{ github.event.release.id || 'latest' }}
-          file: 'chrome-v*.zip'
-          target: './'
-          token: ${{secrets.GITHUB_TOKEN}}
+          version: tags/${{ steps.version.outputs.tag }}
+          file: chrome-${{ steps.version.outputs.tag }}.zip
+          target: chrome.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -32,11 +46,10 @@ jobs:
 
       - name: Upload to Chrome Web Store
         env:
-          EXTENSION_ID: ${{secrets.CHROME_EXTENSION_ID}}
-          CLIENT_ID: ${{secrets.CHROME_CLIENT_ID}}
-          CLIENT_SECRET: ${{secrets.CHROME_CLIENT_SECRET}}
-          REFRESH_TOKEN: ${{secrets.CHROME_REFRESH_TOKEN}}
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
         run: |
-          ZIP=$(ls chrome-v*.zip | head -1)
-          npx chrome-webstore-upload-cli@3 upload --source "$ZIP"
+          npx chrome-webstore-upload-cli@3 upload --source "chrome.zip"
           npx chrome-webstore-upload-cli@3 publish

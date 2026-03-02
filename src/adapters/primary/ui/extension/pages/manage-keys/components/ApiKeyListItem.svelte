@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Icon } from '../../../../shared/components';
   import type { Credential } from '../../../../../../../core/domain/credential/Credential';
+  import { ProviderRegistry } from '../../../../../../../core/domain/provider/ProviderRegistry';
+  import type { Provider } from '../../../../../../../core/domain/credential/Provider';
 
   interface Props {
     credential: Credential;
@@ -19,9 +21,17 @@
       : credential.apiKey.value,
   );
 
+  const BADGE_COLORS: Record<Provider, string> = {
+    gemini: 'bg-blue-500/20 text-blue-400',
+    groq: 'bg-purple-500/20 text-purple-400',
+    zai: 'bg-green-500/20 text-green-400',
+  };
+
   const providerLabel = $derived(
-    credential.provider === 'groq' ? 'GROQ' : 'GEMINI',
+    ProviderRegistry.getConfig(credential.provider).name.toUpperCase(),
   );
+
+  const badgeColor = $derived(BADGE_COLORS[credential.provider]);
 </script>
 
 <div
@@ -31,10 +41,7 @@
 >
   <!-- Provider badge -->
   <span
-    class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded {credential.provider ===
-    'groq'
-      ? 'bg-purple-500/20 text-purple-400'
-      : 'bg-blue-500/20 text-blue-400'}"
+    class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded {badgeColor}"
   >
     {providerLabel}
   </span>

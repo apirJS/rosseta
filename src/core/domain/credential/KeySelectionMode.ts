@@ -6,6 +6,7 @@ export const KEY_SELECTION_MODES = {
   manual: 'Manual',
   'auto-balance:gemini': 'Auto balance (round robin) GEMINI',
   'auto-balance:groq': 'Auto balance (round robin) GROQ',
+  'auto-balance:zai': 'Auto balance (round robin) Z.AI',
 } as const;
 
 export type KeySelectionModeValue = keyof typeof KEY_SELECTION_MODES;
@@ -28,9 +29,10 @@ export class KeySelectionMode extends ValueObject {
   }
 
   /** Returns the provider being balanced, or null if manual. */
-  public get autoBalanceProvider(): 'gemini' | 'groq' | null {
+  public get autoBalanceProvider(): 'gemini' | 'groq' | 'zai' | null {
     if (this._value === 'auto-balance:gemini') return 'gemini';
     if (this._value === 'auto-balance:groq') return 'groq';
+    if (this._value === 'auto-balance:zai') return 'zai';
     return null;
   }
 
@@ -76,5 +78,9 @@ export class KeySelectionMode extends ValueObject {
 
   public static autoBalanceGroq(): KeySelectionMode {
     return new KeySelectionMode('auto-balance:groq');
+  }
+
+  public static autoBalanceZai(): KeySelectionMode {
+    return new KeySelectionMode('auto-balance:zai');
   }
 }

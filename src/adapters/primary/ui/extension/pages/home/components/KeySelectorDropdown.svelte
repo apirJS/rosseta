@@ -2,6 +2,14 @@
   import { Icon } from '../../../../shared/components';
   import type { Credential } from '../../../../../../../core/domain/credential/Credential';
   import type { KeySelectionMode } from '../../../../../../../core/domain/credential/KeySelectionMode';
+  import { ProviderRegistry } from '../../../../../../../core/domain/provider/ProviderRegistry';
+  import type { Provider } from '../../../../../../../core/domain/credential/Provider';
+
+  const PROVIDER_BADGE_COLORS: Record<Provider, string> = {
+    gemini: 'border-blue-400/40 text-blue-400',
+    groq: 'border-purple-400/40 text-purple-400',
+    zai: 'border-green-400/40 text-green-400',
+  };
 
   interface Props {
     credentials: readonly Credential[];
@@ -9,8 +17,9 @@
     currentMode: KeySelectionMode;
     showGeminiAutoBalance: boolean;
     showGroqAutoBalance: boolean;
+    showZaiAutoBalance: boolean;
     onSelectKey: (credential: Credential) => void;
-    onSelectAutoBalance: (provider: 'gemini' | 'groq') => void;
+    onSelectAutoBalance: (provider: 'gemini' | 'groq' | 'zai') => void;
   }
 
   const {
@@ -19,6 +28,7 @@
     currentMode,
     showGeminiAutoBalance,
     showGroqAutoBalance,
+    showZaiAutoBalance,
     onSelectKey,
     onSelectAutoBalance,
   }: Props = $props();
@@ -32,64 +42,39 @@
   aria-label="Select API Key"
 >
   <!-- Auto-balance options (top) -->
-  {#if showGeminiAutoBalance || showGroqAutoBalance}
-    {#if showGeminiAutoBalance}
-      {@const isAutoGemini = currentMode.value === 'auto-balance:gemini'}
-      <button
-        type="button"
-        role="option"
-        aria-selected={isAutoGemini}
-        class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs cursor-pointer
-               transition-colors select-none rounded-md
-               border {isAutoGemini
-          ? 'text-foreground border-primary/40 bg-surface'
-          : 'text-muted border-border hover:text-foreground hover:border-primary/30 hover:bg-surface'}"
-        style="width: calc(100% - 12px); margin: 2px 6px;"
-        onclick={() => onSelectAutoBalance('gemini')}
-      >
-        <span class="truncate text-xs font-medium">Auto balance ⟳</span>
-        <span class="flex items-center gap-2 flex-shrink-0">
-          <span
-            class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border border-blue-400/40 text-blue-400"
-            >GEMINI</span
-          >
-          {#if isAutoGemini}
-            <Icon name="check" class="w-4 h-4 text-primary" />
-          {:else}
-            <span class="w-4"></span>
-          {/if}
-        </span>
-      </button>
-    {/if}
-
-    {#if showGroqAutoBalance}
-      {@const isAutoGroq = currentMode.value === 'auto-balance:groq'}
-      <button
-        type="button"
-        role="option"
-        aria-selected={isAutoGroq}
-        class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs cursor-pointer
-               transition-colors select-none rounded-md
-               border {isAutoGroq
-          ? 'text-foreground border-primary/40 bg-surface'
-          : 'text-muted border-border hover:text-foreground hover:border-primary/30 hover:bg-surface'}"
-        style="width: calc(100% - 12px); margin: 2px 6px;"
-        onclick={() => onSelectAutoBalance('groq')}
-      >
-        <span class="truncate text-xs font-medium">Auto balance ⟳</span>
-        <span class="flex items-center gap-2 flex-shrink-0">
-          <span
-            class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border border-purple-400/40 text-purple-400"
-            >GROQ</span
-          >
-          {#if isAutoGroq}
-            <Icon name="check" class="w-4 h-4 text-primary" />
-          {:else}
-            <span class="w-4"></span>
-          {/if}
-        </span>
-      </button>
-    {/if}
+  {#if showGeminiAutoBalance || showGroqAutoBalance || showZaiAutoBalance}
+    {#each [{ provider: 'gemini' as const, show: showGeminiAutoBalance }, { provider: 'groq' as const, show: showGroqAutoBalance }, { provider: 'zai' as const, show: showZaiAutoBalance }] as { provider, show }}
+      {#if show}
+        {@const isActive = currentMode.value === `auto-balance:${provider}`}
+        {@const badgeColor = PROVIDER_BADGE_COLORS[provider]}
+        {@const label = ProviderRegistry.getConfig(provider).name.toUpperCase()}
+        <button
+          type="button"
+          role="option"
+          aria-selected={isActive}
+          class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs cursor-pointer
+                 transition-colors select-none rounded-md
+                 border {isActive
+            ? 'text-foreground border-primary/40 bg-surface'
+            : 'text-muted border-border hover:text-foreground hover:border-primary/30 hover:bg-surface'}"
+          style="width: calc(100% - 12px); margin: 2px 6px;"
+          onclick={() => onSelectAutoBalance(provider)}
+        >
+          <span class="truncate text-xs font-medium">Auto balance ⟳</span>
+          <span class="flex items-center gap-2 flex-shrink-0">
+            <span
+              class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border {badgeColor}"
+              >{label}</span
+            >
+            {#if isActive}
+              <Icon name="check" class="w-4 h-4 text-primary" />
+            {:else}
+              <span class="w-4"></span>
+            {/if}
+          </span>
+        </button>
+      {/if}
+    {/each}
 
     <div class="border-t border-border mx-2 my-1"></div>
   {/if}
@@ -119,11 +104,9 @@
       <span class="flex items-center gap-2 flex-shrink-0">
         <span
           class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border
-                 {cred.provider === 'groq'
-            ? 'border-purple-400/40 text-purple-400'
-            : 'border-blue-400/40 text-blue-400'}"
+                 {PROVIDER_BADGE_COLORS[cred.provider]}"
         >
-          {cred.provider === 'groq' ? 'GROQ' : 'GEMINI'}
+          {ProviderRegistry.getConfig(cred.provider).name.toUpperCase()}
         </span>
 
         {#if isActive}

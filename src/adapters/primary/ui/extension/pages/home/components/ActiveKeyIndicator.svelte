@@ -3,6 +3,7 @@
   import { getAuthStateContext } from '../../../../shared/context';
   import type { Credential } from '../../../../../../../core/domain/credential/Credential';
   import { KeySelectionMode } from '../../../../../../../core/domain/credential/KeySelectionMode';
+  import { ProviderRegistry } from '../../../../../../../core/domain/provider/ProviderRegistry';
   import KeySelectorDropdown from './KeySelectorDropdown.svelte';
 
   interface Props {
@@ -22,6 +23,9 @@
   const showGroqAutoBalance = $derived(
     allCredentials.filter((c) => c.provider === 'groq').length >= 2,
   );
+  const showZaiAutoBalance = $derived(
+    allCredentials.filter((c) => c.provider === 'zai').length >= 2,
+  );
   const currentMode = $derived(auth.state.keySelectionMode);
 
   let isOpen = $state(false);
@@ -30,7 +34,7 @@
 
   function getDisplayLabel(cred: Credential): string {
     const key = cred.apiKey?.value ?? '';
-    const providerLabel = cred.provider === 'groq' ? 'Groq' : 'Gemini';
+    const providerLabel = ProviderRegistry.getConfig(cred.provider).name;
     const masked = key.length > 8 ? `${key.slice(0, 8)}****` : key;
     return `${providerLabel} · ${masked}`;
   }
@@ -38,7 +42,8 @@
   function getTriggerLabel(): string {
     if (currentMode.isAutoBalance) {
       const provider = currentMode.autoBalanceProvider;
-      return `Auto ⟳ ${provider === 'groq' ? 'GROQ' : 'GEMINI'}`;
+      if (!provider) return 'Auto ⟳';
+      return `Auto ⟳ ${ProviderRegistry.getConfig(provider).name.toUpperCase()}`;
     }
     return getDisplayLabel(credential);
   }
@@ -51,12 +56,13 @@
     isOpen = false;
   }
 
-  function selectAutoBalance(provider: 'gemini' | 'groq') {
-    const mode =
-      provider === 'gemini'
-        ? KeySelectionMode.autoBalanceGemini()
-        : KeySelectionMode.autoBalanceGroq();
-    auth.setKeySelectionMode(mode);
+  function selectAutoBalance(provider: 'gemini' | 'groq' | 'zai') {
+    const modes = {
+      gemini: KeySelectionMode.autoBalanceGemini,
+      groq: KeySelectionMode.autoBalanceGroq,
+      zai: KeySelectionMode.autoBalanceZai,
+    };
+    auth.setKeySelectionMode(modes[provider]());
     isOpen = false;
   }
 
@@ -121,6 +127,7 @@
             {currentMode}
             {showGeminiAutoBalance}
             {showGroqAutoBalance}
+            {showZaiAutoBalance}
             onSelectKey={selectKey}
             onSelectAutoBalance={selectAutoBalance}
           />

@@ -126,7 +126,6 @@ With this worker deployed at `https://your-worker.workers.dev`, set your proxy U
 ## Roadmap
 
 - [x] Release to Chrome Web Store and Firefox Add-ons
-- [ ] Add OpenRouter provider
 - [x] Add proxy support
 - [ ] Improve UI/UX
 

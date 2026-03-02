@@ -70,14 +70,27 @@ describe('Domain: Credential', () => {
       expect(result.success).toBe(false);
     });
 
-    test('fails on invalid API key', () => {
+    test('fails on empty API key', () => {
       const result = Credential.fromProps({
         id: 'cred-1',
         type: 'API_KEY',
         provider: 'gemini',
-        apiKey: 'invalid-key',
+        apiKey: '',
       });
       expect(result.success).toBe(false);
+    });
+
+    test('succeeds with any non-empty key when provider is stored', () => {
+      const result = Credential.fromProps({
+        id: 'cred-1',
+        type: 'API_KEY',
+        provider: 'zai',
+        apiKey: 'some-arbitrary-key-format',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.provider).toBe('zai');
+      }
     });
   });
 

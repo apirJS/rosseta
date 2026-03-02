@@ -15,7 +15,7 @@ const LEGACY_STORAGE_KEY = 'credential';
 const CredentialItemPropsSchema = z.object({
   id: z.string(),
   type: z.literal('API_KEY'),
-  provider: z.enum(['gemini', 'groq']),
+  provider: z.enum(['gemini', 'groq', 'zai']),
   apiKey: z.string(),
 });
 

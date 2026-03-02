@@ -36,7 +36,7 @@ export class Credential extends Entity<string> {
       return failure(new DomainError('Credential ID is missing'));
     }
 
-    const apiKeyResult = ApiKey.create(props.apiKey);
+    const apiKeyResult = ApiKey.fromRaw(props.apiKey, props.provider);
     if (!apiKeyResult.success) return failure(apiKeyResult.error);
     return this.create(props.id, apiKeyResult.data, props.provider);
   }

@@ -24,8 +24,8 @@ describe('Application: GetAllTranslationsUseCase', () => {
 
   test('returns all stored translations', async () => {
     const { storage, useCase } = createUseCase();
-    storage.seed(new Translation('t-1', [], [], 'First', new Date()));
-    storage.seed(new Translation('t-2', [], [], 'Second', new Date()));
+    storage.seed(Translation.create('t-1', [], [], 'First', new Date()));
+    storage.seed(Translation.create('t-2', [], [], 'Second', new Date()));
 
     const result = await useCase.execute();
 

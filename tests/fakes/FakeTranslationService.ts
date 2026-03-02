@@ -32,7 +32,7 @@ export class FakeTranslationService implements ITranslationService {
 
     const translation =
       this._translation ??
-      new Translation(uuidv4(), [], [], 'Fake translation', new Date());
+      Translation.create(uuidv4(), [], [], 'Fake translation', new Date());
 
     return success(translation);
   }

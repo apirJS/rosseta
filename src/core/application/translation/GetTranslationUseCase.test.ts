@@ -24,7 +24,7 @@ describe('Application: GetTranslationUseCase', () => {
 
   test('returns a stored translation by ID', async () => {
     const { storage, useCase } = createUseCase();
-    const translation = new Translation(
+    const translation = Translation.create(
       't-1',
       [],
       [],

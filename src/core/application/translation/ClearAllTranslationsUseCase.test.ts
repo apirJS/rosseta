@@ -13,8 +13,8 @@ function createUseCase() {
 describe('Application: ClearAllTranslationsUseCase', () => {
   test('clears all translations from storage', async () => {
     const { storage, useCase } = createUseCase();
-    storage.seed(new Translation('t-1', [], [], 'First', new Date()));
-    storage.seed(new Translation('t-2', [], [], 'Second', new Date()));
+    storage.seed(Translation.create('t-1', [], [], 'First', new Date()));
+    storage.seed(Translation.create('t-2', [], [], 'Second', new Date()));
     expect(storage.storedCount).toBe(2);
 
     const result = await useCase.execute();

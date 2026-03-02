@@ -63,7 +63,7 @@ function makeTranslation(
   originalText: string,
   createdAt: Date = new Date(),
 ): Translation {
-  return new Translation(
+  return Translation.create(
     id,
     [makeSegment(originalText, 'ja-JP')],
     [makeSegment('Translated', 'en-US')],

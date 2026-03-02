@@ -13,7 +13,7 @@ function createUseCase() {
 describe('Application: DeleteTranslationUseCase', () => {
   test('successfully deletes a translation', async () => {
     const { storage, useCase } = createUseCase();
-    storage.seed(new Translation('t-1', [], [], 'To delete', new Date()));
+    storage.seed(Translation.create('t-1', [], [], 'To delete', new Date()));
     expect(storage.storedCount).toBe(1);
 
     const result = await useCase.execute('t-1');

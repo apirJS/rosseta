@@ -32,7 +32,7 @@ describe('Application: TranslateImageUseCase', () => {
 
   test('returns custom translation from service', async () => {
     const { service, useCase } = createUseCase();
-    const expected = new Translation(
+    const expected = Translation.create(
       'custom-1',
       [],
       [],

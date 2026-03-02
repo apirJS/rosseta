@@ -20,7 +20,7 @@ function seg(
 
 describe('serializeForModal', () => {
   test('maps a Translation domain object to TranslationModalPayload', () => {
-    const translation = new Translation(
+    const translation = Translation.create(
       uuidv4(),
       [seg('こんにちは', 'ja-JP', 'konnichiwa')],
       [seg('Hello', 'en-US')],
@@ -50,7 +50,7 @@ describe('serializeForModal', () => {
   });
 
   test('handles multiple text segments', () => {
-    const translation = new Translation(
+    const translation = Translation.create(
       uuidv4(),
       [
         seg('こんにちは', 'ja-JP', 'konnichiwa'),

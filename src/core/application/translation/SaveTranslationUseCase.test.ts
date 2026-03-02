@@ -12,7 +12,7 @@ function createUseCase() {
 }
 
 function makeTranslation(id: string = 't-1'): Translation {
-  return new Translation(id, [], [], 'Test translation', new Date());
+  return Translation.create(id, [], [], 'Test translation', new Date());
 }
 
 describe('Application: SaveTranslationUseCase', () => {

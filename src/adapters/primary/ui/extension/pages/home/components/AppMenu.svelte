@@ -1,4 +1,6 @@
 <script lang="ts">
+  import browser from 'webextension-polyfill';
+
   interface Props {
     onLogout: () => void;
     onManageKeys: () => void;
@@ -14,6 +16,8 @@
     onHistory,
     proxyActive = false,
   }: Props = $props();
+
+  const version = browser.runtime.getManifest().version;
 </script>
 
 <div
@@ -46,7 +50,6 @@
     >
       History
     </button>
-    <div class="border-t border-border my-1"></div>
     <button
       type="button"
       class="w-full px-3 py-2 text-left text-sm text-destructive hover:bg-surface cursor-pointer"
@@ -54,5 +57,19 @@
     >
       Logout
     </button>
+    <div class="border-t border-border my-1"></div>
+    <div
+      class="px-3 py-1.5 text-xs text-muted flex items-center justify-between"
+    >
+      <span>v{version}</span>
+      <a
+        href="https://github.com/apirJS/rosseta"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-muted hover:text-foreground transition-colors"
+      >
+        GitHub
+      </a>
+    </div>
   </div>
 </div>

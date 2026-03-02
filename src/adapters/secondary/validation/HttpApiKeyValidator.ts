@@ -14,6 +14,9 @@ export class HttpApiKeyValidator implements IApiKeyValidator {
     if (provider === 'gemini') {
       return this.validateGeminiKey(apiKey);
     }
+    if (provider === 'zai') {
+      return this.validateZaiKey(apiKey);
+    }
     return this.validateGroqKey(apiKey);
   }
 
@@ -64,6 +67,47 @@ export class HttpApiKeyValidator implements IApiKeyValidator {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return failure(AuthError.invalidApiKey());
+        }
+
+        if (response.status === 429) {
+          return failure(NetworkError.serverError(429, modelsUrl));
+        }
+
+        return failure(NetworkError.serverError(response.status, modelsUrl));
+      }
+
+      const data = await response.json();
+      if (!data.data || !Array.isArray(data.data)) {
+        return failure(AuthError.invalidApiKey('Unexpected API response'));
+      }
+
+      return success(undefined);
+    } catch (error) {
+      return failure(
+        NetworkError.fromFetchError(
+          error instanceof Error ? error : new Error('Unknown error'),
+          modelsUrl,
+        ),
+      );
+    }
+  }
+
+  private async validateZaiKey(
+    apiKey: string,
+  ): Promise<Result<void, AppError>> {
+    const modelsUrl = 'https://api.z.ai/api/paas/v4/models';
+    try {
+      const response = await fetch(modelsUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Accept-Language': 'en-US,en',
         },
       });
 

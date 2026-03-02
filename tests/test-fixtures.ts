@@ -13,6 +13,7 @@ import { EncodedImage } from '../src/core/domain/image/EncodedImage';
 import { Language } from '../src/core/domain/translation/Language';
 import type { TranslationResponse } from '../src/adapters/secondary/gemini/schema';
 import type { GroqTranslationResponse } from '../src/adapters/secondary/groq/schema';
+import type { ZaiTranslationResponse } from '../src/adapters/secondary/zai/schema';
 import { seedStore } from './browser-mock';
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -34,7 +35,8 @@ export const TARGET_LANGUAGE = Language.create('en-US');
  * Both Gemini and Groq use the same inner shape.
  */
 export const VALID_TRANSLATION_RESPONSE: TranslationResponse &
-  GroqTranslationResponse = {
+  GroqTranslationResponse &
+  ZaiTranslationResponse = {
   success: true,
   data: {
     description: 'A greeting in Japanese',
@@ -89,10 +91,24 @@ export function groqEnvelope(response: GroqTranslationResponse): object {
   };
 }
 
+/** Wrap a ZaiTranslationResponse in the OpenAI-compatible envelope. */
+export function zaiEnvelope(response: ZaiTranslationResponse): object {
+  return {
+    choices: [
+      {
+        message: {
+          content: JSON.stringify(response),
+        },
+      },
+    ],
+  };
+}
+
 // ── Credential & Preferences Factories ──────────────────────────────
 
 const GEMINI_KEY = 'AIza' + 'X'.repeat(35);
 const GROQ_KEY = 'gsk_' + 'X'.repeat(52);
+const ZAI_KEY = 'a'.repeat(32) + '.abcdefghijklmn';
 
 export function createGeminiCredential(): Credential {
   const apiKey = ApiKey.create(GEMINI_KEY);
@@ -110,6 +126,14 @@ export function createGroqCredential(): Credential {
   return credential.data;
 }
 
+export function createZaiCredential(): Credential {
+  const apiKey = ApiKey.create(ZAI_KEY);
+  if (!apiKey.success) throw apiKey.error;
+  const credential = Credential.create(uuidv4(), apiKey.data, 'zai');
+  if (!credential.success) throw credential.error;
+  return credential.data;
+}
+
 export function createDefaultPreferences(): UserPreferences {
   return UserPreferences.createDefault(uuidv4());
 }
@@ -119,10 +143,14 @@ export function createDefaultPreferences(): UserPreferences {
  * The credential is set as the active key.
  */
 export function seedCredentialsAndPreferences(
-  provider: 'gemini' | 'groq' = 'groq',
+  provider: 'gemini' | 'groq' | 'zai' = 'groq',
 ) {
-  const credential =
-    provider === 'gemini' ? createGeminiCredential() : createGroqCredential();
+  const credentialFactories = {
+    gemini: createGeminiCredential,
+    groq: createGroqCredential,
+    zai: createZaiCredential,
+  };
+  const credential = credentialFactories[provider]();
 
   const credentials = Credentials.createEmpty(uuidv4()).add(credential);
   const userPreferences = createDefaultPreferences();

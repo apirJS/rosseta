@@ -17,6 +17,11 @@ const PROVIDERS: ProviderInfo[] = [
     name: ProviderRegistry.getConfig('groq').name,
     apiKeyUrl: 'https://console.groq.com/keys',
   },
+  {
+    id: 'zai',
+    name: ProviderRegistry.getConfig('zai').name,
+    apiKeyUrl: 'https://open.z.ai/apikey',
+  },
 ];
 
 const CYCLE_INTERVAL_MS = 3000;

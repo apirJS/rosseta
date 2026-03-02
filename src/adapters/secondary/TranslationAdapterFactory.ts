@@ -3,6 +3,7 @@ import type { Credential } from '../../core/domain/credential/Credential';
 import type { UserPreferences } from '../../core/domain/preferences/UserPreferences';
 import { GeminiTranslationAdapter } from './gemini/GeminiTranslationAdapter';
 import { GroqTranslationAdapter } from './groq/GroqTranslationAdapter';
+import { ZaiTranslationAdapter } from './zai/ZaiTranslationAdapter';
 
 export function createTranslationAdapter(
   credential: Credential,
@@ -13,5 +14,7 @@ export function createTranslationAdapter(
       return new GeminiTranslationAdapter(credential, preferences);
     case 'groq':
       return new GroqTranslationAdapter(credential, preferences);
+    case 'zai':
+      return new ZaiTranslationAdapter(credential, preferences);
   }
 }

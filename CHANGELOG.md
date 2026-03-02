@@ -1,3 +1,16 @@
+## [1.3.0](https://github.com/apirJS/rosseta/compare/v1.2.1...v1.3.0) (2026-03-02)
+
+### Features
+
+* **provider:** add Z.ai provider integration ([2d1cae4](https://github.com/apirJS/rosseta/commit/2d1cae411b3f3fcfd1dc0913845d86b9045c9810))
+* **provider:** change default Gemini model to gemini-2.5-flash ([34f9d3e](https://github.com/apirJS/rosseta/commit/34f9d3e23207f2d55dec96fdc565a62f137a8c69))
+* **ui:** add version display and GitHub link to app menu ([b07e1b3](https://github.com/apirJS/rosseta/commit/b07e1b3ba7982f2d0a9c65b3be4943738e2c85f6))
+
+### Bug Fixes
+
+* **storage:** add Z.ai to credential storage schema and fix deserialization ([0d03876](https://github.com/apirJS/rosseta/commit/0d03876f48f7c0c082ba979798a7950cea68c31e))
+* **ui:** use dynamic provider labels instead of binary groq/gemini checks ([7ae3bbf](https://github.com/apirJS/rosseta/commit/7ae3bbf7c65b0c0c8ca182bcb2d6e3cd7cae00df))
+
 ## [1.2.1](https://github.com/apirJS/rosseta/compare/v1.2.0...v1.2.1) (2026-03-02)
 
 ### Bug Fixes

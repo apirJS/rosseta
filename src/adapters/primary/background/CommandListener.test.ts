@@ -2,6 +2,7 @@ import { describe, expect, test, mock, beforeEach } from 'bun:test';
 import * as browser from 'webextension-polyfill';
 import { CommandListener } from './CommandListener';
 import { container } from './di-container';
+import { OverlayService } from './services/OverlayService';
 import { resetBrowserMock } from '../../../../tests/browser-mock';
 import { seedCredentialsAndPreferences } from '../../../../tests/test-fixtures';
 
@@ -21,7 +22,8 @@ describe('Adapter: CommandListener', () => {
   });
 
   function getCallback() {
-    const listener = new CommandListener(container);
+    const overlayService = new OverlayService(container);
+    const listener = new CommandListener(overlayService);
     listener.register();
     return commands.onCommand.addListener.mock.calls[0][0] as (
       command: string,

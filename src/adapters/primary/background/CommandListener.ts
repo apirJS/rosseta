@@ -1,18 +1,13 @@
 import * as browser from 'webextension-polyfill';
 import { COMMAND } from '../../../shared/validation/MessageSchema';
-import { OverlayService } from './services/OverlayService';
-import type { Container } from '../../../shared/di/container-factory';
+import type { OverlayService } from './services/OverlayService';
 
 /**
  * Listens for browser keyboard commands and dispatches them.
  * Handles the START_EXTENSION command.
  */
 export class CommandListener {
-  private readonly overlayService: OverlayService;
-
-  constructor(container: Container) {
-    this.overlayService = new OverlayService(container);
-  }
+  constructor(private readonly overlayService: OverlayService) {}
 
   /**
    * Registers the onCommand listener with the browser commands API.

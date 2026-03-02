@@ -22,7 +22,7 @@ export async function injectContentScriptIfNeeded(
     try {
       await browser.scripting.executeScript({
         target: { tabId },
-        files: ['src/content-script.js'],
+        files: ['src/adapters/primary/content/content-script.js'],
       });
 
       await new Promise((resolve) => setTimeout(resolve, 100));

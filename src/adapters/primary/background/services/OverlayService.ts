@@ -18,6 +18,11 @@ export class OverlayService {
   constructor(private readonly container: Container) {}
 
   async triggerOverlayOnActiveTab(): Promise<void> {
+    const activeTab = await getActiveTab();
+    if (!activeTab?.id) return;
+
+    const tabId = activeTab.id;
+
     const credentialsResult =
       await this.container.getCredentialsUseCase.execute();
 
@@ -26,24 +31,18 @@ export class OverlayService {
       !credentialsResult.data ||
       !credentialsResult.data.hasKeys()
     ) {
-      const tab = await getActiveTab();
-      if (tab?.id) {
-        await injectContentScriptIfNeeded(tab.id);
-        const notifier = new TabNotifier(tab.id);
-        await notifier.showError(
-          `auth-error-${Date.now()}`,
-          'Not Authenticated',
-          'Please set your API key in the extension settings.',
-        );
-      }
+      await injectContentScriptIfNeeded(tabId);
+      const notifier = new TabNotifier(tabId);
+      await notifier.showError(
+        `auth-error-${Date.now()}`,
+        'Not Authenticated',
+        'Please set your API key in the extension settings.',
+      );
       return;
     }
 
-    const activeTab = await getActiveTab();
-    if (!activeTab?.id) return;
-
-    await injectContentScriptIfNeeded(activeTab.id);
-    await sendMessageToTab(activeTab.id, {
+    await injectContentScriptIfNeeded(tabId);
+    await sendMessageToTab(tabId, {
       action: 'MOUNT_OVERLAY',
       payload: { rawImage: await captureVisibleTab() },
     });

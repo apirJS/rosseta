@@ -10,6 +10,7 @@ import {
 import * as browser from 'webextension-polyfill';
 import { MessageRouter } from './MessageRouter';
 import { container } from './di-container';
+import { OverlayService } from './services/OverlayService';
 import type { Message } from '../../../shared/validation/MessageSchema';
 import { resetBrowserMock } from '../../../../tests/browser-mock';
 import {
@@ -65,7 +66,8 @@ describe('Adapter: MessageRouter', () => {
   });
 
   function getCallback() {
-    const router = new MessageRouter(container);
+    const overlayService = new OverlayService(container);
+    const router = new MessageRouter(container, overlayService);
     router.register();
     return runtimeMessaging.onMessage.addListener.mock.calls[0][0] as (
       message: unknown,

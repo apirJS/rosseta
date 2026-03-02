@@ -3,7 +3,7 @@ import { MessageSchema } from '../../../shared/validation/MessageSchema';
 import { TranslateImageHandler } from './handlers/TranslateImageHandler';
 import { StartOverlayHandler } from './handlers/StartOverlayHandler';
 import { MountHistoryModalHandler } from './handlers/MountHistoryModalHandler';
-import { OverlayService } from './services/OverlayService';
+import type { OverlayService } from './services/OverlayService';
 import { BrowserError } from '../../../shared/errors';
 import { failure } from '../../../shared/types/Result';
 import type { Container } from '../../../shared/di/container-factory';
@@ -17,9 +17,7 @@ export class MessageRouter {
   private readonly startOverlayHandler: StartOverlayHandler;
   private readonly mountHistoryModalHandler: MountHistoryModalHandler;
 
-  constructor(container: Container) {
-    const overlayService = new OverlayService(container);
-
+  constructor(container: Container, overlayService: OverlayService) {
     this.translateImageHandler = new TranslateImageHandler(container);
     this.startOverlayHandler = new StartOverlayHandler(overlayService);
     this.mountHistoryModalHandler = new MountHistoryModalHandler();

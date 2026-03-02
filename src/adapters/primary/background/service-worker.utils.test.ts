@@ -48,7 +48,7 @@ describe('service-worker.utils', () => {
       expect(result).toBe(true);
       expect(scripting.executeScript).toHaveBeenCalledWith({
         target: { tabId: 1 },
-        files: ['src/content-script.js'],
+        files: ['src/adapters/primary/content/content-script.js'],
       });
     });
 

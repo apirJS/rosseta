@@ -1,6 +1,6 @@
 import type { IProxyHealthChecker } from '../../../core/ports/outbound/IProxyHealthChecker';
 import { success, failure, type Result } from '../../../shared/types/Result';
-import { BrowserError, type AppError } from '../../../shared/errors';
+import { NetworkError, type AppError } from '../../../shared/errors';
 
 export class HttpProxyHealthCheckerAdapter implements IProxyHealthChecker {
   async check(proxyUrl: string): Promise<Result<boolean, AppError>> {
@@ -12,8 +12,9 @@ export class HttpProxyHealthCheckerAdapter implements IProxyHealthChecker {
       return success(response.ok);
     } catch (error) {
       return failure(
-        BrowserError.communicationFailed(
+        NetworkError.fromFetchError(
           error instanceof Error ? error : new Error(String(error)),
+          proxyUrl,
         ),
       );
     }

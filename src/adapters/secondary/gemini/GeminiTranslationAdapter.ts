@@ -1,9 +1,8 @@
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
 import { Language } from '../../../core/domain/translation/Language';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
-import { Translation } from '../../../core/domain/translation/Translation';
-import { TextSegment } from '../../../core/domain/translation/TextSegment';
-import { success, failure, type Result } from '../../../shared/types/Result';
+import type { Translation } from '../../../core/domain/translation/Translation';
+import { failure, type Result } from '../../../shared/types/Result';
 import { AppError, TranslationError } from '../../../shared/errors';
 import type { Credential } from '../../../core/domain/credential/Credential';
 import type { UserPreferences } from '../../../core/domain/preferences/UserPreferences';
@@ -12,7 +11,7 @@ import {
   TranslationResponseBaseSchema,
 } from './schema';
 import { buildTranslationPrompt } from './prompt';
-import { v4 as uuidv4 } from 'uuid';
+import { mapResponseToDomain } from '../shared/translation-response-mapper';
 import { z } from 'zod';
 
 const GEMINI_URL_ENDPOINT =
@@ -38,6 +37,7 @@ export class GeminiTranslationAdapter implements ITranslationService {
         method: 'POST',
         headers,
         body,
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (response.status === 429) {
@@ -129,7 +129,10 @@ export class GeminiTranslationAdapter implements ITranslationService {
     image: EncodedImage,
     targetLanguage: Language,
   ): string {
-    const prompt = buildTranslationPrompt(targetLanguage.name);
+    const prompt = buildTranslationPrompt({
+      targetLanguageCode: targetLanguage.code,
+      targetLanguageName: targetLanguage.name,
+    });
     const responseSchema = z.toJSONSchema(TranslationResponseBaseSchema, {
       target: 'openapi-3.0',
     });
@@ -186,72 +189,6 @@ export class GeminiTranslationAdapter implements ITranslationService {
     data: NonNullable<import('./schema').TranslationResponse['data']>,
     targetLanguage: Language,
   ): Result<Translation, AppError> {
-    const originalSegments: TextSegment[] = [];
-    const translatedSegments: TextSegment[] = [];
-
-    for (const item of data.originalText.contents) {
-      const bcp47Code = item.languageBcp47Code;
-
-      let langResult = Language.fromRaw(bcp47Code);
-      if (!langResult.success) {
-        const shortCode = bcp47Code.split('-')[0];
-        langResult = Language.fromRaw(shortCode);
-      }
-      if (!langResult.success) {
-        console.warn(
-          '[GEMINI] Language.fromRaw failed for code:',
-          bcp47Code,
-          '— falling back to "unknown"',
-        );
-      }
-      const lang = langResult.success
-        ? langResult.data
-        : Language.create('unknown');
-
-      const segmentResult = TextSegment.create(
-        item.text,
-        lang,
-        item.romanization,
-      );
-      if (!segmentResult.success) {
-        console.error(
-          '[GEMINI] TextSegment.create failed:',
-          segmentResult.error,
-        );
-        return failure(TranslationError.malformedResponse());
-      }
-
-      originalSegments.push(segmentResult.data);
-    }
-
-    for (const item of data.translatedText.contents) {
-      // Note: For translated segments, we use the targetLanguage passed to this method
-      // rather than parsing the BCP47 code from the response, since we already have
-      // the correct Language domain object
-      const segmentResult = TextSegment.create(
-        item.text,
-        targetLanguage,
-        item.romanization,
-      );
-      if (!segmentResult.success) {
-        console.error(
-          '[GEMINI] TextSegment.create (translated) failed:',
-          segmentResult.error,
-        );
-        return failure(TranslationError.malformedResponse());
-      }
-
-      translatedSegments.push(segmentResult.data);
-    }
-
-    const translation = new Translation(
-      uuidv4(),
-      originalSegments,
-      translatedSegments,
-      data.description,
-      new Date(),
-    );
-
-    return success(translation);
+    return mapResponseToDomain(data, targetLanguage, 'GEMINI');
   }
 }

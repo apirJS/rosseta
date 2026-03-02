@@ -6,9 +6,6 @@ import { AuthError, NetworkError, type AppError } from '../../../shared/errors';
 const GEMINI_API_VALIDATION_URL =
   'https://generativelanguage.googleapis.com/v1beta/models';
 
-const GROQ_API_VALIDATION_URL =
-  'https://api.groq.com/openai/v1/chat/completions';
-
 export class HttpApiKeyValidator implements IApiKeyValidator {
   async validate(
     apiKey: string,
@@ -60,38 +57,31 @@ export class HttpApiKeyValidator implements IApiKeyValidator {
   private async validateGroqKey(
     apiKey: string,
   ): Promise<Result<void, AppError>> {
+    const modelsUrl = 'https://api.groq.com/openai/v1/models';
     try {
-      const response = await fetch(GROQ_API_VALIDATION_URL, {
-        method: 'POST',
+      const response = await fetch(modelsUrl, {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [{ role: 'user', content: 'echo' }],
-          max_tokens: 1,
-        }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData?.error?.message || 'Invalid Groq API key';
-
         if (response.status === 401 || response.status === 403) {
-          return failure(AuthError.invalidApiKey(errorMessage));
+          return failure(AuthError.invalidApiKey());
         }
 
         if (response.status === 429) {
-          return failure(
-            NetworkError.serverError(429, GROQ_API_VALIDATION_URL),
-          );
+          return failure(NetworkError.serverError(429, modelsUrl));
         }
 
-        return failure(
-          NetworkError.serverError(response.status, GROQ_API_VALIDATION_URL),
-        );
+        return failure(NetworkError.serverError(response.status, modelsUrl));
+      }
+
+      const data = await response.json();
+      if (!data.data || !Array.isArray(data.data)) {
+        return failure(AuthError.invalidApiKey('Unexpected API response'));
       }
 
       return success(undefined);
@@ -99,7 +89,7 @@ export class HttpApiKeyValidator implements IApiKeyValidator {
       return failure(
         NetworkError.fromFetchError(
           error instanceof Error ? error : new Error('Unknown error'),
-          GROQ_API_VALIDATION_URL,
+          modelsUrl,
         ),
       );
     }

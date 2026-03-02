@@ -5,6 +5,7 @@ import {
 } from '../../../core/domain/credential/Credentials';
 import { success, failure, type Result } from '../../../shared/types/Result';
 import { StorageError, type AppError } from '../../../shared/errors';
+import { detectProvider } from '../../../core/domain/credential/Provider';
 import * as browser from 'webextension-polyfill';
 import { z } from 'zod';
 
@@ -85,7 +86,7 @@ export class BrowserCredentialStorageAdapter implements ICredentialStorage {
               {
                 id: legacyParsed.data.id,
                 type: 'API_KEY',
-                provider: 'gemini',
+                provider: detectProvider(legacyParsed.data.apiKey) ?? 'gemini',
                 apiKey: legacyParsed.data.apiKey,
               },
             ],

@@ -152,30 +152,54 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
 
     for (const seg of raw.original) {
       const langResult = Language.fromRaw(seg.languageCode);
-      if (!langResult.success) continue;
+      if (!langResult.success) {
+        console.warn(
+          '[TranslationStorage] Skipping original segment — invalid language:',
+          seg.languageCode,
+        );
+        continue;
+      }
       const segResult = TextSegment.create(
         seg.text,
         langResult.data,
         seg.romanization,
       );
-      if (!segResult.success) continue;
+      if (!segResult.success) {
+        console.warn(
+          '[TranslationStorage] Skipping original segment — invalid data:',
+          seg.text,
+        );
+        continue;
+      }
       originalSegments.push(segResult.data);
     }
 
     for (const seg of raw.translated) {
       const langResult = Language.fromRaw(seg.languageCode);
-      if (!langResult.success) continue;
+      if (!langResult.success) {
+        console.warn(
+          '[TranslationStorage] Skipping translated segment — invalid language:',
+          seg.languageCode,
+        );
+        continue;
+      }
       const segResult = TextSegment.create(
         seg.text,
         langResult.data,
         seg.romanization,
       );
-      if (!segResult.success) continue;
+      if (!segResult.success) {
+        console.warn(
+          '[TranslationStorage] Skipping translated segment — invalid data:',
+          seg.text,
+        );
+        continue;
+      }
       translatedSegments.push(segResult.data);
     }
 
     return success(
-      new Translation(
+      Translation.create(
         raw.id,
         originalSegments,
         translatedSegments,

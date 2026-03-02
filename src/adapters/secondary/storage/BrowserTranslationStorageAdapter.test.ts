@@ -20,7 +20,7 @@ function createTranslation(
   if (!origSeg.success) throw new Error('bad segment');
   const transSeg = TextSegment.create('Hello', en, null);
   if (!transSeg.success) throw new Error('bad segment');
-  return new Translation(
+  return Translation.create(
     id,
     [origSeg.data],
     [transSeg.data],

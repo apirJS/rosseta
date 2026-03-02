@@ -93,7 +93,7 @@ describe('Adapter: HttpApiKeyValidator', () => {
   describe('Groq key validation', () => {
     test('succeeds with valid key (200)', async () => {
       fetchSpy.mockResolvedValueOnce(
-        Response.json({ choices: [{ message: { content: 'echo' } }] }),
+        Response.json({ data: [{ id: 'llama-3.3-70b-versatile' }] }),
       );
 
       const result = await validator.validate('gsk_validKey', 'groq');
@@ -164,9 +164,9 @@ describe('Adapter: HttpApiKeyValidator', () => {
       expect(result.success).toBe(false);
     });
 
-    test('sends POST with Bearer token to Groq URL', async () => {
+    test('sends GET with Bearer token to Groq models URL', async () => {
       fetchSpy.mockResolvedValueOnce(
-        Response.json({ choices: [{ message: { content: 'echo' } }] }),
+        Response.json({ data: [{ id: 'llama-3.3-70b-versatile' }] }),
       );
 
       await validator.validate('gsk_myKey', 'groq');
@@ -174,9 +174,10 @@ describe('Adapter: HttpApiKeyValidator', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const calledUrl = fetchSpy.mock.calls[0][0] as string;
       expect(calledUrl).toContain('api.groq.com');
+      expect(calledUrl).toContain('/models');
 
       const calledOptions = fetchSpy.mock.calls[0][1] as RequestInit;
-      expect(calledOptions.method).toBe('POST');
+      expect(calledOptions.method).toBe('GET');
       expect(
         (calledOptions.headers as Record<string, string>).Authorization,
       ).toBe('Bearer gsk_myKey');

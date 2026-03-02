@@ -16,10 +16,11 @@ export class AppError extends Error {
   public readonly userMessage: string;
   public readonly context?: Record<string, unknown>;
   public readonly timestamp: Date;
-  public readonly cause?: Error;
 
   constructor(options: AppErrorOptions) {
-    super(options.message ?? ERROR_MESSAGES[options.code]);
+    super(options.message ?? ERROR_MESSAGES[options.code], {
+      cause: options.cause,
+    });
 
     this.name = 'AppError';
     this.code = options.code;
@@ -29,11 +30,8 @@ export class AppError extends Error {
 
     Error.captureStackTrace?.(this, this.constructor);
 
-    if (options.cause) {
-      this.cause = options.cause;
-      if (options.cause instanceof Error && options.cause.stack) {
-        this.stack = `${this.stack}\nCaused by: ${options.cause.stack}`;
-      }
+    if (options.cause instanceof Error && options.cause.stack) {
+      this.stack = `${this.stack}\nCaused by: ${options.cause.stack}`;
     }
   }
 

@@ -1,4 +1,4 @@
-import { AggregateRoot } from '../shared/AggregateRoot';
+import { Entity } from '../shared/Entity';
 import { DomainError } from '../shared/DomainError';
 import { failure, success, type Result } from '../../../shared/types/Result';
 import { ApiKey } from './ApiKey';
@@ -11,7 +11,7 @@ export interface CredentialProps {
   apiKey: string;
 }
 
-export class Credential extends AggregateRoot<string> {
+export class Credential extends Entity<string> {
   private constructor(
     id: string,
     private readonly _apiKey: ApiKey,

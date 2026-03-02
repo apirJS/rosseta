@@ -5,7 +5,7 @@ export class BrowserError extends AppError {
   constructor(options: Omit<AppErrorOptions, 'code'> & { code?: ErrorCode }) {
     super({
       ...options,
-      code: options.code ?? ErrorCode.AUTH_NOT_AUTHENTICATED,
+      code: options.code ?? ErrorCode.BROWSER_COMMUNICATION_FAILED,
     });
     this.name = 'BrowserError';
   }

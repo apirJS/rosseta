@@ -123,25 +123,6 @@ describe('Shared: MessageSchema', () => {
       });
       expect(result.success).toBe(true);
     });
-
-    test('SHOW_RESULT with valid payload', () => {
-      const result = MessageSchema.safeParse({
-        action: 'SHOW_RESULT',
-        payload: {
-          originalText: {
-            contents: [
-              { text: 'hello', languageCode: 'en', language: 'English' },
-            ],
-          },
-          translatedText: {
-            contents: [
-              { text: 'hola', languageCode: 'es', language: 'Spanish' },
-            ],
-          },
-        },
-      });
-      expect(result.success).toBe(true);
-    });
   });
 
   // ==================== INVALID MESSAGES ====================

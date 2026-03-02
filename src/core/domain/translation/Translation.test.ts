@@ -31,7 +31,7 @@ describe('Domain: Translation', () => {
   // ==================== CONSTRUCTOR ====================
   describe('constructor', () => {
     test('creates a translation with all fields', () => {
-      const t = new Translation(
+      const t = Translation.create(
         't-1',
         originalSegments,
         translatedSegments,
@@ -50,7 +50,7 @@ describe('Domain: Translation', () => {
   // ==================== TO PROPS ====================
   describe('toProps', () => {
     test('serializes to plain props', () => {
-      const t = new Translation(
+      const t = Translation.create(
         't-1',
         originalSegments,
         translatedSegments,
@@ -99,26 +99,26 @@ describe('Domain: Translation', () => {
   // ==================== ENTITY EQUALITY ====================
   describe('equality', () => {
     test('translations with same ID are equal', () => {
-      const a = new Translation(
+      const a = Translation.create(
         't-1',
         originalSegments,
         translatedSegments,
         'A',
         now,
       );
-      const b = new Translation('t-1', [], [], 'B', new Date());
+      const b = Translation.create('t-1', [], [], 'B', new Date());
       expect(a.equals(b)).toBe(true);
     });
 
     test('translations with different IDs are not equal', () => {
-      const a = new Translation(
+      const a = Translation.create(
         't-1',
         originalSegments,
         translatedSegments,
         'A',
         now,
       );
-      const b = new Translation(
+      const b = Translation.create(
         't-2',
         originalSegments,
         translatedSegments,

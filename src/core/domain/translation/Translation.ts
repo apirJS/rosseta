@@ -20,7 +20,7 @@ export interface TranslationProps {
 }
 
 export class Translation extends AggregateRoot<string> {
-  constructor(
+  private constructor(
     public readonly id: string,
     public readonly original: TextSegment[],
     public readonly translated: TextSegment[],
@@ -28,6 +28,16 @@ export class Translation extends AggregateRoot<string> {
     public readonly createdAt: Date,
   ) {
     super(id);
+  }
+
+  static create(
+    id: string,
+    original: TextSegment[],
+    translated: TextSegment[],
+    description: string,
+    createdAt: Date,
+  ): Translation {
+    return new Translation(id, original, translated, description, createdAt);
   }
 
   public toProps(): TranslationProps {

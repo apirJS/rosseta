@@ -13,29 +13,7 @@ export const MessageSchema = z.discriminatedUnion('action', [
       imageBase64: z.string(),
     }),
   }),
-  z.object({
-    action: z.literal('SHOW_RESULT'),
-    payload: z.object({
-      originalText: z.object({
-        contents: z.array(
-          z.object({
-            text: z.string(),
-            languageCode: z.string(),
-            language: z.string(),
-          }),
-        ),
-      }),
-      translatedText: z.object({
-        contents: z.array(
-          z.object({
-            text: z.string(),
-            languageCode: z.string(),
-            language: z.string(),
-          }),
-        ),
-      }),
-    }),
-  }),
+
   z.object({
     action: z.literal('MOUNT_TRANSLATION_MODAL'),
     payload: z.object({
@@ -136,7 +114,6 @@ export interface MessageReturnTypeMap {
   PONG: void;
   MOUNT_OVERLAY: void;
   TRANSLATE_IMAGE: void;
-  SHOW_RESULT: void;
   MOUNT_TRANSLATION_MODAL: void;
   THEME_CHANGED: void;
   START_OVERLAY: void;

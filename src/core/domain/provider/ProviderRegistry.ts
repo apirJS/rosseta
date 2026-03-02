@@ -27,6 +27,14 @@ export class ProviderRegistry {
     this.configs.set(config.id, config);
   }
 
+  /**
+   * Returns the config for a registered provider.
+   *
+   * This intentionally throws rather than returning Result, because
+   * `Provider` is a compile-time union type ('gemini' | 'groq') and
+   * all providers are registered at module load. An unknown provider
+   * here is a programmer error (impossible state), not a runtime failure.
+   */
   static getConfig(provider: Provider): ProviderConfig {
     const config = this.configs.get(provider);
     if (!config) throw new Error(`Unknown provider: ${provider}`);
@@ -200,12 +208,8 @@ ProviderRegistry.register({
 ProviderRegistry.register({
   id: 'groq',
   name: 'Groq',
-  defaultModelId: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+  defaultModelId: 'meta-llama/llama-4-scout-17b-16e-instruct',
   models: [
-    {
-      id: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-      name: 'Llama 4 Maverick',
-    },
     {
       id: 'meta-llama/llama-4-scout-17b-16e-instruct',
       name: 'Llama 4 Scout',

@@ -13,7 +13,7 @@ describe('Domain: UserPreferences', () => {
       expect(prefs.id).toBe('prefs-1');
       expect(prefs.theme.value).toBe('system');
       expect(prefs.targetLanguage.code).toBe('en-US');
-      expect(prefs.selectedModel.id).toBe('gemini-2.5-flash-lite');
+      expect(prefs.selectedModel.id).toBe('gemini-2.5-flash');
       expect(prefs.shortcut).toBeNull();
       expect(prefs.proxyUrl).toBeNull();
     });
@@ -106,7 +106,7 @@ describe('Domain: UserPreferences', () => {
       );
 
       expect(updated.selectedModel.id).toBe('gemini-2.0-flash');
-      expect(original.selectedModel.id).toBe('gemini-2.5-flash-lite');
+      expect(original.selectedModel.id).toBe('gemini-2.5-flash');
     });
 
     test('withShortcut returns new instance with updated shortcut', () => {
@@ -172,7 +172,7 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         theme: 'dark',
         targetLanguage: 'ja-JP',
-        selectedModel: 'gemini-2.5-flash-lite',
+        selectedModel: 'gemini-2.5-flash',
         proxyUrl: null,
       });
 

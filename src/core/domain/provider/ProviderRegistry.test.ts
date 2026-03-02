@@ -22,9 +22,9 @@ describe('Domain: ProviderRegistry', () => {
 
   // ==================== GET DEFAULT MODEL ====================
   describe('getDefaultModelId', () => {
-    test('gemini default is gemini-2.5-flash-lite', () => {
+    test('gemini default is gemini-2.5-flash', () => {
       expect(ProviderRegistry.getDefaultModelId('gemini')).toBe(
-        'gemini-2.5-flash-lite',
+        'gemini-2.5-flash',
       );
     });
 

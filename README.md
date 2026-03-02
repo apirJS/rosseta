@@ -25,8 +25,8 @@ Built with **Svelte 5**, **TypeScript**, **Tailwind CSS v4**, and a **DDD + Hexa
 ## Features
 
 - 🖱️ **Region select** — Draw a box on any part of a page, including images, and get an instant translation overlay with romanization
-- 🤖 **Multi-provider** — Switch between Gemini and Groq models on the fly
-- 🌍 **110+ languages** — [Gemini supports 110 languages](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models?hl=id#expandable-1), [Groq (Llama 4) supports 12](https://github.com/marketplace/models/azureml-meta/Llama-4-Scout-17B-16E-Instruct) — auto-filtered per provider
+- 🤖 **Multi-provider** — Switch between Gemini, Groq, and Z.ai models on the fly
+- 🌍 **110+ languages** — [Gemini supports 110 languages](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models?hl=id#expandable-1), [Groq (Llama 4) supports 12](https://github.com/marketplace/models/azureml-meta/Llama-4-Scout-17B-16E-Instruct), [Z.ai (GLM-4V) supports 26](https://replicate.com/cuuupid/glm-4v-9b/readme) — auto-filtered per provider
 - 🔑 **Key management** — Multiple API keys per provider with auto-rotation
 - 🌐 **Proxy support** — Route all API calls through your own relay server
 - 📜 **History** — Every translation saved locally, searchable
@@ -53,7 +53,7 @@ Rosseta can route all API requests through a proxy server instead of calling the
 
 **Why use a proxy?**
 
-- Your network blocks `generativelanguage.googleapis.com` or `api.groq.com`
+- Your network blocks `generativelanguage.googleapis.com`, `api.groq.com`, or `api.z.ai`
 - You want to hide your IP address from the API provider
 - You need request logging, rate limiting, or caching on your own server
 
@@ -65,8 +65,9 @@ The proxy URL **replaces the base URL** of the API. Rosseta appends the original
 | -------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | Gemini   | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key=...` | `https://my-proxy.com/{model}:generateContent?key=...` |
 | Groq     | `https://api.groq.com/openai/v1/chat/completions`                                         | `https://my-proxy.com/chat/completions`                |
+| Z.ai     | `https://api.z.ai/api/paas/v4/chat/completions`                                           | `https://my-proxy.com/chat/completions`                |
 
-> **Important:** Your API key is still included in the request (as a query param for Gemini, as an `Authorization` header for Groq). Make sure you trust your proxy server.
+> **Important:** Your API key is still included in the request (as a query param for Gemini, as an `Authorization` header for Groq and Z.ai). Make sure you trust your proxy server.
 
 ### Configuration
 
@@ -89,6 +90,7 @@ A minimal reverse proxy that forwards requests to the original API:
 const PROVIDERS = {
   '/v1beta/': 'https://generativelanguage.googleapis.com',
   '/openai/': 'https://api.groq.com',
+  '/api/paas/': 'https://api.z.ai',
 };
 
 export default {
@@ -117,9 +119,9 @@ export default {
 };
 ```
 
-With this worker deployed at `https://your-worker.workers.dev`, set your proxy URL to `https://your-worker.workers.dev/v1beta/models` for Gemini or `https://your-worker.workers.dev/openai/v1` for Groq.
+With this worker deployed at `https://your-worker.workers.dev`, set your proxy URL to `https://your-worker.workers.dev/v1beta/models` for Gemini, `https://your-worker.workers.dev/openai/v1` for Groq, or `https://your-worker.workers.dev/api/paas/v4` for Z.ai.
 
-> **Tip:** Since both providers use different base URLs, you'll only be proxying whichever provider you configure. To proxy both, you'll need one proxy URL per provider — or a single proxy that inspects the path to determine the target (like the example above).
+> **Tip:** Since each provider uses a different base URL, you'll only be proxying whichever provider you configure. To proxy multiple, you'll need one proxy URL per provider — or a single proxy that inspects the path to determine the target (like the example above).
 
 ---
 
@@ -136,7 +138,7 @@ With this worker deployed at `https://your-worker.workers.dev`, set your proxy U
 Rosseta does **not** collect, store, or transmit any personal data to our servers.
 
 - **API keys**, **preferences**, and **translation history** are stored locally in your browser using `browser.storage.local` and never leave your device.
-- **Translation requests** (screenshots of selected areas) are sent directly from your browser to the AI provider you configured (Google Gemini or Groq) using your own API key. We have no access to this data.
+- **Translation requests** (screenshots of selected areas) are sent directly from your browser to the AI provider you configured (Google Gemini, Groq, or Z.ai) using your own API key. We have no access to this data.
 - **No analytics, tracking, or telemetry** of any kind.
 
 ---

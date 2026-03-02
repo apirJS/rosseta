@@ -56,7 +56,8 @@ This project follows **Domain-Driven Design (DDD)** with a **Hexagonal (Ports & 
 │  │   Primary     │  │ Secondary│  │   Primary (UI)   │  │
 │  │  background   │  │  gemini  │  │  Svelte 5 + TW4  │  │
 │  │  content      │  │  groq    │  │  extension popup │  │
-│  │              │  │  storage  │  │  injected overlay│  │
+│  │              │  │  zai     │  │  injected overlay│  │
+│  │              │  │  storage  │  │                  │  │
 │  └──────┬───────┘  └────┬─────┘  └────────┬─────────┘  │
 │         │               │                 │             │
 │ ────────┼───────────────┼─────────────────┼──────────── │
@@ -113,6 +114,7 @@ src/
 │   └── secondary/                 # Infrastructure (driven adapters)
 │       ├── gemini/                # Gemini API client
 │       ├── groq/                  # Groq API client
+│       ├── zai/                   # Z.ai API client
 │       ├── storage/               # Browser storage adapters
 │       └── validation/            # API key validation
 │
@@ -333,7 +335,7 @@ ProviderRegistry.register({
 
 ```typescript
 // src/core/domain/credential/Provider.ts
-export type Provider = 'gemini' | 'groq' | 'openai';
+export type Provider = 'gemini' | 'groq' | 'zai' | 'openai';
 ```
 
 ### 3. Create the adapter

@@ -34,11 +34,11 @@ Perform **exhaustive** OCR on the provided image. Extract **every single piece o
 
 **Success rules & Edge Cases**
 1) **Completeness**: capture ALL visible text. Missing text is a critical error.
-2) **Reading order**: natural order (LTR/RTL/top-to-bottom). Group contiguous words/lines sharing the same language into one segment. Do NOT invent text.
+2) **Segmentation**: Each **visually distinct block** of text is its own segment. A block is text that is spatially grouped together AND shares the same purpose (e.g. a headline, a button label, a timestamp, a channel name). Do NOT merge text from different UI elements, cards, or areas into one segment — even if they share the same language. Within a block that wraps across multiple visual lines (e.g. a logo or a heading), **join the lines with a single space** — do NOT use \\\\n. Do NOT invent text. Use natural reading order (LTR/RTL/top-to-bottom).
 3) **Garbled/Illegible text**: If text exists but is completely unreadable, return success=false. If partially legible, extract what you can and ignore the rest.
-4) **Single characters & quotes**: Properly escape internal quotes (\\" \\'). Do NOT wrap the entire JSON in extra quotes.
+4) **Single characters & quotes**: Properly escape internal quotes (\\\\" \\\\'). Do NOT wrap the entire JSON in extra quotes.
 5) \`originalText.contents[i]\`:
-   - \`text\`: exact extracted text. Preserve meaningful newlines as \\\\n ; strip leading/trailing spaces.
+   - \`text\`: exact extracted text. Join wrapped lines within the same block with a single space; strip leading/trailing spaces.
    - \`languageBcp47Code\`: BCP-47 with region (e.g. \`"en-US"\`, \`"ja-JP"\`). Use \`"number"\` for purely numeric segments, \`"symbol"\` for symbol/emoji-only segments, \`"unknown"\` if the language cannot be identified. **Never use \`"und"\` or \`"Undetermined"\`.**
    - \`language\`: English name (e.g. \`"English"\`, \`"Japanese"\`). Use \`"Number"\`, \`"Symbol"\`, or \`"Unknown"\` for the corresponding special codes.
    - \`romanization\`: include only when the source script is non-Latin and a common romanization exists; otherwise \`null\`.

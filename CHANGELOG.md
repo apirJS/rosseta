@@ -1,3 +1,9 @@
+## [1.3.1](https://github.com/apirJS/rosseta/compare/v1.3.0...v1.3.1) (2026-03-06)
+
+### Bug Fixes
+
+* **prompt:** segment by visual block instead of merging by language ([e544dc5](https://github.com/apirJS/rosseta/commit/e544dc51d7109a6dc5b820ba1eca26e10d84f6f5))
+
 ## [1.3.0](https://github.com/apirJS/rosseta/compare/v1.2.1...v1.3.0) (2026-03-02)
 
 ### Features

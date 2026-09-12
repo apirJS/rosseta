@@ -117,8 +117,7 @@ export class ZaiTranslationAdapter implements ITranslationService {
         thinking: { type: 'disabled' },
       });
 
-      const baseUrl = this.userPreferences.proxyUrl ?? ZAI_BASE_URL;
-      const response = await fetch(`${baseUrl}/chat/completions`, {
+      const response = await fetch(`${ZAI_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${this.credential.apiKey.value}`,
@@ -137,7 +136,7 @@ export class ZaiTranslationAdapter implements ITranslationService {
         console.error('[ZAI] Request failed with status:', response.status);
         const hint =
           response.status === 404
-            ? 'check your proxy URL'
+            ? 'model not found'
             : response.status === 401
               ? 'invalid API key'
               : response.status === 403

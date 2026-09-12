@@ -16,7 +16,6 @@ const UserPreferencesSchema = z.object({
   targetLanguage: z.string().optional(),
   selectedModel: z.string().optional(),
   theme: z.enum(['dark', 'light', 'system']).optional(),
-  proxyUrl: z.string().nullable().optional(),
 });
 
 export class BrowserUserPreferencesStorageAdapter implements IUserPreferencesStorage {

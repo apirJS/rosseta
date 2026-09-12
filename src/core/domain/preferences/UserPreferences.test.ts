@@ -15,7 +15,6 @@ describe('Domain: UserPreferences', () => {
       expect(prefs.targetLanguage.code).toBe('en-US');
       expect(prefs.selectedModel.id).toBe('gemini-2.5-flash');
       expect(prefs.shortcut).toBeNull();
-      expect(prefs.proxyUrl).toBeNull();
     });
   });
 
@@ -128,36 +127,6 @@ describe('Domain: UserPreferences', () => {
       expect(prefs.shortcut).toBe('Ctrl+Shift+Space');
       expect(prefs.theme.isDark).toBe(true);
     });
-
-    test('withProxyUrl returns new instance with updated proxyUrl', () => {
-      const original = UserPreferences.createDefault('prefs-1');
-      expect(original.proxyUrl).toBeNull();
-
-      const updated = original.withProxyUrl('https://proxy.example.com');
-
-      expect(updated.proxyUrl).toBe('https://proxy.example.com');
-      expect(original.proxyUrl).toBeNull();
-      expect(updated.theme.isSystem).toBe(true);
-    });
-
-    test('withProxyUrl preserves proxyUrl through other with* calls', () => {
-      const prefs = UserPreferences.createDefault('prefs-1')
-        .withProxyUrl('https://proxy.example.com')
-        .withTheme(Theme.dark())
-        .withShortcut('Ctrl+Shift+Space');
-
-      expect(prefs.proxyUrl).toBe('https://proxy.example.com');
-      expect(prefs.theme.isDark).toBe(true);
-      expect(prefs.shortcut).toBe('Ctrl+Shift+Space');
-    });
-
-    test('withProxyUrl can clear proxy back to null', () => {
-      const prefs = UserPreferences.createDefault('prefs-1')
-        .withProxyUrl('https://proxy.example.com')
-        .withProxyUrl(null);
-
-      expect(prefs.proxyUrl).toBeNull();
-    });
   });
 
   // ==================== TO PROPS ROUND TRIP ====================
@@ -173,7 +142,6 @@ describe('Domain: UserPreferences', () => {
         theme: 'dark',
         targetLanguage: 'ja-JP',
         selectedModel: 'gemini-2.5-flash',
-        proxyUrl: null,
       });
 
       const restored = UserPreferences.fromRaw(props);

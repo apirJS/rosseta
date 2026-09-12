@@ -49,7 +49,7 @@ export class GeminiTranslationAdapter implements ITranslationService {
         console.error('[GEMINI] Request failed with status:', response.status);
         const hint =
           response.status === 404
-            ? 'check your proxy URL'
+            ? 'model not found'
             : response.status === 401
               ? 'invalid API key'
               : response.status === 403
@@ -115,8 +115,7 @@ export class GeminiTranslationAdapter implements ITranslationService {
 
   private buildRequestUrl(): string {
     const apiKey = this.credential.apiKey.value;
-    const baseUrl = this.userPreferences.proxyUrl ?? GEMINI_URL_ENDPOINT;
-    return `${baseUrl}/${this.userPreferences.selectedModel.id}:generateContent?key=${apiKey}`;
+    return `${GEMINI_URL_ENDPOINT}/${this.userPreferences.selectedModel.id}:generateContent?key=${apiKey}`;
   }
 
   private buildRequestHeaders(): HeadersInit {

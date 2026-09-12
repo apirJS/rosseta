@@ -13,6 +13,8 @@ import {
 import { buildGroqTranslationPrompt } from './prompt';
 import { mapResponseToDomain } from '../shared/translation-response-mapper';
 
+const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
+
 export class GroqTranslationAdapter implements ITranslationService {
   constructor(
     private readonly credential: Credential,
@@ -45,9 +47,7 @@ export class GroqTranslationAdapter implements ITranslationService {
         response_format: { type: 'json_object' },
       });
 
-      const groqBaseUrl =
-        this.userPreferences.proxyUrl ?? 'https://api.groq.com/openai/v1';
-      const response = await fetch(`${groqBaseUrl}/chat/completions`, {
+      const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${this.credential.apiKey.value}`,
@@ -66,7 +66,7 @@ export class GroqTranslationAdapter implements ITranslationService {
         console.error('[GROQ] Request failed with status:', response.status);
         const hint =
           response.status === 404
-            ? 'check your proxy URL'
+            ? 'model not found'
             : response.status === 401
               ? 'invalid API key'
               : response.status === 403

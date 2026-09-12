@@ -14,7 +14,6 @@
   import LogoutConfirmModal from './components/LogoutConfirmModal.svelte';
   import HistoryPage from '../history/HistoryPage.svelte';
   import ManageKeysPage from '../manage-keys/ManageKeysPage.svelte';
-  import ProxySettingsPage from '../proxy-settings/ProxySettingsPage.svelte';
   import type { LanguageCode } from '../../../shared/constants/languages';
 
   const auth = getAuthStateContext();
@@ -57,11 +56,6 @@
     controller.showManageApiKeys();
   }
 
-  function handleProxySettings() {
-    controller.closeMenu();
-    controller.showProxySettings();
-  }
-
   let menuAreaEl = $state<HTMLDivElement>();
 
   $effect(() => {
@@ -89,8 +83,6 @@
       <ManageKeysPage onback={controller.showMain} />
     {:else if controller.state.currentView === 'history'}
       <HistoryPage onback={controller.showMain} />
-    {:else if controller.state.currentView === 'proxy-settings'}
-      <ProxySettingsPage onback={controller.showMain} />
     {:else if controller.state.currentView === 'main' && activeCredential}
       <div class="flex flex-col h-full w-full bg-background">
         <div class="flex justify-between items-center p-4 pb-0">
@@ -104,9 +96,7 @@
               <AppMenu
                 onLogout={handleLogoutClick}
                 onManageKeys={handleManageKeys}
-                onProxySettings={handleProxySettings}
                 onHistory={controller.showHistory}
-                proxyActive={!!preferences.state.proxyUrl}
               />
             {/if}
           </div>

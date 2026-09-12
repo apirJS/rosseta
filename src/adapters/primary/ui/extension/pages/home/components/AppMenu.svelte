@@ -4,18 +4,10 @@
   interface Props {
     onLogout: () => void;
     onManageKeys: () => void;
-    onProxySettings: () => void;
     onHistory: () => void;
-    proxyActive?: boolean;
   }
 
-  const {
-    onLogout,
-    onManageKeys,
-    onProxySettings,
-    onHistory,
-    proxyActive = false,
-  }: Props = $props();
+  const { onLogout, onManageKeys, onHistory }: Props = $props();
 
   const version = browser.runtime.getManifest().version;
 </script>
@@ -30,18 +22,6 @@
       onclick={onManageKeys}
     >
       Manage API Keys
-    </button>
-    <button
-      type="button"
-      class="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-surface cursor-pointer"
-      onclick={onProxySettings}
-    >
-      <span class="inline-flex items-center gap-1.5">
-        Proxy Settings
-        {#if proxyActive}
-          <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-        {/if}
-      </span>
     </button>
     <button
       type="button"

@@ -19,6 +19,7 @@
 
   const { original, translated, description, detachModal }: Props = $props();
 
+  // svelte-ignore state_referenced_locally
   const ctrl = new TranslationModalController({
     original,
     translated,

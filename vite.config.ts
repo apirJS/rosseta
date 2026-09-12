@@ -16,6 +16,11 @@ export default defineConfig({
       output: {
         manualChunks: undefined
       },
+      onwarn(warning, warn) {
+        // @tailwindcss/vite transforms CSS without emitting sourcemaps (dev-only notice)
+        if (warning.code === 'SOURCEMAP_BROKEN') return;
+        warn(warning);
+      },
     },
   },
   plugins: [

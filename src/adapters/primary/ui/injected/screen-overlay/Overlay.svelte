@@ -9,6 +9,7 @@
   }
   const { viewportImg, captureWidth, detachOverlay, onReady }: Props = $props();
 
+  // svelte-ignore state_referenced_locally
   const controller = new OverlayController(viewportImg, detachOverlay, onReady);
 
   let overlayEl: HTMLDivElement;

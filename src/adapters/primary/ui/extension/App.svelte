@@ -23,13 +23,17 @@
   const { authUseCases, preferencesUseCases, translationUseCases }: Props =
     $props();
 
+  // svelte-ignore state_referenced_locally
   setAuthContext(authUseCases);
+  // svelte-ignore state_referenced_locally
   setPreferencesContext(preferencesUseCases);
+  // svelte-ignore state_referenced_locally
   setTranslationContext(translationUseCases);
 
   const auth = useAuth();
   setAuthStateContext(auth);
 
+  // svelte-ignore state_referenced_locally
   const preferences = usePreferences(preferencesUseCases);
   setPreferencesStateContext(preferences);
 </script>

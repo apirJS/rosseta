@@ -8,6 +8,7 @@
   const { title, onclose, ondragstart }: Props = $props();
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-header" onpointerdown={ondragstart}>
   <span class="modal-header-title">{title}</span>
   <button

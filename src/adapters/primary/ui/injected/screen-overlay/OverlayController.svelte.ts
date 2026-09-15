@@ -6,8 +6,6 @@ export class OverlayController {
   public isPointerMoving = $state<boolean>(false);
   public isReady = $state<boolean>(false);
 
-  // Use the data URL directly for instant first paint (no blink).
-  // The blob URL replaces it once loaded for better memory efficiency.
   public readonly backgroundStyle = $derived.by(() => {
     const url = this.blobUrl ?? this.viewportImg;
 
@@ -26,8 +24,6 @@ export class OverlayController {
     $effect(() => {
       let active = true;
 
-      // Pre-decode the data URL so the browser has the pixels ready
-      // before we reveal the overlay. This eliminates the dark-flash blink.
       this.decodeImage(this.viewportImg).then(() => {
         if (active) {
           this.isReady = true;
@@ -46,11 +42,6 @@ export class OverlayController {
     });
   }
 
-  /**
-   * Called by the Overlay component to provide a reference to the container
-   * element inside the Shadow DOM. This allows SelectionBox to mount there
-   * instead of document.body, keeping it isolated from host page interference.
-   */
   public setContainer(container: HTMLElement): void {
     this.overlayContainer = container;
   }
@@ -74,13 +65,10 @@ export class OverlayController {
   public handlePointerDown = (e: PointerEvent) => {
     const target = e.currentTarget as HTMLElement;
 
-    // Use pointer capture so that ALL subsequent pointermove/pointerup events
-    // are delivered to THIS element, regardless of what the host page does.
     target.setPointerCapture(e.pointerId);
 
     this.isPointerMoving = true;
 
-    // Mount the SelectionBox inside the shadow DOM container (or fall back to document.body)
     const mountTarget = this.overlayContainer ?? document.body;
     const selectionBox = new SelectionBox(mountTarget);
     const { width: winWidth, height: winHeight } =
@@ -162,7 +150,6 @@ export class OverlayController {
         height,
       );
 
-      // Remove the overlay immediately after selection
       this.detachOverlay();
 
       await sendMessageToRuntime({
@@ -176,10 +163,6 @@ export class OverlayController {
     }
   }
 
-  /**
-   * Max dimension for the cropped image sent to Gemini.
-   * Larger images are scaled down — Gemini doesn't need 4K for OCR.
-   */
   private static readonly MAX_CROP_DIMENSION = 1500;
 
   private cropImage(
@@ -199,14 +182,12 @@ export class OverlayController {
           return;
         }
 
-        // Scale factor handles devicePixelRatio (Retina displays)
         const scaleX = img.naturalWidth / window.innerWidth;
         const scaleY = img.naturalHeight / window.innerHeight;
 
         let cropW = width * scaleX;
         let cropH = height * scaleY;
 
-        // Downscale if either dimension exceeds the limit
         const maxDim = OverlayController.MAX_CROP_DIMENSION;
         if (cropW > maxDim || cropH > maxDim) {
           const ratio = Math.min(maxDim / cropW, maxDim / cropH);
@@ -229,7 +210,6 @@ export class OverlayController {
           canvas.height,
         );
 
-        // JPEG at 80% quality — ~5-10x smaller than PNG
         resolve(canvas.toDataURL('image/jpeg', 0.8));
       };
       img.onerror = (e) => reject(e);

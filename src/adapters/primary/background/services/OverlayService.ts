@@ -7,13 +7,6 @@ import {
 import { TabNotifier } from './TabNotifier';
 import type { Container } from '../../../../shared/di/container-factory';
 
-/**
- * Orchestrates the overlay trigger flow:
- * 1. Validates credentials
- * 2. Injects content script if needed
- * 3. Captures screenshot
- * 4. Sends MOUNT_OVERLAY to the active tab
- */
 export class OverlayService {
   constructor(private readonly container: Container) {}
 

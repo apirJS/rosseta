@@ -3,12 +3,6 @@ import tailwindStyles from '../../ui/styles/app.css?inline';
 import Overlay from '../../ui/injected/screen-overlay/Overlay.svelte';
 import { CSS_MAX_Z_INDEX } from '../../ui/shared/constants/ui';
 
-/**
- * Handles mounting and unmounting the selection overlay.
- *
- * Creates a Shadow DOM host with scroll-locking, mounts the Overlay
- * Svelte component, and provides a detach callback to clean up.
- */
 export class OverlayHandler {
   private static readonly HOST_ID = 'rosseta-host';
 
@@ -17,12 +11,10 @@ export class OverlayHandler {
 
     const savedScrollX = window.scrollX;
     const savedScrollY = window.scrollY;
-    // Capture viewport width BEFORE any DOM changes (matches screenshot dimensions)
     const captureWidth = window.innerWidth;
 
     const host = document.createElement('div');
     host.id = OverlayHandler.HOST_ID;
-    // Start invisible — revealed via opacity transition once image is decoded
     host.style.opacity = '0';
 
     const shadowRoot = host.attachShadow({ mode: 'open' });
@@ -42,7 +34,6 @@ export class OverlayHandler {
       pointerEvents: 'auto',
     } satisfies Partial<CSSStyleDeclaration>);
 
-    // --- Scroll prevention via event interception (no DOM/CSS changes = no layout shift) ---
     const preventScroll = (e: Event) => e.preventDefault();
     const SCROLL_KEYS = new Set([
       'ArrowUp',
@@ -59,12 +50,10 @@ export class OverlayHandler {
       if (SCROLL_KEYS.has(e.key)) e.preventDefault();
     };
 
-    // Block wheel + touch scroll on the overlay itself
     appContainer.addEventListener('wheel', preventScroll, { passive: false });
     appContainer.addEventListener('touchmove', preventScroll, {
       passive: false,
     });
-    // Block keyboard scroll globally (keys aren't scoped to the overlay)
     document.addEventListener('keydown', preventScrollKeys);
 
     shadowRoot.appendChild(appContainer);

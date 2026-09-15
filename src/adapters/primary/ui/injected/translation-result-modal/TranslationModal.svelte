@@ -27,12 +27,9 @@
     detachModal,
   });
 
-  // --- Hovered language label (overrides "Mixed" when hovering a segment) ---
   let hoveredLangLabel = $state<string | null>(null);
 
-  // --- Cross-highlight: track which segment index is hovered in either section ---
   let hoveredSegmentIndex = $state<number | null>(null);
-  // Which side is being hovered ('original' | 'translated' | null)
   let hoveredSide = $state<'original' | 'translated' | null>(null);
 
   const displayedLangLabel = $derived(
@@ -52,7 +49,7 @@
     hoveredSegmentIndex = index;
     hoveredSide = index != null ? 'translated' : null;
   }
-  // Auto-focus this modal's backdrop so it receives keyboard events
+
   let backdropEl: HTMLDivElement;
   $effect(() => {
     backdropEl?.focus();
@@ -80,7 +77,6 @@
     />
 
     <div class="modal-body">
-      <!-- Original -->
       <div class="section">
         <div class="section-header">
           <span class="section-label"
@@ -107,7 +103,6 @@
         />
       </div>
 
-      <!-- Translated -->
       <div class="section">
         <div class="section-header">
           <span class="section-label"
@@ -133,7 +128,6 @@
         />
       </div>
 
-      <!-- Description -->
       {#if ctrl.description}
         <div class="section">
           <div class="section-header">

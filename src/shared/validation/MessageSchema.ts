@@ -1,4 +1,15 @@
 import * as z from 'zod';
+import type { StoredModel } from '../../core/ports/outbound/IModelStorage';
+
+export interface FetchModelsResponse {
+  success: boolean;
+  models?: StoredModel[];
+  error?: {
+    code: string;
+    message: string;
+    userMessage: string;
+  };
+}
 
 export const MessageSchema = z.discriminatedUnion('action', [
   z.object({
@@ -50,6 +61,12 @@ export const MessageSchema = z.discriminatedUnion('action', [
   }),
   z.object({
     action: z.literal('START_OVERLAY'),
+  }),
+  z.object({
+    action: z.literal('FETCH_MODELS'),
+    payload: z.object({
+      provider: z.string().min(1),
+    }),
   }),
   z.object({
     action: z.literal('MOUNT_HISTORY_MODAL'),
@@ -117,6 +134,7 @@ export interface MessageReturnTypeMap {
   MOUNT_TRANSLATION_MODAL: void;
   THEME_CHANGED: void;
   START_OVERLAY: void;
+  FETCH_MODELS: FetchModelsResponse;
   MOUNT_HISTORY_MODAL: void;
   SHOW_TOAST: void;
   DISMISS_TOAST: void;

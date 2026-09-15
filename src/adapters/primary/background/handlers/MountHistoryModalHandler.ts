@@ -5,9 +5,6 @@ import {
 } from '../service-worker.utils';
 import { TabNotifier } from '../services/TabNotifier';
 
-/**
- * Payload shape for the MOUNT_HISTORY_MODAL action.
- */
 interface MountHistoryModalPayload {
   id: string;
   original: {
@@ -24,11 +21,6 @@ interface MountHistoryModalPayload {
   createdAt: Date;
 }
 
-/**
- * Handles the MOUNT_HISTORY_MODAL message action.
- * Injects content script if needed, shows an info toast,
- * then forwards the translation payload to mount a modal on the active tab.
- */
 export class MountHistoryModalHandler {
   async handle(payload: MountHistoryModalPayload): Promise<void> {
     const activeTab = await getActiveTab();

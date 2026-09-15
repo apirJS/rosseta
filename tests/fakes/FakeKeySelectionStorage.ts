@@ -1,12 +1,12 @@
 import { KeySelectionMode } from '../../src/core/domain/credential/KeySelectionMode';
-import type { Provider } from '../../src/core/domain/credential/Provider';
+import type { AnyProvider } from '../../src/core/domain/credential/Provider';
 import type { IKeySelectionStorage } from '../../src/core/ports/outbound/IKeySelectionStorage';
 import { AppError } from '../../src/shared/errors';
 import { failure, type Result, success } from '../../src/shared/types/Result';
 
 export class FakeKeySelectionStorage implements IKeySelectionStorage {
   private _mode: KeySelectionMode = KeySelectionMode.manual();
-  private _lastUsedIds = new Map<Provider, string>();
+  private _lastUsedIds = new Map<string, string>();
   private _error: AppError | null = null;
 
   failNextCallWith(error: AppError): void {
@@ -19,7 +19,7 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
   }
 
   /** Seed a lastUsedId for testing. */
-  seedLastUsedId(provider: Provider, id: string): void {
+  seedLastUsedId(provider: string, id: string): void {
     this._lastUsedIds.set(provider, id);
   }
 
@@ -43,7 +43,7 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
   }
 
   async getLastUsedId(
-    provider: Provider,
+    provider: AnyProvider,
   ): Promise<Result<string | null, AppError>> {
     const error = this.consumeError();
     if (error) return failure(error);
@@ -51,7 +51,7 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
   }
 
   async setLastUsedId(
-    provider: Provider,
+    provider: AnyProvider,
     credentialId: string,
   ): Promise<Result<void, AppError>> {
     const error = this.consumeError();

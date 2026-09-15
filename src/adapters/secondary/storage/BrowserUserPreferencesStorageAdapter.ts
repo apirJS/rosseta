@@ -14,7 +14,7 @@ const STORAGE_KEY = 'userPreferences';
 const UserPreferencesSchema = z.object({
   id: z.string().optional(),
   targetLanguage: z.string().optional(),
-  selectedModel: z.string().optional(),
+  selectedModels: z.record(z.string(), z.string()).optional(),
   theme: z.enum(['dark', 'light', 'system']).optional(),
 });
 

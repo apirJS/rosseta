@@ -1,72 +1,78 @@
 <script lang="ts">
   import { Icon } from '../../../../shared/components';
-  import { getAuthStateContext } from '../../../../shared/context';
+  import { getAuthStateContext, getPopupToastContext } from '../../../../shared/context';
+  import { maskApiKey } from '../../../../shared/utils';
   import type { Credential } from '../../../../../../../core/domain/credential/Credential';
+  import type { AnyProvider } from '../../../../../../../core/domain/credential/Provider';
   import { KeySelectionMode } from '../../../../../../../core/domain/credential/KeySelectionMode';
-  import { ProviderRegistry } from '../../../../../../../core/domain/provider/ProviderRegistry';
   import KeySelectorDropdown from './KeySelectorDropdown.svelte';
 
   interface Props {
-    credential: Credential;
-    onMenuToggle: () => void;
-    isMenuOpen: boolean;
+    provider: AnyProvider;
+    credential: Credential | null;
   }
 
-  const { credential, onMenuToggle, isMenuOpen }: Props = $props();
+  const { provider, credential }: Props = $props();
   const auth = getAuthStateContext();
+  const toast = getPopupToastContext();
 
-  const allCredentials = $derived(auth.state.credentials?.items ?? []);
-  const hasMultiple = $derived(allCredentials.length > 1);
-  const showGeminiAutoBalance = $derived(
-    allCredentials.filter((c) => c.provider === 'gemini').length >= 2,
+  const providerCredentials = $derived(
+    (auth.state.credentials?.items ?? []).filter(
+      (c) => c.provider === provider,
+    ),
   );
-  const showGroqAutoBalance = $derived(
-    allCredentials.filter((c) => c.provider === 'groq').length >= 2,
-  );
-  const showZaiAutoBalance = $derived(
-    allCredentials.filter((c) => c.provider === 'zai').length >= 2,
-  );
+  const hasMultiple = $derived(providerCredentials.length > 1);
   const currentMode = $derived(auth.state.keySelectionMode);
+
+  const providerActive = $derived(
+    credential && credential.provider === provider ? credential : null,
+  );
+
+  const autoBalanceProviders = $derived(
+    providerCredentials.length >= 2 ? [provider] : [],
+  );
 
   let isOpen = $state(false);
   let triggerEl = $state<HTMLButtonElement>();
   let popoverEl = $state<HTMLDivElement>();
 
   function getDisplayLabel(cred: Credential): string {
-    const key = cred.apiKey?.value ?? '';
-    const providerLabel = ProviderRegistry.getConfig(cred.provider).name;
-    const masked = key.length > 8 ? `${key.slice(0, 8)}****` : key;
-    return `${providerLabel} · ${masked}`;
+    return maskApiKey(cred.apiKey.value);
   }
 
   function getTriggerLabel(): string {
-    if (currentMode.isAutoBalance) {
-      const provider = currentMode.autoBalanceProvider;
-      if (!provider) return 'Auto ⟳';
-      return `Auto ⟳ ${ProviderRegistry.getConfig(provider).name.toUpperCase()}`;
+    if (
+      currentMode.isAutoBalance &&
+      currentMode.autoBalanceProvider === provider
+    ) {
+      return 'Auto ⟳';
     }
-    return getDisplayLabel(credential);
+    if (providerActive) return getDisplayLabel(providerActive);
+    return '—';
   }
 
-  function selectKey(cred: Credential) {
+  async function selectKey(cred: Credential) {
     if (!currentMode.isManual) {
-      auth.setKeySelectionMode(KeySelectionMode.manual());
+      await auth.setKeySelectionMode(KeySelectionMode.manual());
     }
-    auth.setActiveKey(cred.id);
+    await auth.setActiveKey(cred.id);
     isOpen = false;
   }
 
-  function selectAutoBalance(provider: 'gemini' | 'groq' | 'zai') {
-    const modes = {
-      gemini: KeySelectionMode.autoBalanceGemini,
-      groq: KeySelectionMode.autoBalanceGroq,
-      zai: KeySelectionMode.autoBalanceZai,
-    };
-    auth.setKeySelectionMode(modes[provider]());
+  async function selectAutoBalance(targetProvider: AnyProvider) {
+    const error = await auth.setKeySelectionMode(
+      KeySelectionMode.autoBalance(targetProvider),
+    );
+    if (error) {
+      toast.show({
+        type: 'error',
+        message: 'Could not enable auto-balance',
+        description: error,
+      });
+    }
     isOpen = false;
   }
 
-  // Close on click outside
   $effect(() => {
     if (!isOpen) return;
 
@@ -88,55 +94,61 @@
   });
 </script>
 
-<div class="flex items-center gap-2">
-  <button
-    type="button"
-    class="p-1 text-muted hover:text-foreground cursor-pointer"
-    onclick={onMenuToggle}
-    aria-label="Menu"
-  >
-    <Icon name="menu" class="w-5 h-5" />
-  </button>
+<div>
+  <span class="block text-sm font-medium text-foreground mb-1">
+    API Key
+  </span>
 
   {#if hasMultiple}
     <div class="relative">
       <button
         type="button"
         bind:this={triggerEl}
-        class="inline-flex items-center gap-1.5 text-sm text-foreground font-medium cursor-pointer
-               px-2.5 py-1 rounded-md border border-border
-               hover:text-primary hover:border-primary/50 transition-colors max-w-[240px] select-none"
+        class="w-full flex items-center px-3 py-2 pr-8 rounded-md border border-border bg-background
+               text-sm text-foreground text-left cursor-pointer select-none
+               focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
+               hover:border-primary/50 transition-colors"
         onclick={() => (isOpen = !isOpen)}
-        aria-haspopup="listbox"
+        aria-haspopup="true"
         aria-expanded={isOpen}
       >
         <span class="truncate">{getTriggerLabel()}</span>
-        <Icon
-          name="chevron-down"
-          class="w-3.5 h-3.5 text-muted flex-shrink-0 transition-transform {isOpen
-            ? 'rotate-180'
-            : ''}"
-        />
+        <span
+          class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2"
+        >
+          <Icon
+            name="chevron-down"
+            class="w-4 h-4 text-foreground flex-shrink-0 transition-transform {isOpen
+              ? 'rotate-180'
+              : ''}"
+          />
+        </span>
       </button>
 
       {#if isOpen}
         <div bind:this={popoverEl}>
           <KeySelectorDropdown
-            credentials={allCredentials}
-            activeCredentialId={credential.id}
+            credentials={providerCredentials}
+            activeCredentialId={providerActive?.id ?? null}
             {currentMode}
-            {showGeminiAutoBalance}
-            {showGroqAutoBalance}
-            {showZaiAutoBalance}
+            {autoBalanceProviders}
             onSelectKey={selectKey}
             onSelectAutoBalance={selectAutoBalance}
           />
         </div>
       {/if}
     </div>
+  {:else if providerCredentials.length === 1}
+    <div
+      class="w-full flex items-center px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground select-none"
+    >
+      <span class="truncate">{getDisplayLabel(providerCredentials[0])}</span>
+    </div>
   {:else}
-    <span class="text-sm text-foreground font-medium truncate max-w-[160px]">
-      {getDisplayLabel(credential)}
-    </span>
+    <div
+      class="w-full flex items-center px-3 py-2 rounded-md border border-border bg-background text-sm text-muted select-none opacity-50 cursor-not-allowed"
+    >
+      —
+    </div>
   {/if}
 </div>

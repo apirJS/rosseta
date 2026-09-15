@@ -31,16 +31,10 @@ export class Theme extends ValueObject {
     return this._value === 'light';
   }
 
-  /**
-   * Create a Theme from a known value (compile-time autocomplete).
-   */
   public static create(value: ThemeValue): Theme {
     return new Theme(value);
   }
 
-  /**
-   * Create a Theme from raw string input (runtime validation).
-   */
   public static fromRaw(raw: string): Result<Theme, DomainError> {
     if (!raw || typeof raw !== 'string') {
       return failure(new DomainError('Theme must be a non-empty string'));

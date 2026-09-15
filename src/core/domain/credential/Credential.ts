@@ -2,12 +2,12 @@ import { Entity } from '../shared/Entity';
 import { DomainError } from '../shared/DomainError';
 import { failure, success, type Result } from '../../../shared/types/Result';
 import { ApiKey } from './ApiKey';
-import type { Provider } from './Provider';
+import type { AnyProvider } from './Provider';
 
 export interface CredentialProps {
   id: string;
   type: 'API_KEY';
-  provider: Provider;
+  provider: AnyProvider;
   apiKey: string;
 }
 
@@ -15,7 +15,7 @@ export class Credential extends Entity<string> {
   private constructor(
     id: string,
     private readonly _apiKey: ApiKey,
-    private readonly _provider: Provider,
+    private readonly _provider: AnyProvider,
   ) {
     super(id);
   }
@@ -23,7 +23,7 @@ export class Credential extends Entity<string> {
   static create(
     id: string,
     apiKey: ApiKey,
-    provider: Provider,
+    provider: AnyProvider,
   ): Result<Credential, DomainError> {
     if (!id || id.trim().length === 0) {
       return failure(new DomainError('Credential ID cannot be empty'));
@@ -45,7 +45,7 @@ export class Credential extends Entity<string> {
     return 'API_KEY';
   }
 
-  get provider(): Provider {
+  get provider(): AnyProvider {
     return this._provider;
   }
 

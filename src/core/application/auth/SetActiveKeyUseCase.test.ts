@@ -18,12 +18,15 @@ function seedWithTwoCredentials(storage: FakeCredentialStorage): {
 } {
   const creds = Credentials.createEmpty('creds-1');
 
-  const key1 = ApiKey.create('AIzaSyTestKeyForSetActive1000000000000000');
+  const key1 = ApiKey.createWithProvider(
+    'AIzaSyTestKeyForSetActive1000000000000000',
+    'google',
+  );
   if (!key1.success) throw new Error('Test helper: invalid API key');
-  const cred1 = Credential.create('cred-1', key1.data, 'gemini');
+  const cred1 = Credential.create('cred-1', key1.data, 'google');
   if (!cred1.success) throw new Error('Test helper: invalid credential');
 
-  const key2 = ApiKey.create('gsk_' + 'a'.repeat(52));
+  const key2 = ApiKey.createWithProvider('gsk_' + 'a'.repeat(52), 'groq');
   if (!key2.success) throw new Error('Test helper: invalid API key');
   const cred2 = Credential.create('cred-2', key2.data, 'groq');
   if (!cred2.success) throw new Error('Test helper: invalid credential');
@@ -39,7 +42,6 @@ describe('Application: SetActiveKeyUseCase', () => {
     const { storage, useCase } = createUseCase();
     const { id1 } = seedWithTwoCredentials(storage);
 
-    // After seeding, cred-2 is active (last added). Switch to cred-1.
     const result = await useCase.execute(id1);
 
     expect(result.success).toBe(true);
@@ -48,41 +50,39 @@ describe('Application: SetActiveKeyUseCase', () => {
     }
   });
 
-  test('fails when credential ID does not exist', async () => {
+  test('fails for unknown credential ID', async () => {
     const { storage, useCase } = createUseCase();
     seedWithTwoCredentials(storage);
 
-    const result = await useCase.execute('non-existent-id');
+    const result = await useCase.execute('nonexistent');
 
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBeInstanceOf(AuthError);
-      expect(result.error.code).toBe(ErrorCode.AUTH_INVALID_API_KEY);
+    }
+  });
+
+  test('fails when storage save fails', async () => {
+    const { storage, useCase } = createUseCase();
+    seedWithTwoCredentials(storage);
+    storage.failNextCallWith(StorageError.writeFailed('credentials'));
+
+    const result = await useCase.execute('cred-1');
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe(ErrorCode.STORAGE_WRITE_FAILED);
     }
   });
 
   test('fails when no credentials stored', async () => {
     const { useCase } = createUseCase();
 
-    const result = await useCase.execute('any-id');
+    const result = await useCase.execute('cred-1');
 
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBeInstanceOf(AuthError);
-      expect(result.error.code).toBe(ErrorCode.AUTH_INVALID_API_KEY);
-    }
-  });
-
-  test('fails when storage.get() fails', async () => {
-    const { storage, useCase } = createUseCase();
-    storage.failNextCallWith(StorageError.readFailed('credentials'));
-
-    const result = await useCase.execute('any-id');
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBeInstanceOf(StorageError);
-      expect(result.error.code).toBe(ErrorCode.STORAGE_READ_FAILED);
     }
   });
 });

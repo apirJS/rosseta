@@ -1,10 +1,3 @@
-/**
- * Shared mapper that converts a parsed API translation response
- * into a domain Translation entity.
- *
- * Used by both GeminiTranslationAdapter and GroqTranslationAdapter
- * to avoid duplicated mapToDomain logic.
- */
 import { v4 as uuidv4 } from 'uuid';
 import { Language } from '../../../core/domain/translation/Language';
 import { TextSegment } from '../../../core/domain/translation/TextSegment';
@@ -12,7 +5,6 @@ import { Translation } from '../../../core/domain/translation/Translation';
 import { success, failure, type Result } from '../../../shared/types/Result';
 import { TranslationError, type AppError } from '../../../shared/errors';
 
-/** Shape shared by both Gemini and Groq response schemas. */
 export interface TranslationData {
   originalText: {
     contents: {
@@ -33,13 +25,6 @@ export interface TranslationData {
   description: string;
 }
 
-/**
- * Maps a raw API translation response to a domain Translation.
- *
- * @param data - The parsed and validated translation data from the API
- * @param targetLanguage - The target language domain object
- * @param tag - A short provider tag for log messages (e.g. "GEMINI", "GROQ")
- */
 export function mapResponseToDomain(
   data: TranslationData,
   targetLanguage: Language,

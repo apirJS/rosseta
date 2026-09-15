@@ -27,22 +27,15 @@ Built with **Svelte 5**, **TypeScript**, **Tailwind CSS v4**, and a **DDD + Hexa
 ## Features
 
 - 🖱️ **Region select** — Draw a box on any part of a page, including images, and get an instant translation overlay with romanization
-- 🤖 **Multi-provider** — Switch between Gemini, Groq, and Z.ai models on the fly
+- 🤖 **Multi-provider** — Google, Groq, xAI, OpenAI, Anthropic, Mistral, DeepInfra, and any OpenAI-compatible endpoint, with model lists fetched straight from the provider
 - 🔑 **Key management** — Multiple API keys per provider with auto-rotation
+- 🧩 **Custom endpoints** — Point Rosseta at any OpenAI-compatible API
 - 📜 **History** — Every translation saved locally, searchable
 - 🌙 **Dark mode** — System-aware with manual toggle
 
 ### Supported languages
 
-Language availability depends on the provider:
-
-| Provider       | Languages | Reference                                                                                        |
-| -------------- | --------- | ------------------------------------------------------------------------------------------------ |
-| Gemini         | 110+      | [Supported languages](https://cloud.google.com/vertex-ai/generative-ai/docs/models#expandable-1) |
-| Groq (Llama 4) | 12        | [Model card](https://github.com/marketplace/models/azureml-meta/Llama-4-Scout-17B-16E-Instruct)  |
-| Z.ai (GLM-4V)  | 26        | [Model card](https://replicate.com/cuuupid/glm-4v-9b/readme)                                     |
-
-The extension auto-filters the language list based on the active provider.
+The full language list is available regardless of provider. Most vision-capable models handle all of them; if the chosen model cannot serve a language, the provider's error is surfaced as a toast and you can switch models freely.
 
 ---
 
@@ -71,7 +64,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, architecture deta
 Rosseta does **not** collect, store, or transmit any personal data to our servers.
 
 - **API keys**, **preferences**, and **translation history** are stored locally in your browser using `browser.storage.local` and never leave your device.
-- **Translation requests** (screenshots of selected areas) are sent directly from your browser to the AI provider you configured (Google Gemini, Groq, or Z.ai) using your own API key. We have no access to this data.
+- **Translation requests** (screenshots of selected areas) are sent directly from your browser to the AI provider you configured, using your own API key. We have no access to this data.
 - **No analytics, tracking, or telemetry** of any kind.
 
 ---

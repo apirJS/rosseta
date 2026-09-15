@@ -5,13 +5,11 @@ import {
   Theme,
   type ThemeValue,
 } from '../../../../../core/domain/preferences/Theme';
-import { AiModel } from '../../../../../core/domain/preferences/AiModel';
 import {
   Language,
   type LanguageCode,
 } from '../../../../../core/domain/translation/Language';
 import { LANGUAGE_MAP } from '../../../../../core/domain/translation/LANGUAGE_MAP';
-import { ProviderRegistry } from '../../../../../core/domain/provider/ProviderRegistry';
 
 export function getBrowserLanguage(): Language {
   const browserLang = navigator.language;
@@ -33,9 +31,7 @@ export class PreferencesState {
   theme = $state<Theme>(Theme.system());
   resolvedTheme = $state<'dark' | 'light'>('light');
   targetLanguage = $state<Language>(getBrowserLanguage());
-  selectedModel = $state<AiModel>(
-    AiModel.create(ProviderRegistry.getDefaultModelId('gemini')),
-  );
+  selectedModels = $state<Record<string, string>>({});
   loading = $state(false);
   loaded = $state(false);
   shortcut = $state<string | null>(null);
@@ -67,7 +63,6 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    // Notify external handler (e.g. broadcast to content script)
     useCases.onThemeApplied?.(resolved);
   }
 
@@ -78,7 +73,7 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     if (result.success && result.data) {
       state.theme = result.data.theme;
       state.targetLanguage = result.data.targetLanguage;
-      state.selectedModel = result.data.selectedModel;
+      state.selectedModels = { ...result.data.selectedModels };
     }
 
     const shortcutResult =
@@ -114,11 +109,13 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     });
   }
 
-  async function setSelectedModel(modelId: string) {
-    const model = AiModel.create(modelId);
-    state.selectedModel = model;
+  async function setSelectedModelFor(provider: string, modelId: string) {
+    const trimmed = modelId.trim();
+    if (!trimmed) return;
+
+    state.selectedModels = { ...state.selectedModels, [provider]: trimmed };
     await useCases.updatePreferences.execute({
-      preferences: { selectedModel: modelId },
+      preferences: { selectedModels: { ...state.selectedModels } },
     });
   }
 
@@ -136,6 +133,6 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     setTheme,
     toggleTheme,
     setTargetLanguage,
-    setSelectedModel,
+    setSelectedModelFor,
   };
 }

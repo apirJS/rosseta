@@ -7,9 +7,7 @@
     isMultiLang: boolean;
     hasRomanization: boolean;
     onSegmentHover?: (label: string | null) => void;
-    /** Index hovered in the sibling section (cross-highlight) */
     crossHighlightIndex?: number | null;
-    /** Notify parent which segment index is hovered here */
     onSegmentIndexHover?: (index: number | null) => void;
   }
 
@@ -25,10 +23,8 @@
 
   let textBoxEl: HTMLDivElement;
 
-  // Track which segment index is currently hovered (text or romanization)
   let hoveredIndex = $state<number | null>(null);
 
-  // Merge internal hover and cross-highlight from sibling section
   const activeIndex = $derived(hoveredIndex ?? crossHighlightIndex);
   let isResizing = $state(false);
 
@@ -72,13 +68,6 @@
     onSegmentIndexHover?.(null);
   }
 
-  // --- Resize ---
-
-  /**
-   * Freeze all sibling `.section` elements to their current computed heights.
-   * This prevents flex-competition from absorbing the space change when one
-   * section is being resized (which made the ORIGINAL resize look broken).
-   */
   function freezeSiblingSections(currentSection: HTMLElement): () => void {
     const parent = currentSection.parentElement;
     if (!parent) return () => {};
@@ -119,7 +108,6 @@
     const startHeight = textBoxEl.getBoundingClientRect().height;
     const section = textBoxEl.closest('.section') as HTMLElement | null;
 
-    // Freeze siblings so they don't absorb freed space
     const unfreezesiblings = section
       ? freezeSiblingSections(section)
       : () => {};

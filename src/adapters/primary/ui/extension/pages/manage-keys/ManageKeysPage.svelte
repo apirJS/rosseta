@@ -1,12 +1,20 @@
 <script lang="ts">
   import {
     getAuthStateContext,
+    getCustomProvidersStateContext,
+    getModelsStateContext,
     getPreferencesStateContext,
+    getPopupToastContext,
   } from '../../../shared/context';
-  import { Icon, ThemeToggle } from '../../../shared/components';
+  import { Icon, Select, ThemeToggle } from '../../../shared/components';
+  import { PROVIDERS } from '../../../../../../core/domain/credential/Provider';
+  import { ProviderRegistry } from '../../../../../../core/domain/provider/ProviderRegistry';
+  import {
+    createManageKeysController,
+    type ManageKeysDeps,
+  } from './ManageKeysController.svelte';
   import ApiKeyListItem from './components/ApiKeyListItem.svelte';
   import ApiKeyViewerModal from './components/ApiKeyViewerModal.svelte';
-  import { useProviderCycle } from '../../../shared/hooks/useProviderCycle.svelte';
 
   interface Props {
     onback: () => void;
@@ -15,94 +23,69 @@
   const { onback }: Props = $props();
   const auth = getAuthStateContext();
   const preferences = getPreferencesStateContext();
-  const provider = useProviderCycle();
+  const models = getModelsStateContext();
+  const customProviders = getCustomProvidersStateContext();
+  const toast = getPopupToastContext();
 
-  let apiKeyInput = $state('');
-  let duplicateError = $state('');
-  let viewingKey = $state<string | null>(null);
-  let pendingDeleteId = $state<string | null>(null);
-  let pendingDeleteTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+  const allProviderIds = $derived([
+    ...PROVIDERS,
+    ...customProviders.state.providers.map((p) => p.id),
+  ]);
 
-  const allKeys = $derived(auth.state.credentials?.items ?? []);
+  const deps: ManageKeysDeps = {
+    credentials: () => auth.state.credentials,
+    addApiKey: auth.addApiKey,
+    removeApiKey: auth.removeApiKey,
+    setActiveKey: (credentialId) => {
+      void auth.setActiveKey(credentialId);
+    },
+    modelsFor: models.modelsFor,
+    fetchModels: models.fetchModels,
+    clearAllModels: async () => {
+      await Promise.all(
+        allProviderIds.map((provider) => models.clearModels(provider)),
+      );
+    },
+    toast,
+  };
 
-  const visibleKeys = $derived(
-    pendingDeleteId ? allKeys.filter((c) => c.id !== pendingDeleteId) : allKeys,
-  );
+  const controller = createManageKeysController(deps);
 
-  // Dynamic search: filter keys as user types
-  const filteredKeys = $derived.by(() => {
-    const query = apiKeyInput.trim().toLowerCase();
-    if (!query) return visibleKeys;
-    return visibleKeys.filter(
-      (c) =>
-        c.apiKey.value.toLowerCase().includes(query) ||
-        c.provider.toLowerCase().includes(query),
-    );
+  $effect(() => {
+    return () => controller.destroy();
   });
 
-  // Check for duplicate
-  function isDuplicate(rawKey: string): boolean {
-    return allKeys.some((c) => c.apiKey.value === rawKey.trim());
-  }
+  const providerOptions = $derived(
+    allProviderIds.map((id) => ({
+      value: id,
+      label: ProviderRegistry.getConfig(id).name,
+    })),
+  );
 
-  async function handleAdd() {
-    const trimmed = apiKeyInput.trim();
-    if (!trimmed) return;
+  const selectedProviderName = $derived(
+    ProviderRegistry.getConfig(controller.state.selectedProvider).name,
+  );
 
-    if (isDuplicate(trimmed)) {
-      duplicateError = 'This API key has already been added.';
-      setTimeout(() => (duplicateError = ''), 3000);
-      return;
-    }
-
-    duplicateError = '';
-    await auth.addApiKey(trimmed);
-    if (!auth.state.error) {
-      apiKeyInput = '';
-    }
-  }
-
-  function commitPendingDelete() {
-    if (!pendingDeleteId) return;
-    if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
-    auth.removeApiKey(pendingDeleteId);
-    pendingDeleteId = null;
-    pendingDeleteTimer = null;
-  }
-
-  function handleDelete(credentialId: string) {
-    commitPendingDelete();
-    pendingDeleteId = credentialId;
-    pendingDeleteTimer = setTimeout(() => {
-      auth.removeApiKey(credentialId);
-      pendingDeleteId = null;
-      pendingDeleteTimer = null;
-    }, 5000);
-  }
-
-  function undoDelete() {
-    if (!pendingDeleteId) return;
-    if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
-    pendingDeleteId = null;
-    pendingDeleteTimer = null;
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') controller.addApiKey();
   }
 </script>
 
 <div class="flex flex-col h-full w-full bg-background">
-  <!-- Header -->
   <div class="flex items-center p-4 pb-0">
     <button
       type="button"
       class="flex items-center text-sm text-muted hover:text-foreground cursor-pointer"
       onclick={() => {
-        commitPendingDelete();
+        controller.commitPendingDelete();
         onback();
       }}
+      aria-label="Back"
     >
-      <Icon name="arrow-left" class="w-4 h-4 mr-1" />
+      <Icon name="arrow-left" class="w-4 h-4" />
     </button>
     <h2 class="flex-1 text-center text-base font-semibold text-foreground">
-      Manage API Keys
+      API Keys
     </h2>
     <ThemeToggle
       isDark={preferences.state.resolvedTheme === 'dark'}
@@ -110,64 +93,75 @@
     />
   </div>
 
-  <!-- Content -->
   <div class="flex-1 flex flex-col px-4 py-4 min-h-0 overflow-hidden">
-    <!-- Add new key -->
-    <div class="flex gap-2 mb-4">
+    <div class="flex gap-2 mb-3">
+      <div class="w-28 shrink-0">
+        <Select
+          id="new-key-provider"
+          value={controller.state.selectedProvider}
+          options={providerOptions}
+          onchange={(value) =>
+            (controller.state.selectedProvider = value as typeof controller.state.selectedProvider)}
+        />
+      </div>
       <input
-        type="text"
-        class="flex-1 px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary"
-        placeholder={`${provider.current.name} API Key`}
-        bind:value={apiKeyInput}
-        onkeydown={(e) => e.key === 'Enter' && handleAdd()}
+        type="password"
+        class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary"
+        placeholder={`${selectedProviderName} API Key`}
+        bind:value={controller.state.apiKeyInput}
+        onkeydown={handleKeydown}
       />
       <button
         type="button"
-        class="px-3 py-2 rounded-lg bg-primary text-primary-fg text-sm font-medium hover:opacity-90 cursor-pointer whitespace-nowrap"
-        onclick={handleAdd}
+        class="flex items-center justify-center w-10 shrink-0 rounded-lg bg-primary text-primary-fg hover:opacity-90 cursor-pointer disabled:opacity-50"
+        onclick={() => controller.addApiKey()}
         disabled={auth.state.loading}
+        aria-label="Add API key"
+        title="Add API key"
       >
-        Add +
+        <Icon name="plus" class="w-4 h-4" />
       </button>
     </div>
 
-    {#if duplicateError}
-      <p class="text-sm text-destructive mb-3">{duplicateError}</p>
-    {/if}
+    <div class="relative mb-3">
+      <input
+        type="text"
+        class="w-full pl-8 pr-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary"
+        placeholder="Search keys"
+        bind:value={controller.state.searchQuery}
+      />
+      <span
+        class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none"
+      >
+        <Icon name="search" class="w-4 h-4 text-muted" />
+      </span>
+    </div>
 
-    {#if auth.state.error}
-      <p class="text-sm text-destructive mb-3">{auth.state.error}</p>
-    {/if}
-
-    <!-- Key list -->
     <div class="flex flex-col gap-2 overflow-y-auto">
-      {#if auth.state.credentials}
-        {#each filteredKeys as credential (credential.id)}
-          <ApiKeyListItem
-            {credential}
-            isActive={auth.state.credentials.activeCredentialId ===
-              credential.id}
-            onSetActive={() => auth.setActiveKey(credential.id)}
-            onDelete={() => handleDelete(credential.id)}
-            onView={() => (viewingKey = credential.apiKey.value)}
-          />
-        {/each}
-      {/if}
-
-      {#if !auth.state.credentials?.hasKeys()}
-        <p class="text-sm text-muted text-center py-4">
-          No API keys added yet.
-        </p>
-      {:else if filteredKeys.length === 0 && !pendingDeleteId}
-        <p class="text-sm text-muted text-center py-4">
-          No keys match your search.
-        </p>
-      {/if}
+      {#each controller.visibleKeys as credential (credential.id)}
+        <ApiKeyListItem
+          {credential}
+          isActive={auth.state.credentials?.activeCredentialId ===
+            credential.id}
+          onSetActive={() => controller.setActiveKey(credential)}
+          onDelete={() => controller.requestDelete(credential.id)}
+          onView={() => controller.viewKey(credential.id)}
+        />
+      {:else}
+        {#if controller.allKeys.length === 0}
+          <p class="text-sm text-muted text-center py-4">
+            No API keys yet. Add one above.
+          </p>
+        {:else}
+          <p class="text-sm text-muted text-center py-4">
+            No keys match your search.
+          </p>
+        {/if}
+      {/each}
     </div>
   </div>
 
-  <!-- Undo banner -->
-  {#if pendingDeleteId}
+  {#if controller.state.pendingDeleteId}
     <div
       class="flex items-center justify-between px-3 py-2 bg-surface border-t border-border text-sm"
     >
@@ -175,7 +169,7 @@
       <button
         type="button"
         class="text-primary font-medium hover:underline cursor-pointer"
-        onclick={undoDelete}
+        onclick={() => controller.cancelPendingDelete()}
       >
         Undo
       </button>
@@ -183,6 +177,9 @@
   {/if}
 </div>
 
-{#if viewingKey}
-  <ApiKeyViewerModal apiKey={viewingKey} onclose={() => (viewingKey = null)} />
+{#if controller.viewingKey}
+  <ApiKeyViewerModal
+    apiKey={controller.viewingKey}
+    onclose={() => controller.closeViewer()}
+  />
 {/if}

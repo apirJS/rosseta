@@ -2,12 +2,14 @@
   import browser from 'webextension-polyfill';
 
   interface Props {
-    onLogout: () => void;
     onManageKeys: () => void;
+    onManageModels: () => void;
+    onCustomProviders: () => void;
     onHistory: () => void;
   }
 
-  const { onLogout, onManageKeys, onHistory }: Props = $props();
+  const { onManageKeys, onManageModels, onCustomProviders, onHistory }: Props =
+    $props();
 
   const version = browser.runtime.getManifest().version;
 </script>
@@ -26,16 +28,23 @@
     <button
       type="button"
       class="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-surface cursor-pointer"
-      onclick={onHistory}
+      onclick={onManageModels}
     >
-      History
+      Manage Models
     </button>
     <button
       type="button"
-      class="w-full px-3 py-2 text-left text-sm text-destructive hover:bg-surface cursor-pointer"
-      onclick={onLogout}
+      class="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-surface cursor-pointer"
+      onclick={onCustomProviders}
     >
-      Logout
+      Custom Providers
+    </button>
+    <button
+      type="button"
+      class="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-surface cursor-pointer"
+      onclick={onHistory}
+    >
+      History
     </button>
     <div class="border-t border-border my-1"></div>
     <div

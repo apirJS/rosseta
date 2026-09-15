@@ -5,10 +5,6 @@ import { TranslationModalHandler } from '../handlers/TranslationModalHandler';
 import { ToastHandler } from '../handlers/ToastHandler';
 import type { ThemeManager } from '../hosts/ThemeManager';
 
-/**
- * Validates incoming runtime messages and dispatches them to the appropriate handler.
- * Centralizes message validation and routing for the content script.
- */
 export class ContentMessageRouter {
   private readonly overlayHandler: OverlayHandler;
   private readonly translationModalHandler: TranslationModalHandler;
@@ -20,9 +16,6 @@ export class ContentMessageRouter {
     this.toastHandler = new ToastHandler(themeManager);
   }
 
-  /**
-   * Registers the onMessage listener with the browser runtime.
-   */
   register(): void {
     browser.runtime.onMessage.addListener(async (message: unknown) => {
       const result = MessageSchema.safeParse(message);

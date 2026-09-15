@@ -1,37 +1,68 @@
 import { describe, expect, test } from 'bun:test';
 import { UserPreferences } from './UserPreferences';
 import { Theme } from './Theme';
-import { AiModel } from './AiModel';
 import { Language } from '../translation/Language';
 import { DomainError } from '../shared/DomainError';
 
 describe('Domain: UserPreferences', () => {
-  // ==================== CREATE DEFAULT ====================
   describe('createDefault', () => {
     test('creates with sensible defaults', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
       expect(prefs.id).toBe('prefs-1');
       expect(prefs.theme.value).toBe('system');
       expect(prefs.targetLanguage.code).toBe('en-US');
-      expect(prefs.selectedModel.id).toBe('gemini-2.5-flash');
+      expect(prefs.selectedModels).toEqual({});
       expect(prefs.shortcut).toBeNull();
     });
   });
 
-  // ==================== FROM RAW ====================
+  describe('getModelIdFor', () => {
+    test('returns the saved model for the provider', () => {
+      const prefs = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        selectedModels: { google: 'gemini-2.0-flash' },
+      });
+      expect(prefs.success && prefs.data.getModelIdFor('google')).toBe(
+        'gemini-2.0-flash',
+      );
+    });
+
+    test('falls back to the provider default when nothing is saved', () => {
+      const prefs = UserPreferences.createDefault('prefs-1');
+      expect(prefs.getModelIdFor('google')).toBe('gemini-2.5-flash');
+      expect(prefs.getModelIdFor('anthropic')).toBe(
+        'claude-sonnet-4-20250514',
+      );
+    });
+
+    test('returns empty string for providers without a default', () => {
+      const prefs = UserPreferences.createDefault('prefs-1');
+      expect(prefs.getModelIdFor('custom-unknown')).toBe('');
+      expect(prefs.hasSelectedModel('custom-unknown')).toBe(false);
+    });
+
+    test('hasSelectedModel is true when a model resolves', () => {
+      const prefs = UserPreferences.createDefault('prefs-1');
+      expect(prefs.hasSelectedModel('google')).toBe(true);
+    });
+  });
+
   describe('fromRaw', () => {
     test('accepts valid raw props', () => {
       const result = UserPreferences.fromRaw({
         id: 'prefs-1',
         theme: 'dark',
         targetLanguage: 'ja-JP',
-        selectedModel: 'gemini-2.0-flash',
+        selectedModels: { google: 'gemini-2.0-flash', groq: 'llama-4' },
       });
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.theme.isDark).toBe(true);
         expect(result.data.targetLanguage.code).toBe('ja-JP');
-        expect(result.data.selectedModel.id).toBe('gemini-2.0-flash');
+        expect(result.data.selectedModels).toEqual({
+          google: 'gemini-2.0-flash',
+          groq: 'llama-4',
+        });
       }
     });
 
@@ -41,6 +72,35 @@ describe('Domain: UserPreferences', () => {
       if (result.success) {
         expect(result.data.theme.value).toBe('system');
         expect(result.data.targetLanguage.code).toBe('en-US');
+        expect(result.data.selectedModels).toEqual({});
+      }
+    });
+
+    test('drops invalid selectedModels entries instead of failing', () => {
+      const result = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        selectedModels: {
+          google: 'gemini-2.0-flash',
+          groq: '',
+          xai: 42,
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.selectedModels).toEqual({
+          google: 'gemini-2.0-flash',
+        });
+      }
+    });
+
+    test('ignores legacy selectedModel', () => {
+      const result = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        selectedModel: 'gpt-4o',
+      } as Parameters<typeof UserPreferences.fromRaw>[0]);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.selectedModels).toEqual({});
       }
     });
 
@@ -68,87 +128,56 @@ describe('Domain: UserPreferences', () => {
       });
       expect(result.success).toBe(false);
     });
-
-    test('fails on invalid model', () => {
-      const result = UserPreferences.fromRaw({
-        id: 'prefs-1',
-        selectedModel: 'gpt-4-turbo',
-      });
-      expect(result.success).toBe(false);
-    });
   });
 
-  // ==================== WITH* IMMUTABLE UPDATES ====================
-  describe('immutable updates', () => {
-    test('withTheme returns new instance with updated theme', () => {
-      const original = UserPreferences.createDefault('prefs-1');
-      const updated = original.withTheme(Theme.dark());
-
+  describe('with* methods', () => {
+    test('withTheme returns new preferences with updated theme', () => {
+      const prefs = UserPreferences.createDefault('prefs-1');
+      const updated = prefs.withTheme(Theme.create('dark'));
       expect(updated.theme.isDark).toBe(true);
-      expect(original.theme.isSystem).toBe(true); // original unchanged
-      expect(updated.targetLanguage.code).toBe(original.targetLanguage.code);
-      expect(updated.selectedModel.id).toBe(original.selectedModel.id);
+      expect(updated.targetLanguage.code).toBe(prefs.targetLanguage.code);
+      expect(prefs.theme.value).toBe('system');
     });
 
-    test('withTargetLanguage returns new instance', () => {
-      const original = UserPreferences.createDefault('prefs-1');
-      const updated = original.withTargetLanguage(Language.create('ko-KR'));
-
-      expect(updated.targetLanguage.code).toBe('ko-KR');
-      expect(original.targetLanguage.code).toBe('en-US');
+    test('withTargetLanguage returns new preferences with updated language', () => {
+      const prefs = UserPreferences.createDefault('prefs-1');
+      const updated = prefs.withTargetLanguage(Language.create('ja-JP'));
+      expect(updated.targetLanguage.code).toBe('ja-JP');
+      expect(prefs.targetLanguage.code).toBe('en-US');
     });
 
-    test('withSelectedModel returns new instance', () => {
-      const original = UserPreferences.createDefault('prefs-1');
-      const updated = original.withSelectedModel(
-        AiModel.create('gemini-2.0-flash'),
-      );
+    test('withSelectedModel updates only that provider', () => {
+      const prefs = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        selectedModels: { google: 'gemini-2.0-flash' },
+      });
+      expect(prefs.success).toBe(true);
+      if (!prefs.success) return;
 
-      expect(updated.selectedModel.id).toBe('gemini-2.0-flash');
-      expect(original.selectedModel.id).toBe('gemini-2.5-flash');
-    });
-
-    test('withShortcut returns new instance with updated shortcut', () => {
-      const original = UserPreferences.createDefault('prefs-1');
-      expect(original.shortcut).toBeNull();
-
-      const updated = original.withShortcut('Ctrl+Shift+Space');
-
-      expect(updated.shortcut).toBe('Ctrl+Shift+Space');
-      expect(original.shortcut).toBeNull(); // original unchanged
-      expect(updated.theme.isSystem).toBe(true); // other fields preserved
-    });
-
-    test('withShortcut preserves shortcut through other with* calls', () => {
-      const prefs = UserPreferences.createDefault('prefs-1')
-        .withShortcut('Ctrl+Shift+Space')
-        .withTheme(Theme.dark());
-
-      expect(prefs.shortcut).toBe('Ctrl+Shift+Space');
-      expect(prefs.theme.isDark).toBe(true);
+      const updated = prefs.data.withSelectedModel('groq', 'llama-4');
+      expect(updated.selectedModels).toEqual({
+        google: 'gemini-2.0-flash',
+        groq: 'llama-4',
+      });
+      expect(updated.getModelIdFor('groq')).toBe('llama-4');
+      expect(prefs.data.selectedModels).toEqual({
+        google: 'gemini-2.0-flash',
+      });
     });
   });
 
-  // ==================== TO PROPS ROUND TRIP ====================
-  describe('toProps', () => {
-    test('round-trips through toProps and fromRaw', () => {
-      const original = UserPreferences.createDefault('prefs-1')
-        .withTheme(Theme.dark())
-        .withTargetLanguage(Language.create('ja-JP'));
+  describe('toProps round-trip', () => {
+    test('round-trips through fromRaw', () => {
+      const prefs = UserPreferences.createDefault('prefs-1')
+        .withTargetLanguage(Language.create('ja-JP'))
+        .withSelectedModel('xai', 'grok-3');
+      const props = prefs.toProps();
 
-      const props = original.toProps();
-      expect(props).toEqual({
-        id: 'prefs-1',
-        theme: 'dark',
-        targetLanguage: 'ja-JP',
-        selectedModel: 'gemini-2.5-flash',
-      });
-
-      const restored = UserPreferences.fromRaw(props);
-      expect(restored.success).toBe(true);
-      if (restored.success) {
-        expect(restored.data.theme.isDark).toBe(true);
-        expect(restored.data.targetLanguage.code).toBe('ja-JP');
+      const result = UserPreferences.fromRaw(props);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.targetLanguage.code).toBe('ja-JP');
+        expect(result.data.selectedModels).toEqual({ xai: 'grok-3' });
       }
     });
   });

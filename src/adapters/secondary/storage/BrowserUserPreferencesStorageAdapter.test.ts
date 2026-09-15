@@ -13,7 +13,7 @@ function validPreferencesProps(overrides: Record<string, unknown> = {}) {
     id: 'prefs-1',
     theme: 'dark',
     targetLanguage: 'en-US',
-    selectedModel: 'gemini-2.5-flash',
+    selectedModels: { google: 'gemini-2.5-flash' },
     ...overrides,
   };
 }
@@ -48,6 +48,24 @@ describe('Adapter: BrowserUserPreferencesStorageAdapter', () => {
       expect(result.data).not.toBeNull();
       expect(result.data).toBeInstanceOf(UserPreferences);
       expect(result.data?.theme.value).toBe('dark');
+      expect(result.data?.getModelIdFor('google')).toBe('gemini-2.5-flash');
+    }
+  });
+
+  test('get() ignores legacy selectedModel instead of migrating it', async () => {
+    seedStore({
+      userPreferences: {
+        id: 'prefs-1',
+        targetLanguage: 'fr-FR',
+        selectedModel: 'gemini-2.5-flash',
+      },
+    });
+
+    const result = await adapter.get();
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data?.selectedModels).toEqual({});
+      expect(result.data?.targetLanguage.code).toBe('fr-FR');
     }
   });
 
@@ -81,6 +99,32 @@ describe('Adapter: BrowserUserPreferencesStorageAdapter', () => {
     expect(getResult.success).toBe(true);
     if (getResult.success) {
       expect(getResult.data?.theme.value).toBe('light');
+      expect(getResult.data?.getModelIdFor('google')).toBe('gemini-2.5-flash');
+    }
+  });
+
+  test('set() persists per-provider model selections', async () => {
+    const result = await adapter.set({
+      selectedModels: { groq: 'llama-4', xai: 'grok-3' },
+    });
+    expect(result.success).toBe(true);
+
+    const getResult = await adapter.get();
+    expect(getResult.success).toBe(true);
+    if (getResult.success) {
+      expect(getResult.data?.getModelIdFor('groq')).toBe('llama-4');
+      expect(getResult.data?.getModelIdFor('xai')).toBe('grok-3');
+      expect(getResult.data?.getModelIdFor('google')).toBe('gemini-2.5-flash');
+    }
+  });
+
+  test('set() persists target language changes', async () => {
+    await adapter.set({ targetLanguage: 'ja-JP' });
+
+    const getResult = await adapter.get();
+    expect(getResult.success).toBe(true);
+    if (getResult.success) {
+      expect(getResult.data?.targetLanguage.code).toBe('ja-JP');
     }
   });
 

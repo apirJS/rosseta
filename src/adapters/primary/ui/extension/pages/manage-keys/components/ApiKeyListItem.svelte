@@ -1,8 +1,9 @@
 <script lang="ts">
   import { Icon } from '../../../../shared/components';
+  import { maskApiKey } from '../../../../shared/utils';
+  import { PROVIDER_BADGE_COLORS } from '../../../../shared/constants/providers';
   import type { Credential } from '../../../../../../../core/domain/credential/Credential';
   import { ProviderRegistry } from '../../../../../../../core/domain/provider/ProviderRegistry';
-  import type { Provider } from '../../../../../../../core/domain/credential/Provider';
 
   interface Props {
     credential: Credential;
@@ -15,23 +16,16 @@
   const { credential, isActive, onSetActive, onDelete, onView }: Props =
     $props();
 
-  const maskedKey = $derived(
-    credential.apiKey.value.length > 10
-      ? `${credential.apiKey.value.slice(0, 10)}****`
-      : credential.apiKey.value,
-  );
-
-  const BADGE_COLORS: Record<Provider, string> = {
-    gemini: 'bg-blue-500/20 text-blue-400',
-    groq: 'bg-purple-500/20 text-purple-400',
-    zai: 'bg-green-500/20 text-green-400',
-  };
+  const maskedKey = $derived(maskApiKey(credential.apiKey.value));
 
   const providerLabel = $derived(
     ProviderRegistry.getConfig(credential.provider).name.toUpperCase(),
   );
 
-  const badgeColor = $derived(BADGE_COLORS[credential.provider]);
+  const badgeColor = $derived(
+    PROVIDER_BADGE_COLORS[credential.provider] ??
+      PROVIDER_BADGE_COLORS['custom-provider'],
+  );
 </script>
 
 <div
@@ -39,14 +33,12 @@
     ? 'bg-surface border-primary/50'
     : 'bg-surface border-border'}"
 >
-  <!-- Provider badge -->
   <span
     class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded {badgeColor}"
   >
     {providerLabel}
   </span>
 
-  <!-- Masked key -->
   <button
     type="button"
     class="flex-1 text-sm text-foreground truncate text-left cursor-pointer hover:text-primary transition-colors"
@@ -56,12 +48,10 @@
     {maskedKey}
   </button>
 
-  <!-- Active indicator -->
   {#if isActive}
     <span class="text-[10px] text-primary font-medium">ACTIVE</span>
   {/if}
 
-  <!-- View full key button -->
   <button
     type="button"
     class="p-1 text-muted hover:text-foreground transition-colors cursor-pointer"
@@ -71,7 +61,6 @@
     <Icon name="eye" class="w-4 h-4" />
   </button>
 
-  <!-- Delete button -->
   <button
     type="button"
     class="p-1 text-muted hover:text-destructive transition-colors cursor-pointer"

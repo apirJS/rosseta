@@ -1,8 +1,10 @@
 @import 'tailwindcss';
 @import './ayu-theme.css';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 #app {
-  height: 320px;
+  height: 400px;
   width: 324px;
   overflow: hidden;
 }

@@ -5,6 +5,8 @@
   interface Option {
     value: string;
     label: string;
+    disabled?: boolean;
+    hidden?: boolean;
   }
 
   interface Props {
@@ -47,7 +49,13 @@
   <div class="relative">
     <select {id} {value} {disabled} class={selectClass} onchange={handleChange}>
       {#each options as option}
-        <option value={option.value}>{option.label}</option>
+        <option
+          value={option.value}
+          disabled={option.disabled}
+          hidden={option.hidden}
+        >
+          {option.label}
+        </option>
       {/each}
     </select>
     <div

@@ -4,7 +4,6 @@ import tailwindcss from '@tailwindcss/vite';
 import webExtension from 'vite-plugin-web-extension';
 import { svelteTesting } from '@testing-library/svelte/vite';
 
-// https://vite.dev/config/
 export default defineConfig({
   build: {
     outDir: `dist/${process.env.TARGET || 'chrome'}`,

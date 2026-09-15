@@ -27,7 +27,6 @@ export function createHistoryController() {
   function getFiltered(): Translation[] {
     let items = state.translations;
 
-    // Time filter
     if (state.timeFilter !== 'all') {
       const now = Date.now();
       const cutoff =
@@ -37,7 +36,6 @@ export function createHistoryController() {
       items = items.filter((t) => t.createdAt.getTime() >= cutoff);
     }
 
-    // Search filter (match against original text segments)
     if (state.searchQuery.trim()) {
       const query = state.searchQuery.toLowerCase();
       items = items.filter((t) =>
@@ -68,7 +66,6 @@ export function createHistoryController() {
     state.timeFilter = value;
   }
 
-  /** Commit any pending delete immediately (fire-and-forget). */
   function commitPendingDelete() {
     if (!state.pendingDelete) return;
     clearTimeout(state.pendingDelete.timer);
@@ -77,7 +74,6 @@ export function createHistoryController() {
   }
 
   function deleteItem(id: string) {
-    // Commit any previously pending delete first
     commitPendingDelete();
 
     const idx = state.translations.findIndex((t) => t.id === id);

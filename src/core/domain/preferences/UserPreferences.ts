@@ -2,7 +2,6 @@ import { AggregateRoot } from '../shared/AggregateRoot';
 import { DomainError } from '../shared/DomainError';
 import { failure, success, type Result } from '../../../shared/types/Result';
 import { Theme, type ThemeValue } from './Theme';
-import { AiModel } from './AiModel';
 import { Language, type LanguageCode } from '../translation/Language';
 import { ProviderRegistry } from '../provider/ProviderRegistry';
 
@@ -10,7 +9,7 @@ export interface UserPreferencesProps {
   id: string;
   theme: ThemeValue;
   targetLanguage: LanguageCode;
-  selectedModel: string;
+  selectedModels: Record<string, string>;
 }
 
 export class UserPreferences extends AggregateRoot<string> {
@@ -18,7 +17,7 @@ export class UserPreferences extends AggregateRoot<string> {
     id: string,
     private readonly _theme: Theme,
     private readonly _targetLanguage: Language,
-    private readonly _selectedModel: AiModel,
+    private readonly _selectedModels: Readonly<Record<string, string>>,
     private readonly _shortcut: string | null = null,
   ) {
     super(id);
@@ -32,12 +31,20 @@ export class UserPreferences extends AggregateRoot<string> {
     return this._targetLanguage;
   }
 
-  public get selectedModel(): AiModel {
-    return this._selectedModel;
+  public get selectedModels(): Readonly<Record<string, string>> {
+    return this._selectedModels;
   }
 
   public get shortcut(): string | null {
     return this._shortcut;
+  }
+
+  public getModelIdFor(provider: string): string {
+    return this._selectedModels[provider] ?? ProviderRegistry.getDefaultModelId(provider);
+  }
+
+  public hasSelectedModel(provider: string): boolean {
+    return this.getModelIdFor(provider).length > 0;
   }
 
   public toProps(): UserPreferencesProps {
@@ -45,7 +52,7 @@ export class UserPreferences extends AggregateRoot<string> {
       id: this.id,
       theme: this._theme.value,
       targetLanguage: this._targetLanguage.code,
-      selectedModel: this._selectedModel.id,
+      selectedModels: { ...this._selectedModels },
     };
   }
 
@@ -54,7 +61,7 @@ export class UserPreferences extends AggregateRoot<string> {
       id: string;
       theme: string;
       targetLanguage: string;
-      selectedModel: string;
+      selectedModels: Record<string, unknown>;
     }>,
   ): Result<UserPreferences, DomainError> {
     if (!props.id) {
@@ -67,28 +74,25 @@ export class UserPreferences extends AggregateRoot<string> {
     const languageResult = Language.fromRaw(props.targetLanguage ?? 'en-US');
     if (!languageResult.success) return failure(languageResult.error);
 
-    const fallbackModelId = ProviderRegistry.getDefaultModelId('gemini');
-    const modelResult = AiModel.fromRaw(props.selectedModel ?? fallbackModelId);
-    if (!modelResult.success) return failure(modelResult.error);
+    const selectedModels = sanitizeSelectedModels(props.selectedModels);
 
     return success(
       new UserPreferences(
         props.id,
         themeResult.data,
         languageResult.data,
-        modelResult.data,
+        selectedModels,
         null,
       ),
     );
   }
 
   public static createDefault(id: string): UserPreferences {
-    const defaultModelId = ProviderRegistry.getDefaultModelId('gemini');
     return new UserPreferences(
       id,
       Theme.system(),
       Language.create('en-US'),
-      AiModel.create(defaultModelId),
+      {},
       null,
     );
   }
@@ -98,7 +102,7 @@ export class UserPreferences extends AggregateRoot<string> {
       this.id,
       theme,
       this._targetLanguage,
-      this._selectedModel,
+      this._selectedModels,
       this._shortcut,
     );
   }
@@ -108,17 +112,20 @@ export class UserPreferences extends AggregateRoot<string> {
       this.id,
       this._theme,
       language,
-      this._selectedModel,
+      this._selectedModels,
       this._shortcut,
     );
   }
 
-  public withSelectedModel(model: AiModel): UserPreferences {
+  public withSelectedModel(
+    provider: string,
+    modelId: string,
+  ): UserPreferences {
     return new UserPreferences(
       this.id,
       this._theme,
       this._targetLanguage,
-      model,
+      { ...this._selectedModels, [provider]: modelId },
       this._shortcut,
     );
   }
@@ -128,8 +135,22 @@ export class UserPreferences extends AggregateRoot<string> {
       this.id,
       this._theme,
       this._targetLanguage,
-      this._selectedModel,
+      this._selectedModels,
       shortcut,
     );
   }
+}
+
+function sanitizeSelectedModels(
+  raw: Record<string, unknown> | undefined,
+): Record<string, string> {
+  const sanitized: Record<string, string> = {};
+  if (!raw || typeof raw !== 'object') return sanitized;
+
+  for (const [provider, modelId] of Object.entries(raw)) {
+    if (typeof modelId === 'string' && modelId.trim().length > 0) {
+      sanitized[provider] = modelId.trim();
+    }
+  }
+  return sanitized;
 }

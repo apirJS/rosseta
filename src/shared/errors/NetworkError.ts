@@ -1,9 +1,6 @@
 import { AppError, type AppErrorOptions } from './AppError';
 import { ErrorCode } from './ErrorCode';
 
-/**
- * Network-related errors.
- */
 export class NetworkError extends AppError {
   constructor(options: Omit<AppErrorOptions, 'code'> & { code?: ErrorCode }) {
     super({
@@ -33,9 +30,6 @@ export class NetworkError extends AppError {
     });
   }
 
-  /**
-   * Create from a fetch error.
-   */
   public static fromFetchError(error: Error, url?: string): NetworkError {
     if (!navigator.onLine) {
       return NetworkError.offline();

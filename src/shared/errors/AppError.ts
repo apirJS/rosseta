@@ -7,10 +7,6 @@ export interface AppErrorOptions {
   context?: Record<string, unknown>;
 }
 
-/**
- * Base application error with code, context, and optional cause.
- * Use specific subclasses (AuthError, TranslationError, etc.) when possible.
- */
 export class AppError extends Error {
   public readonly code: ErrorCode;
   public readonly userMessage: string;
@@ -35,9 +31,6 @@ export class AppError extends Error {
     }
   }
 
-  /**
-   * Create an AppError from an unknown caught value.
-   */
   public static fromUnknown(
     error: unknown,
     fallbackCode = ErrorCode.UNKNOWN_ERROR,
@@ -60,25 +53,16 @@ export class AppError extends Error {
     });
   }
 
-  /**
-   * Check if this error matches a specific code.
-   */
   public is(code: ErrorCode): boolean {
     return this.code === code;
   }
 
-  /**
-   * Check if this error is in a category (e.g., all AUTH_ errors).
-   */
   public isCategory(
     prefix: 'AUTH' | 'TRANSLATION' | 'NETWORK' | 'STORAGE' | 'VALIDATION',
   ): boolean {
     return this.code.startsWith(prefix);
   }
 
-  /**
-   * Serialize for logging or transmission.
-   */
   public toJSON(): Record<string, unknown> {
     return {
       name: this.name,

@@ -23,7 +23,6 @@
     { value: 'all', label: 'All time' },
   ];
 
-  // Load history on mount
   $effect(() => {
     controller.load();
   });
@@ -35,7 +34,6 @@
   isDark={preferences.state.resolvedTheme === 'dark'}
   onToggleTheme={preferences.toggleTheme}
 >
-  <!-- Search + Filter Bar (Fixed) -->
   <div class="flex gap-2 mb-3">
     <div class="relative flex-1">
       <Icon
@@ -65,7 +63,6 @@
     </select>
   </div>
 
-  <!-- Scrollable History List -->
   <div class="flex-1 overflow-y-auto flex flex-col gap-1.5 min-h-0 -mx-1 px-1">
     {#if controller.state.loading}
       <div class="flex items-center justify-center py-8 text-muted">
@@ -90,7 +87,6 @@
     {/if}
   </div>
 
-  <!-- Undo Delete Banner -->
   {#if controller.state.pendingDelete}
     <div
       class="flex items-center justify-between px-3 py-2 bg-surface border-t border-border text-sm"

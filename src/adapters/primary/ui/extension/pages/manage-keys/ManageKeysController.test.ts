@@ -1,0 +1,272 @@
+import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
+import {
+  createManageKeysController,
+  type ManageKeysDeps,
+} from './ManageKeysController.svelte';
+import { ApiKey } from '../../../../../../core/domain/credential/ApiKey';
+import { Credential } from '../../../../../../core/domain/credential/Credential';
+import { Credentials } from '../../../../../../core/domain/credential/Credentials';
+import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
+import { success } from '../../../../../../shared/types/Result';
+import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import { v4 as uuidv4 } from 'uuid';
+
+function makeCredential(id: string, rawKey: string, provider: 'google' | 'groq') {
+  const apiKey = ApiKey.createWithProvider(rawKey, provider);
+  if (!apiKey.success) throw new Error('bad key');
+  const cred = Credential.create(id, apiKey.data, provider);
+  if (!cred.success) throw new Error('bad cred');
+  return cred.data;
+}
+
+function createToastFake() {
+  const show = vi.fn();
+  const toast = {
+    show,
+    dismiss: vi.fn(),
+    update: vi.fn(),
+    toasts: [],
+  } as unknown as PopupToastController;
+  return { toast, show };
+}
+
+function createDeps(overrides: Partial<ManageKeysDeps> = {}) {
+  const { toast, show } = createToastFake();
+
+  const credentials = Credentials.createEmpty('creds-1')
+    .add(makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'))
+    .add(makeCredential('q1', 'gsk_groqKeyValue123', 'groq'));
+
+  const deps: ManageKeysDeps = {
+    credentials: () => credentials,
+    addApiKey: vi.fn().mockResolvedValue(null),
+    removeApiKey: vi.fn().mockResolvedValue(null),
+    setActiveKey: vi.fn(),
+    modelsFor: vi.fn().mockReturnValue([]),
+    fetchModels: vi.fn().mockResolvedValue(
+      success<StoredModel[]>([
+        { id: 'm1', name: 'Model 1', source: 'fetched' },
+      ]),
+    ),
+    clearAllModels: vi.fn().mockResolvedValue(undefined),
+    toast,
+    ...overrides,
+  };
+
+  return { deps, show, credentials };
+}
+
+describe('UI Controller: ManageKeysController', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('lists all keys by default', () => {
+    const { deps } = createDeps();
+    const controller = createManageKeysController(deps);
+
+    expect(controller.allKeys).toHaveLength(2);
+    expect(controller.visibleKeys).toHaveLength(2);
+  });
+
+  test('addApiKey with empty input does nothing', async () => {
+    const { deps } = createDeps();
+    const controller = createManageKeysController(deps);
+
+    await controller.addApiKey();
+
+    expect(deps.addApiKey).not.toHaveBeenCalled();
+  });
+
+  test('addApiKey duplicate shows an error toast', async () => {
+    const { deps, show } = createDeps();
+    const controller = createManageKeysController(deps);
+    controller.state.apiKeyInput = 'AIzaGoogleKeyValue123';
+
+    await controller.addApiKey();
+
+    expect(deps.addApiKey).not.toHaveBeenCalled();
+    expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error', message: 'Key already added' }),
+    );
+  });
+
+  test('addApiKey success clears the input and toasts', async () => {
+    const { deps, show } = createDeps();
+    const controller = createManageKeysController(deps);
+    controller.state.selectedProvider = 'groq';
+    controller.state.apiKeyInput = 'gsk_new_key_value';
+
+    await controller.addApiKey();
+
+    expect(deps.addApiKey).toHaveBeenCalledWith('gsk_new_key_value', 'groq');
+    expect(controller.state.apiKeyInput).toBe('');
+    expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success', message: 'API key added' }),
+    );
+  });
+
+  test('addApiKey failure shows an error toast and keeps input', async () => {
+    const { deps, show } = createDeps({
+      addApiKey: vi.fn().mockResolvedValue('Storage is full'),
+    });
+    const controller = createManageKeysController(deps);
+    controller.state.apiKeyInput = 'gsk_new_key_value';
+
+    await controller.addApiKey();
+
+    expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        message: 'Could not add key',
+        description: 'Storage is full',
+      }),
+    );
+    expect(controller.state.apiKeyInput).toBe('gsk_new_key_value');
+  });
+
+  test('addApiKey auto-fetches models when the provider has none stored', async () => {
+    const { deps } = createDeps();
+    const controller = createManageKeysController(deps);
+    controller.state.selectedProvider = 'groq';
+    controller.state.apiKeyInput = 'gsk_new_key_value';
+
+    await controller.addApiKey();
+
+    expect(deps.fetchModels).toHaveBeenCalledWith('groq');
+  });
+
+  test('addApiKey skips auto-fetch when models are already stored', async () => {
+    const { deps } = createDeps({
+      modelsFor: vi.fn().mockReturnValue([
+        { id: 'm1', name: 'Model 1', source: 'fetched' },
+      ]),
+    });
+    const controller = createManageKeysController(deps);
+    controller.state.apiKeyInput = 'gsk_new_key_value';
+
+    await controller.addApiKey();
+
+    expect(deps.fetchModels).not.toHaveBeenCalled();
+  });
+
+  test('search filters by key value and provider', () => {
+    const { deps } = createDeps();
+    const controller = createManageKeysController(deps);
+
+    controller.state.searchQuery = 'groq';
+    expect(controller.visibleKeys.map((c) => c.id)).toEqual(['q1']);
+
+    controller.state.searchQuery = 'aizaGoogle';
+    expect(controller.visibleKeys.map((c) => c.id)).toEqual(['g1']);
+  });
+
+  describe('delete with undo', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test('requestDelete hides the key immediately and commits after the window', async () => {
+      const { deps } = createDeps();
+      const controller = createManageKeysController(deps);
+
+      controller.requestDelete('g1');
+
+      expect(controller.state.pendingDeleteId).toBe('g1');
+      expect(controller.visibleKeys.map((c) => c.id)).toEqual(['q1']);
+      expect(deps.removeApiKey).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(5000);
+      await vi.runAllTicks();
+
+      expect(deps.removeApiKey).toHaveBeenCalledWith('g1');
+      expect(controller.state.pendingDeleteId).toBeNull();
+    });
+
+    test('undo cancels the pending delete', async () => {
+      const { deps } = createDeps();
+      const controller = createManageKeysController(deps);
+
+      controller.requestDelete('g1');
+      controller.cancelPendingDelete();
+
+      vi.advanceTimersByTime(6000);
+      await vi.runAllTicks();
+
+      expect(deps.removeApiKey).not.toHaveBeenCalled();
+      expect(controller.visibleKeys).toHaveLength(2);
+    });
+
+    test('requestDelete while pending cancels the previous timer', async () => {
+      const { deps } = createDeps();
+      const controller = createManageKeysController(deps);
+
+      controller.requestDelete('g1');
+      controller.requestDelete('q1');
+
+      vi.advanceTimersByTime(5000);
+      await vi.runAllTicks();
+
+      expect(deps.removeApiKey).not.toHaveBeenCalledWith('g1');
+      expect(deps.removeApiKey).toHaveBeenCalledWith('q1');
+    });
+
+    test('destroy cancels the pending delete', async () => {
+      const { deps } = createDeps();
+      const controller = createManageKeysController(deps);
+
+      controller.requestDelete('g1');
+      controller.destroy();
+
+      vi.advanceTimersByTime(6000);
+      await vi.runAllTicks();
+
+      expect(deps.removeApiKey).not.toHaveBeenCalled();
+    });
+
+    test('deleting the last key clears all stored models', async () => {
+      let live = Credentials.createEmpty('creds-1').add(
+        makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'),
+      );
+      const { deps } = createDeps({
+        credentials: () => live,
+        removeApiKey: vi.fn().mockImplementation(async () => {
+          live = Credentials.createEmpty('creds-1');
+          return null;
+        }),
+      });
+      const controller = createManageKeysController(deps);
+
+      controller.requestDelete('g1');
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(deps.clearAllModels).toHaveBeenCalledTimes(1);
+    });
+
+    test('deleting a key while others remain keeps stored models', async () => {
+      const { deps } = createDeps();
+      const controller = createManageKeysController(deps);
+
+      controller.requestDelete('g1');
+      vi.advanceTimersByTime(5000);
+      await vi.runAllTicks();
+
+      expect(deps.clearAllModels).not.toHaveBeenCalled();
+    });
+  });
+
+  test('viewKey exposes the full key value', () => {
+    const { deps } = createDeps();
+    const controller = createManageKeysController(deps);
+
+    controller.viewKey('g1');
+    expect(controller.viewingKey).toBe('AIzaGoogleKeyValue123');
+
+    controller.closeViewer();
+    expect(controller.viewingKey).toBeNull();
+  });
+});

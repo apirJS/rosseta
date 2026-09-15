@@ -13,7 +13,6 @@ export class ResolveActiveCredentialUseCase implements IResolveActiveCredentialU
   ): Promise<Result<Credential, AppError>> {
     const modeResult = await this.keySelectionStorage.getMode();
     if (!modeResult.success) {
-      // Fallback to manual if storage fails
       return this.resolveManual(credentials);
     }
 
@@ -23,7 +22,6 @@ export class ResolveActiveCredentialUseCase implements IResolveActiveCredentialU
       return this.resolveManual(credentials);
     }
 
-    // Auto-balance mode
     const provider = mode.autoBalanceProvider;
     if (!provider) {
       return this.resolveManual(credentials);
@@ -31,7 +29,6 @@ export class ResolveActiveCredentialUseCase implements IResolveActiveCredentialU
 
     const providerKeys = credentials.getByProvider(provider);
     if (providerKeys.length < 2) {
-      // Not enough keys — fall back to manual
       return this.resolveManual(credentials);
     }
 
@@ -44,7 +41,6 @@ export class ResolveActiveCredentialUseCase implements IResolveActiveCredentialU
       return this.resolveManual(credentials);
     }
 
-    // Persist the last used ID for next rotation
     await this.keySelectionStorage.setLastUsedId(provider, next.id);
 
     return success(next);

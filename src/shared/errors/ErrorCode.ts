@@ -1,46 +1,33 @@
-/**
- * Centralized error codes for the entire application.
- * Format: CATEGORY_SPECIFIC_ERROR
- */
 export enum ErrorCode {
-  // Auth errors (1xxx)
   AUTH_INVALID_API_KEY = 'AUTH_INVALID_API_KEY',
   AUTH_NOT_AUTHENTICATED = 'AUTH_NOT_AUTHENTICATED',
 
-  // Translation errors (2xxx)
   TRANSLATION_FAILED = 'TRANSLATION_FAILED',
   TRANSLATION_RATE_LIMITED = 'TRANSLATION_RATE_LIMITED',
   TRANSLATION_INVALID_IMAGE = 'TRANSLATION_INVALID_IMAGE',
   TRANSLATION_UNSUPPORTED_LANGUAGE = 'TRANSLATION_UNSUPPORTED_LANGUAGE',
   TRANSLATION_MALFORMED_RESPONSE = 'TRANSLATION_MALFORMED_RESPONSE',
   TRANSLATION_AI_REJECTED = 'TRANSLATION_AI_REJECTED',
+  TRANSLATION_MODEL_NO_VISION = 'TRANSLATION_MODEL_NO_VISION',
 
-  // Network errors (3xxx)
   NETWORK_OFFLINE = 'NETWORK_OFFLINE',
   NETWORK_TIMEOUT = 'NETWORK_TIMEOUT',
   NETWORK_SERVER_ERROR = 'NETWORK_SERVER_ERROR',
 
-  // Storage errors (4xxx)
   STORAGE_QUOTA_EXCEEDED = 'STORAGE_QUOTA_EXCEEDED',
   STORAGE_READ_FAILED = 'STORAGE_READ_FAILED',
   STORAGE_WRITE_FAILED = 'STORAGE_WRITE_FAILED',
 
-  // Validation errors (5xxx)
   VALIDATION_INVALID_INPUT = 'VALIDATION_INVALID_INPUT',
   VALIDATION_EMPTY_SELECTION = 'VALIDATION_EMPTY_SELECTION',
 
-  // Browser/Extension errors (6xxx)
   BROWSER_NO_ACTIVE_TAB = 'BROWSER_NO_ACTIVE_TAB',
   BROWSER_SCRIPT_INJECTION_FAILED = 'BROWSER_SCRIPT_INJECTION_FAILED',
   BROWSER_COMMUNICATION_FAILED = 'BROWSER_COMMUNICATION_FAILED',
 
-  // Unknown
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }
 
-/**
- * Maps error codes to user-friendly messages.
- */
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.BROWSER_NO_ACTIVE_TAB]: 'Unable to find an active browser tab.',
   [ErrorCode.BROWSER_SCRIPT_INJECTION_FAILED]:
@@ -50,7 +37,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
 
   [ErrorCode.AUTH_INVALID_API_KEY]:
     'Invalid API key. Please check your key and try again.',
-  [ErrorCode.AUTH_NOT_AUTHENTICATED]: 'Please log in to use this feature.',
+  [ErrorCode.AUTH_NOT_AUTHENTICATED]: 'No API key set. Add one in the popup.',
 
   [ErrorCode.TRANSLATION_FAILED]: 'Translation failed. Please try again.',
   [ErrorCode.TRANSLATION_RATE_LIMITED]:
@@ -61,6 +48,8 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.TRANSLATION_MALFORMED_RESPONSE]:
     'Received an unexpected response from the translation service.',
   [ErrorCode.TRANSLATION_AI_REJECTED]: 'The AI could not process this image.',
+  [ErrorCode.TRANSLATION_MODEL_NO_VISION]:
+    'The selected model cannot read images. Pick a vision-capable model (e.g. qwen-vl).',
 
   [ErrorCode.NETWORK_OFFLINE]: 'No internet connection.',
   [ErrorCode.NETWORK_TIMEOUT]: 'Request timed out. Please try again.',

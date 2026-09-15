@@ -17,11 +17,6 @@ async function updateManifest(): Promise<void> {
     process.exit(1);
   }
 
-  // Extensions strictly require x.y.z.w (numbers only).
-  // This regex strips the alphabet characters from pre-releases.
-  // Example A: "1.2.0" -> "1.2.0"
-  // Example B: "1.2.0-beta.1" -> "1.2.0.1"
-  // Example C: "1.2.0-alpha" -> "1.2.0"
   const cleanVersion = rawVersion
     .replace(/-[a-zA-Z]+\./, '.')
     .replace(/-[a-zA-Z]+/, '');

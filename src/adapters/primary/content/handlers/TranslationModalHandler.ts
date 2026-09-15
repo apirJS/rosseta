@@ -5,9 +5,6 @@ import { createShadowDomHost } from '../hosts/ShadowDomHost';
 import type { ThemeManager } from '../hosts/ThemeManager';
 import type { Translation } from '../../../../core/domain/translation/Translation';
 
-/**
- * Payload shape for mounting a translation modal.
- */
 export interface TranslationModalPayload {
   id: string;
   original: {
@@ -24,9 +21,6 @@ export interface TranslationModalPayload {
   createdAt: Date;
 }
 
-/**
- * Maps a Translation domain entity to the modal payload format.
- */
 export function serializeForModal(
   translation: Translation,
 ): TranslationModalPayload {
@@ -47,13 +41,6 @@ export function serializeForModal(
   };
 }
 
-/**
- * Handles mounting and unmounting translation result modals.
- *
- * Each translation gets its own Shadow DOM host (keyed by translation ID),
- * allowing multiple modals to coexist. Integrates with ThemeManager for
- * dark/light theme tracking.
- */
 export class TranslationModalHandler {
   constructor(private readonly themeManager: ThemeManager) {}
 

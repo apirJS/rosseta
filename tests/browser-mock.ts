@@ -1,10 +1,11 @@
 import { mock } from 'bun:test';
+import * as realAi from 'ai';
 
-// ── In-memory storage backing ────────────────────────────────────────
 let store: Record<string, unknown> = {};
 
 const storageMock = {
-  get: mock(async (keys: string | string[]) => {
+  get: mock(async (keys: string | string[] | null) => {
+    if (keys === null) return { ...store };
     const keyList = Array.isArray(keys) ? keys : [keys];
     const result: Record<string, unknown> = {};
     for (const k of keyList) {
@@ -44,20 +45,10 @@ export const browserMock = {
   },
 };
 
-// Intercept all imports of 'webextension-polyfill'.
-// The real module uses `module.exports = browser`, so Bun resolves
-// `import * as browser from 'webextension-polyfill'` as a namespace.
-// We expose every property from browserMock at the top level AND
-// as the default export, to cover both import styles.
 mock.module('webextension-polyfill', () => ({
   ...browserMock,
   default: browserMock,
 }));
-
-// ── Mock Svelte-dependent content handler modules ────────────────────
-// These must be in the preload because Bun resolves mock.module paths
-// relative to the calling file, and ContentMessageRouter.ts imports
-// these modules transitively. Preload runs before all test files.
 
 mock.module(
   '../src/adapters/primary/ui/injected/toast/ToastController.svelte',
@@ -69,7 +60,6 @@ mock.module(
   () => ({ toastController: {} }),
 );
 
-// Mock CSS ?inline imports that Svelte handlers use
 mock.module(
   '../src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css?inline',
   () => ({ default: '' }),
@@ -82,18 +72,27 @@ mock.module(
   () => ({ default: '' }),
 );
 
-// Mock Svelte component imports used by handlers
 mock.module('svelte', () => ({
   mount: mock(),
   unmount: mock(),
 }));
 
-/** Seed the in-memory store directly (bypasses the mock spy). */
+export const generateTextMock = mock(
+  async (..._args: unknown[]): Promise<unknown> => {
+    throw new Error('generateTextMock: no behavior configured');
+  },
+);
+
+mock.module('ai', () => ({
+  ...realAi,
+  generateText: (...args: unknown[]) =>
+    (generateTextMock as unknown as (...a: unknown[]) => unknown)(...args),
+}));
+
 export function seedStore(data: Record<string, unknown>) {
   Object.assign(store, data);
 }
 
-/** Reset in-memory store and clear all mock call history. */
 export function resetBrowserMock() {
   store = {};
   storageMock.get.mockClear();
@@ -108,4 +107,5 @@ export function resetBrowserMock() {
   browserMock.tabs.captureVisibleTab.mockClear();
   browserMock.commands.onCommand.addListener.mockClear();
   browserMock.scripting.executeScript.mockClear();
+  generateTextMock.mockClear();
 }

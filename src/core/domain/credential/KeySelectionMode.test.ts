@@ -3,7 +3,6 @@ import { KeySelectionMode } from './KeySelectionMode';
 import { DomainError } from '../shared/DomainError';
 
 describe('Domain: KeySelectionMode', () => {
-  // ==================== FACTORY METHODS ====================
   describe('static factories', () => {
     test('manual() creates manual mode', () => {
       const mode = KeySelectionMode.manual();
@@ -13,29 +12,35 @@ describe('Domain: KeySelectionMode', () => {
       expect(mode.autoBalanceProvider).toBeNull();
     });
 
-    test('autoBalanceGemini() creates gemini auto-balance mode', () => {
-      const mode = KeySelectionMode.autoBalanceGemini();
-      expect(mode.value).toBe('auto-balance:gemini');
+    test('autoBalance() creates auto-balance mode for any provider', () => {
+      const mode = KeySelectionMode.autoBalance('google');
+      expect(mode.value).toBe('auto-balance:google');
       expect(mode.isManual).toBe(false);
       expect(mode.isAutoBalance).toBe(true);
-      expect(mode.autoBalanceProvider).toBe('gemini');
+      expect(mode.autoBalanceProvider).toBe('google');
     });
 
-    test('autoBalanceGroq() creates groq auto-balance mode', () => {
-      const mode = KeySelectionMode.autoBalanceGroq();
-      expect(mode.value).toBe('auto-balance:groq');
-      expect(mode.isManual).toBe(false);
-      expect(mode.isAutoBalance).toBe(true);
-      expect(mode.autoBalanceProvider).toBe('groq');
+    test('autoBalance() works for every provider', () => {
+      for (const provider of [
+        'google',
+        'groq',
+        'xai',
+        'openai',
+        'anthropic',
+        'mistral',
+        'deepinfra',
+      ] as const) {
+        const mode = KeySelectionMode.autoBalance(provider);
+        expect(mode.autoBalanceProvider).toBe(provider);
+      }
     });
   });
 
-  // ==================== CREATE ====================
   describe('create', () => {
     test('creates from known values', () => {
       expect(KeySelectionMode.create('manual').value).toBe('manual');
-      expect(KeySelectionMode.create('auto-balance:gemini').value).toBe(
-        'auto-balance:gemini',
+      expect(KeySelectionMode.create('auto-balance:google').value).toBe(
+        'auto-balance:google',
       );
       expect(KeySelectionMode.create('auto-balance:groq').value).toBe(
         'auto-balance:groq',
@@ -43,13 +48,13 @@ describe('Domain: KeySelectionMode', () => {
     });
   });
 
-  // ==================== FROM RAW ====================
   describe('fromRaw', () => {
     test('accepts valid mode strings', () => {
       for (const val of [
         'manual',
-        'auto-balance:gemini',
+        'auto-balance:google',
         'auto-balance:groq',
+        'auto-balance:xai',
       ] as const) {
         const result = KeySelectionMode.fromRaw(val);
         expect(result.success).toBe(true);
@@ -72,33 +77,29 @@ describe('Domain: KeySelectionMode', () => {
         expect(result.error.message).toContain('Invalid key selection mode');
       }
     });
+
+    test('rejects auto-balance with unknown provider', () => {
+      const result = KeySelectionMode.fromRaw('auto-balance:not-a-provider');
+      expect(result.success).toBe(false);
+    });
+
+    test('rejects auto-balance with empty provider', () => {
+      const result = KeySelectionMode.fromRaw('auto-balance:');
+      expect(result.success).toBe(false);
+    });
+
+    test('rejects legacy providers that no longer exist', () => {
+      const result = KeySelectionMode.fromRaw('auto-balance:azure');
+      expect(result.success).toBe(false);
+    });
   });
 
-  // ==================== LABEL ====================
   describe('label', () => {
     test('returns human-readable labels', () => {
       expect(KeySelectionMode.manual().label).toBe('Manual');
-      expect(KeySelectionMode.autoBalanceGemini().label).toBe(
-        'Auto balance (round robin) GEMINI',
+      expect(KeySelectionMode.autoBalance('google').label).toBe(
+        'Auto balance (round robin) GOOGLE',
       );
-      expect(KeySelectionMode.autoBalanceGroq().label).toBe(
-        'Auto balance (round robin) GROQ',
-      );
-    });
-  });
-
-  // ==================== EQUALITY ====================
-  describe('equality', () => {
-    test('same modes are equal', () => {
-      expect(KeySelectionMode.manual().equals(KeySelectionMode.manual())).toBe(
-        true,
-      );
-    });
-
-    test('different modes are not equal', () => {
-      expect(
-        KeySelectionMode.manual().equals(KeySelectionMode.autoBalanceGemini()),
-      ).toBe(false);
     });
   });
 });

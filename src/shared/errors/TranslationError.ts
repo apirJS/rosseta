@@ -1,9 +1,6 @@
 import { AppError, type AppErrorOptions } from './AppError';
 import { ErrorCode } from './ErrorCode';
 
-/**
- * Translation-related errors.
- */
 export class TranslationError extends AppError {
   constructor(options: Omit<AppErrorOptions, 'code'> & { code?: ErrorCode }) {
     super({
@@ -51,6 +48,13 @@ export class TranslationError extends AppError {
     return new TranslationError({
       code: ErrorCode.TRANSLATION_AI_REJECTED,
       context: { reason },
+    });
+  }
+
+  public static modelNoVision(detail?: string): TranslationError {
+    return new TranslationError({
+      code: ErrorCode.TRANSLATION_MODEL_NO_VISION,
+      context: detail ? { detail } : undefined,
     });
   }
 }

@@ -6,9 +6,6 @@ import { toastController } from '../../ui/injected/toast/ToastController.svelte'
 import { createShadowDomHost } from '../hosts/ShadowDomHost';
 import type { ThemeManager } from '../hosts/ThemeManager';
 
-/**
- * Payload shape for SHOW_TOAST messages.
- */
 interface ShowToastPayload {
   id?: string;
   type: 'loading' | 'success' | 'error' | 'info';
@@ -17,23 +14,12 @@ interface ShowToastPayload {
   duration?: number;
 }
 
-/**
- * Handles toast notification mounting, showing, and dismissing.
- *
- * Lazily creates a persistent Shadow DOM host for the toast container.
- * Integrates with ThemeManager for dark/light theme tracking.
- * Error toasts automatically include a Retry action.
- */
 export class ToastHandler {
   private static readonly HOST_ID = 'rosseta-toast-host';
   private host: HTMLElement | null = null;
 
   constructor(private readonly themeManager: ThemeManager) {}
 
-  /**
-   * Shows or updates a toast notification.
-   * Error toasts automatically get a Retry button.
-   */
   show(payload: ShowToastPayload): void {
     this.ensureHost();
 
@@ -56,7 +42,6 @@ export class ToastHandler {
     }
   }
 
-  /** Dismisses a toast by ID. */
   dismiss(id: string): void {
     toastController.dismiss(id);
   }
@@ -89,9 +74,6 @@ export class ToastHandler {
     }
   }
 
-  /**
-   * Ensures a persistent Shadow DOM host exists for the toast container.
-   */
   private ensureHost(): void {
     if (this.host) return;
 

@@ -28,4 +28,5 @@ dist-ssr
 docs/
 https/
 coverage/
-temp.md
+temp/
+*.tsbuildinfo

@@ -5,7 +5,7 @@ import {
 } from '../../../core/domain/credential/Credentials';
 import { success, failure, type Result } from '../../../shared/types/Result';
 import { StorageError, type AppError } from '../../../shared/errors';
-import { detectProvider } from '../../../core/domain/credential/Provider';
+import { isAnyProvider } from '../../../core/domain/credential/Provider';
 import * as browser from 'webextension-polyfill';
 import { z } from 'zod';
 
@@ -15,7 +15,7 @@ const LEGACY_STORAGE_KEY = 'credential';
 const CredentialItemPropsSchema = z.object({
   id: z.string(),
   type: z.literal('API_KEY'),
-  provider: z.enum(['gemini', 'groq', 'zai']),
+  provider: z.string(),
   apiKey: z.string(),
 });
 
@@ -23,12 +23,6 @@ const CredentialsPropsSchema = z.object({
   id: z.string(),
   activeCredentialId: z.nullable(z.string()),
   items: z.array(CredentialItemPropsSchema),
-});
-
-const LegacyCredentialSchema = z.object({
-  id: z.string(),
-  type: z.literal('API_KEY'),
-  apiKey: z.string(),
 });
 
 export class BrowserCredentialStorageAdapter implements ICredentialStorage {
@@ -54,57 +48,54 @@ export class BrowserCredentialStorageAdapter implements ICredentialStorage {
         STORAGE_KEY,
         LEGACY_STORAGE_KEY,
       ]);
-      const raw = result[STORAGE_KEY];
 
-      if (raw) {
-        const parsed = CredentialsPropsSchema.safeParse(raw);
-        if (!parsed.success) {
-          await browser.storage.local.remove(STORAGE_KEY);
-          return success(null);
-        }
-
-        const credentialsResult = Credentials.fromProps(
-          parsed.data as CredentialsProps,
-        );
-        if (!credentialsResult.success) {
-          await browser.storage.local.remove(STORAGE_KEY);
-          return success(null);
-        }
-
-        return success(credentialsResult.data);
-      }
-
-      // Migration: convert legacy single credential to Credentials aggregate
-      const legacyRaw = result[LEGACY_STORAGE_KEY];
-      if (legacyRaw) {
-        const legacyParsed = LegacyCredentialSchema.safeParse(legacyRaw);
-        if (legacyParsed.success) {
-          const migratedProps: CredentialsProps = {
-            id: 'migrated',
-            activeCredentialId: legacyParsed.data.id,
-            items: [
-              {
-                id: legacyParsed.data.id,
-                type: 'API_KEY',
-                provider: detectProvider(legacyParsed.data.apiKey) ?? 'gemini',
-                apiKey: legacyParsed.data.apiKey,
-              },
-            ],
-          };
-
-          const credentialsResult = Credentials.fromProps(migratedProps);
-          if (credentialsResult.success) {
-            await this.save(credentialsResult.data);
-            await browser.storage.local.remove(LEGACY_STORAGE_KEY);
-            return success(credentialsResult.data);
-          }
-        }
-
+      if (result[LEGACY_STORAGE_KEY]) {
         await browser.storage.local.remove(LEGACY_STORAGE_KEY);
       }
 
-      return success(null);
-    } catch (error) {
+      const raw = result[STORAGE_KEY];
+      if (!raw) {
+        return success(null);
+      }
+
+      const parsed = CredentialsPropsSchema.safeParse(raw);
+      if (!parsed.success) {
+        await browser.storage.local.remove(STORAGE_KEY);
+        return success(null);
+      }
+
+      let changed = false;
+      const items: CredentialsProps['items'] = [];
+      for (const item of parsed.data.items) {
+        if (!isAnyProvider(item.provider)) {
+          changed = true;
+          continue;
+        }
+        items.push({ ...item, provider: item.provider });
+      }
+
+      let activeCredentialId = parsed.data.activeCredentialId;
+      if (activeCredentialId && !items.some((i) => i.id === activeCredentialId)) {
+        activeCredentialId = items.length > 0 ? items[0].id : null;
+        changed = true;
+      }
+
+      const credentialsResult = Credentials.fromProps({
+        id: parsed.data.id,
+        activeCredentialId,
+        items,
+      });
+      if (!credentialsResult.success) {
+        await browser.storage.local.remove(STORAGE_KEY);
+        return success(null);
+      }
+
+      if (changed) {
+        await this.save(credentialsResult.data);
+      }
+
+      return success(credentialsResult.data);
+    } catch {
       return failure(StorageError.readFailed(STORAGE_KEY));
     }
   }

@@ -3,7 +3,7 @@ import type { IKeySelectionStorage } from '../../ports/outbound/IKeySelectionSto
 import type { ICredentialStorage } from '../../ports/outbound/ICredentialStorage';
 import type { KeySelectionMode } from '../../domain/credential/KeySelectionMode';
 import { success, failure, type Result } from '../../../shared/types/Result';
-import { AuthError, type AppError } from '../../../shared/errors';
+import { ValidationError, type AppError } from '../../../shared/errors';
 
 export class SetKeySelectionModeUseCase implements ISetKeySelectionModeUseCase {
   constructor(
@@ -12,15 +12,15 @@ export class SetKeySelectionModeUseCase implements ISetKeySelectionModeUseCase {
   ) {}
 
   async execute(mode: KeySelectionMode): Promise<Result<void, AppError>> {
-    // Manual mode is always valid
     if (mode.isManual) {
       return this.keySelectionStorage.setMode(mode);
     }
 
-    // For auto-balance, verify the provider has ≥ 2 keys
     const provider = mode.autoBalanceProvider;
     if (!provider) {
-      return failure(AuthError.invalidApiKey('Invalid auto-balance provider'));
+      return failure(
+        ValidationError.invalidInput('Invalid auto-balance provider'),
+      );
     }
 
     const credsResult = await this.credentialStorage.get();
@@ -29,7 +29,7 @@ export class SetKeySelectionModeUseCase implements ISetKeySelectionModeUseCase {
     const credentials = credsResult.data;
     if (!credentials) {
       return failure(
-        AuthError.invalidApiKey(
+        ValidationError.invalidInput(
           'No credentials found. Add at least 2 keys to enable auto-balance.',
         ),
       );
@@ -38,7 +38,7 @@ export class SetKeySelectionModeUseCase implements ISetKeySelectionModeUseCase {
     const providerKeys = credentials.getByProvider(provider);
     if (providerKeys.length < 2) {
       return failure(
-        AuthError.invalidApiKey(
+        ValidationError.invalidInput(
           `Need at least 2 ${provider} keys to enable auto-balance. Found ${providerKeys.length}.`,
         ),
       );

@@ -6,7 +6,6 @@ import { BrowserKeySelectionStorageAdapter } from './BrowserKeySelectionStorageA
 import { KeySelectionMode } from '../../../core/domain/credential/KeySelectionMode';
 import { ErrorCode } from '../../../shared/errors/ErrorCode';
 
-// Cast storage.local for mock method access
 const storage = browser.storage.local as unknown as {
   get: ReturnType<typeof import('bun:test').mock>;
   set: ReturnType<typeof import('bun:test').mock>;
@@ -18,8 +17,6 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
 
   beforeEach(() => resetBrowserMock());
 
-  // ── getMode ──────────────────────────────────────────────────
-
   test('getMode() returns manual when storage is empty', async () => {
     const result = await adapter.getMode();
     expect(result.success).toBe(true);
@@ -29,12 +26,12 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
   });
 
   test('getMode() returns stored auto-balance mode', async () => {
-    seedStore({ keySelectionMode: 'auto-balance:gemini' });
+    seedStore({ keySelectionMode: 'auto-balance:google' });
 
     const result = await adapter.getMode();
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.value).toBe('auto-balance:gemini');
+      expect(result.data.value).toBe('auto-balance:google');
     }
   });
 
@@ -42,6 +39,51 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
     seedStore({ keySelectionMode: 'garbage-value' });
 
     const result = await adapter.getMode();
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.value).toBe('manual');
+    }
+  });
+
+  test('getMode() resets legacy auto-balance:gemini to manual and deletes it', async () => {
+    seedStore({ keySelectionMode: 'auto-balance:gemini' });
+
+    const result = await adapter.getMode();
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.value).toBe('manual');
+    }
+    expect(storage.remove).toHaveBeenCalledWith('keySelectionMode');
+  });
+
+  test('getMode() resets legacy auto-balance:zai to manual', async () => {
+    seedStore({ keySelectionMode: 'auto-balance:zai' });
+
+    const result = await adapter.getMode();
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.value).toBe('manual');
+    }
+  });
+
+  test('getMode() resets auto-balance for unknown providers to manual', async () => {
+    seedStore({ keySelectionMode: 'auto-balance:not-a-provider' });
+
+    const result = await adapter.getMode();
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.value).toBe('manual');
+    }
+  });
+
+  test('getMode() resets empty auto-balance suffix to manual', async () => {
+    seedStore({ keySelectionMode: 'auto-balance:' });
+
+    const result = await adapter.getMode();
+
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.value).toBe('manual');
@@ -60,18 +102,15 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
     }
   });
 
-  // ── setMode ──────────────────────────────────────────────────
-
   test('setMode() writes mode to storage', async () => {
-    const mode = KeySelectionMode.autoBalanceGemini();
+    const mode = KeySelectionMode.autoBalance('google');
     const result = await adapter.setMode(mode);
     expect(result.success).toBe(true);
 
-    // Verify it persisted
     const getResult = await adapter.getMode();
     expect(getResult.success).toBe(true);
     if (getResult.success) {
-      expect(getResult.data.value).toBe('auto-balance:gemini');
+      expect(getResult.data.value).toBe('auto-balance:google');
     }
   });
 
@@ -93,17 +132,15 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
       throw originalError;
     });
 
-    const result = await adapter.setMode(KeySelectionMode.autoBalanceGroq());
+    const result = await adapter.setMode(KeySelectionMode.autoBalance('groq'));
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.cause).toBe(originalError);
     }
   });
 
-  // ── getLastUsedId ────────────────────────────────────────────
-
   test('getLastUsedId() returns null when no id stored', async () => {
-    const result = await adapter.getLastUsedId('gemini');
+    const result = await adapter.getLastUsedId('google');
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toBeNull();
@@ -111,27 +148,38 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
   });
 
   test('getLastUsedId() returns stored id for provider', async () => {
-    seedStore({ 'lastUsedKeyId:gemini': 'cred-abc' });
+    seedStore({ 'lastUsedKeyId:google': 'cred-abc' });
 
-    const result = await adapter.getLastUsedId('gemini');
+    const result = await adapter.getLastUsedId('google');
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toBe('cred-abc');
     }
   });
 
+  test('getLastUsedId() ignores legacy provider keys', async () => {
+    seedStore({ 'lastUsedKeyId:gemini': 'legacy-cred' });
+
+    const result = await adapter.getLastUsedId('google');
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBeNull();
+    }
+  });
+
   test('getLastUsedId() isolates providers', async () => {
     seedStore({
-      'lastUsedKeyId:gemini': 'gemini-id',
+      'lastUsedKeyId:google': 'google-id',
       'lastUsedKeyId:groq': 'groq-id',
     });
 
-    const geminiResult = await adapter.getLastUsedId('gemini');
+    const googleResult = await adapter.getLastUsedId('google');
     const groqResult = await adapter.getLastUsedId('groq');
 
-    expect(geminiResult.success).toBe(true);
+    expect(googleResult.success).toBe(true);
     expect(groqResult.success).toBe(true);
-    if (geminiResult.success) expect(geminiResult.data).toBe('gemini-id');
+    if (googleResult.success) expect(googleResult.data).toBe('google-id');
     if (groqResult.success) expect(groqResult.data).toBe('groq-id');
   });
 
@@ -140,21 +188,18 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
       throw new Error('read failed');
     });
 
-    const result = await adapter.getLastUsedId('gemini');
+    const result = await adapter.getLastUsedId('google');
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.code).toBe(ErrorCode.STORAGE_READ_FAILED);
     }
   });
 
-  // ── setLastUsedId ────────────────────────────────────────────
-
   test('setLastUsedId() writes id to storage', async () => {
-    const result = await adapter.setLastUsedId('gemini', 'cred-123');
+    const result = await adapter.setLastUsedId('google', 'cred-123');
     expect(result.success).toBe(true);
 
-    // Verify it persisted
-    const getResult = await adapter.getLastUsedId('gemini');
+    const getResult = await adapter.getLastUsedId('google');
     expect(getResult.success).toBe(true);
     if (getResult.success) {
       expect(getResult.data).toBe('cred-123');
@@ -179,7 +224,7 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
       throw originalError;
     });
 
-    const result = await adapter.setLastUsedId('gemini', 'cred-789');
+    const result = await adapter.setLastUsedId('google', 'cred-789');
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.cause).toBe(originalError);

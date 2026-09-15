@@ -1,4 +1,4 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createGoogle } from '@ai-sdk/google';
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
@@ -21,7 +21,7 @@ export class GoogleTranslationAdapter implements ITranslationService {
     image: EncodedImage,
     targetLanguage: Language,
   ): Promise<Result<Translation, AppError>> {
-    const google = createGoogleGenerativeAI({
+    const google = createGoogle({
       apiKey: this.credential.apiKey.value,
     });
 

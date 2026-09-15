@@ -3,6 +3,7 @@ import type { Credential } from '../../core/domain/credential/Credential';
 import type { UserPreferences } from '../../core/domain/preferences/UserPreferences';
 import type { CustomProviderConfig } from '../../core/domain/provider/CustomProviderConfig';
 import { isCustomProviderId } from '../../core/domain/provider/CustomProviderConfig';
+import type { IStructuredOutputExemptionStorage } from '../../core/ports/outbound/IStructuredOutputExemptionStorage';
 import { GoogleTranslationAdapter } from './google/GoogleTranslationAdapter';
 import { GroqTranslationAdapter } from './groq/GroqTranslationAdapter';
 import { XaiTranslationAdapter } from './xai/XaiTranslationAdapter';
@@ -13,12 +14,14 @@ import { DeepInfraTranslationAdapter } from './deepinfra/DeepInfraTranslationAda
 import { ZaiTranslationAdapter } from './zai/ZaiTranslationAdapter';
 import { OpenRouterTranslationAdapter } from './openrouter/OpenRouterTranslationAdapter';
 import { OpenCodeTranslationAdapter } from './opencode/OpenCodeTranslationAdapter';
+import { HuggingFaceTranslationAdapter } from './huggingface/HuggingFaceTranslationAdapter';
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
 
 export function createTranslationAdapter(
   credential: Credential,
   preferences: UserPreferences,
-  customProviderConfig?: CustomProviderConfig,
+  customProviderConfig: CustomProviderConfig | undefined,
+  structuredOutputExemptions: IStructuredOutputExemptionStorage,
 ): ITranslationService {
   if (isCustomProviderId(credential.provider)) {
     if (!customProviderConfig) {
@@ -30,30 +33,33 @@ export function createTranslationAdapter(
       credential,
       preferences,
       customProviderConfig,
+      structuredOutputExemptions,
     );
   }
 
   switch (credential.provider) {
     case 'google':
-      return new GoogleTranslationAdapter(credential, preferences);
+      return new GoogleTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'groq':
-      return new GroqTranslationAdapter(credential, preferences);
+      return new GroqTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'xai':
-      return new XaiTranslationAdapter(credential, preferences);
+      return new XaiTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'openai':
-      return new OpenAITranslationAdapter(credential, preferences);
+      return new OpenAITranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'anthropic':
-      return new AnthropicTranslationAdapter(credential, preferences);
+      return new AnthropicTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'mistral':
-      return new MistralTranslationAdapter(credential, preferences);
+      return new MistralTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'deepinfra':
-      return new DeepInfraTranslationAdapter(credential, preferences);
+      return new DeepInfraTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'zai':
-      return new ZaiTranslationAdapter(credential, preferences);
+      return new ZaiTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'openrouter':
-      return new OpenRouterTranslationAdapter(credential, preferences);
+      return new OpenRouterTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'opencode':
-      return new OpenCodeTranslationAdapter(credential, preferences);
+      return new OpenCodeTranslationAdapter(credential, preferences, structuredOutputExemptions);
+    case 'huggingface':
+      return new HuggingFaceTranslationAdapter(credential, preferences, structuredOutputExemptions);
     default: {
       const _exhaustive: never = credential.provider;
       throw new Error(`Unknown provider: ${_exhaustive}`);

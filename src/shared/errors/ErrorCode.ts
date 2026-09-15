@@ -49,7 +49,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
     'Received an unexpected response from the translation service.',
   [ErrorCode.TRANSLATION_AI_REJECTED]: 'The AI could not process this image.',
   [ErrorCode.TRANSLATION_MODEL_NO_VISION]:
-    'The selected model cannot read images. Pick a vision-capable model (e.g. qwen-vl).',
+    'The selected model cannot read images. Pick a vision-capable model.',
 
   [ErrorCode.NETWORK_OFFLINE]: 'No internet connection.',
   [ErrorCode.NETWORK_TIMEOUT]: 'Request timed out. Please try again.',

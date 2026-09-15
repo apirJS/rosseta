@@ -19,8 +19,17 @@ const translationDataInnerSchema = z.object({
 
 export const translationDataSchema = z.object({
   success: z.boolean(),
-  error: z.nullable(z.string()),
+  error: z.string().nullable(),
   data: translationDataInnerSchema.nullable(),
 });
 
+export const translationDataLenientSchema = z.object({
+  success: z.boolean(),
+  error: z.string().nullish(),
+  data: translationDataInnerSchema.nullish(),
+});
+
 export type TranslationSchemaOutput = z.infer<typeof translationDataSchema>;
+export type TranslationSchemaLenientOutput = z.infer<
+  typeof translationDataLenientSchema
+>;

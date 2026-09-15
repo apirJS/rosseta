@@ -108,6 +108,7 @@ describe('Domain: ProviderRegistry', () => {
         'deepinfra',
         'google',
         'groq',
+        'huggingface',
         'mistral',
         'openai',
         'opencode',

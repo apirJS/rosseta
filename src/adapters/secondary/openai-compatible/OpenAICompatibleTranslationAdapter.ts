@@ -8,6 +8,7 @@ import type { AppError } from '../../../shared/errors';
 import type { Credential } from '../../../core/domain/credential/Credential';
 import type { UserPreferences } from '../../../core/domain/preferences/UserPreferences';
 import type { CustomProviderConfig } from '../../../core/domain/provider/CustomProviderConfig';
+import type { IStructuredOutputExemptionStorage } from '../../../core/ports/outbound/IStructuredOutputExemptionStorage';
 import { executeTranslation } from '../shared/ai-sdk-translation';
 
 export class OpenAICompatibleTranslationAdapter implements ITranslationService {
@@ -15,6 +16,7 @@ export class OpenAICompatibleTranslationAdapter implements ITranslationService {
     private readonly credential: Credential,
     private readonly userPreferences: UserPreferences,
     private readonly providerConfig: CustomProviderConfig,
+    private readonly structuredOutputExemptions: IStructuredOutputExemptionStorage,
   ) {}
 
   public async translateImage(
@@ -33,6 +35,6 @@ export class OpenAICompatibleTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'CUSTOM', this.userPreferences.includeDescription);
+    return executeTranslation(model, image, targetLanguage, 'CUSTOM', this.userPreferences.includeDescription, this.structuredOutputExemptions);
   }
 }

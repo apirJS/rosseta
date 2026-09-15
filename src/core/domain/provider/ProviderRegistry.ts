@@ -184,3 +184,10 @@ ProviderRegistry.register({
   defaultModelId: 'deepseek-v4-flash-vision-exp',
   models: [],
 });
+
+ProviderRegistry.register({
+  id: 'huggingface',
+  name: 'Hugging Face',
+  defaultModelId: 'Qwen/Qwen2.5-VL-72B-Instruct',
+  models: [],
+});

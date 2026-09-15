@@ -34,6 +34,7 @@ describe('Adapter: ModelFetchService', () => {
       'zai',
       'openrouter',
       'opencode',
+      'huggingface',
     ]) {
       expect(service.canFetch(provider)).toBe(true);
     }
@@ -145,6 +146,33 @@ describe('Adapter: ModelFetchService', () => {
     ];
     expect(url).toBe('https://opencode.ai/zen/v1/models');
     expect(init.headers.Authorization).toBe('Bearer zen-key');
+  });
+
+  test('fetchModels hits the Hugging Face router OpenAI-compatible endpoint', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          { id: 'Qwen/Qwen2.5-VL-72B-Instruct', object: 'model' },
+          { id: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct', object: 'model' },
+        ],
+      }),
+    );
+
+    const result = await service.fetchModels('huggingface', 'hf_key');
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.map((m) => m.id)).toEqual([
+        'meta-llama/Llama-4-Maverick-17B-128E-Instruct',
+        'Qwen/Qwen2.5-VL-72B-Instruct',
+      ]);
+    }
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(url).toBe('https://router.huggingface.co/v1/models');
+    expect(init.headers.Authorization).toBe('Bearer hf_key');
   });
 
   test('fetchModels tolerates malformed response shape', async () => {

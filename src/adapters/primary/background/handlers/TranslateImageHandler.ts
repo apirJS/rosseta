@@ -133,6 +133,7 @@ export class TranslateImageHandler {
       activeCredential,
       preferences,
       customProviderConfig,
+      this.container.structuredOutputExemptionStorage,
     );
     const translateImageUseCase = new TranslateImageUseCase(translationService);
 

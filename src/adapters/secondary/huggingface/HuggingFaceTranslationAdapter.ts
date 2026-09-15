@@ -1,4 +1,4 @@
-import { createDeepInfra } from '@ai-sdk/deepinfra';
+import { createHuggingFace } from '@ai-sdk/huggingface';
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
@@ -10,7 +10,7 @@ import type { UserPreferences } from '../../../core/domain/preferences/UserPrefe
 import type { IStructuredOutputExemptionStorage } from '../../../core/ports/outbound/IStructuredOutputExemptionStorage';
 import { executeTranslation } from '../shared/ai-sdk-translation';
 
-export class DeepInfraTranslationAdapter implements ITranslationService {
+export class HuggingFaceTranslationAdapter implements ITranslationService {
   constructor(
     private readonly credential: Credential,
     private readonly userPreferences: UserPreferences,
@@ -21,14 +21,21 @@ export class DeepInfraTranslationAdapter implements ITranslationService {
     image: EncodedImage,
     targetLanguage: Language,
   ): Promise<Result<Translation, AppError>> {
-    const deepinfra = createDeepInfra({
+    const huggingface = createHuggingFace({
       apiKey: this.credential.apiKey.value,
     });
 
-    const model = deepinfra(
+    const model = huggingface(
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'DEEPINFRA', this.userPreferences.includeDescription, this.structuredOutputExemptions);
+    return executeTranslation(
+      model,
+      image,
+      targetLanguage,
+      'HUGGINGFACE',
+      this.userPreferences.includeDescription,
+      this.structuredOutputExemptions,
+    );
   }
 }

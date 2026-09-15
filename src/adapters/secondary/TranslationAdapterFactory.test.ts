@@ -10,6 +10,7 @@ import { DeepInfraTranslationAdapter } from './deepinfra/DeepInfraTranslationAda
 import { ZaiTranslationAdapter } from './zai/ZaiTranslationAdapter';
 import { OpenRouterTranslationAdapter } from './openrouter/OpenRouterTranslationAdapter';
 import { OpenCodeTranslationAdapter } from './opencode/OpenCodeTranslationAdapter';
+import { HuggingFaceTranslationAdapter } from './huggingface/HuggingFaceTranslationAdapter';
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
 import { CustomProviderConfig } from '../../core/domain/provider/CustomProviderConfig';
 import { Credential } from '../../core/domain/credential/Credential';
@@ -18,6 +19,7 @@ import { ApiKey } from '../../core/domain/credential/ApiKey';
 import { v4 as uuidv4 } from 'uuid';
 import type { Provider } from '../../core/domain/credential/Provider';
 import type { ITranslationService } from '../../core/ports/outbound/ITranslationService';
+import { FakeStructuredOutputExemptionStorage } from '../../../tests/fakes/FakeStructuredOutputExemptionStorage';
 
 function createCredential(provider: string) {
   const apiKey = ApiKey.createWithProvider('test-key-value-12345', provider as never);
@@ -56,6 +58,7 @@ describe('Adapter: TranslationAdapterFactory', () => {
     zai: ZaiTranslationAdapter,
     openrouter: OpenRouterTranslationAdapter,
     opencode: OpenCodeTranslationAdapter,
+    huggingface: HuggingFaceTranslationAdapter,
   };
 
   for (const provider of Object.keys(expectedAdapters) as Provider[]) {
@@ -65,6 +68,8 @@ describe('Adapter: TranslationAdapterFactory', () => {
       const adapter = createTranslationAdapter(
         createCredential(provider),
         preferences,
+        undefined,
+        new FakeStructuredOutputExemptionStorage(),
       );
       expect(adapter).toBeInstanceOf(expected);
     });
@@ -75,6 +80,7 @@ describe('Adapter: TranslationAdapterFactory', () => {
       createCredential('custom-factory-1'),
       preferences,
       createCustomConfig(),
+      new FakeStructuredOutputExemptionStorage(),
     );
     expect(adapter).toBeInstanceOf(OpenAICompatibleTranslationAdapter);
   });
@@ -84,6 +90,8 @@ describe('Adapter: TranslationAdapterFactory', () => {
       createTranslationAdapter(
         createCredential('custom-factory-1'),
         preferences,
+        undefined,
+        new FakeStructuredOutputExemptionStorage(),
       ),
     ).toThrow('Custom provider config is required');
   });

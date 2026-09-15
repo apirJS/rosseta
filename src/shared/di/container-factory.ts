@@ -5,6 +5,7 @@ import { BrowserKeySelectionStorageAdapter } from '../../adapters/secondary/stor
 import { BrowserModelStorageAdapter } from '../../adapters/secondary/storage/BrowserModelStorageAdapter';
 import { BrowserCommandStorageAdapter } from '../../adapters/secondary/storage/BrowserCommandStorageAdapter';
 import { BrowserCustomProviderStorageAdapter } from '../../adapters/secondary/storage/BrowserCustomProviderStorageAdapter';
+import { BrowserStructuredOutputExemptionStorage } from '../../adapters/secondary/storage/BrowserStructuredOutputExemptionStorage';
 import { ModelFetchService } from '../../adapters/secondary/model-fetchers/ModelFetchService';
 import { GetCredentialsUseCase } from '../../core/application/auth/GetCredentialUseCase';
 import { AddApiKeyUseCase } from '../../core/application/auth/AddApiKeyUseCase';
@@ -35,6 +36,7 @@ import type { IUserPreferencesStorage } from '../../core/ports/outbound/IUserPre
 import type { IKeySelectionStorage } from '../../core/ports/outbound/IKeySelectionStorage';
 import type { IModelStorage } from '../../core/ports/outbound/IModelStorage';
 import type { ICustomProviderStorage } from '../../core/ports/outbound/ICustomProviderStorage';
+import type { IStructuredOutputExemptionStorage } from '../../core/ports/outbound/IStructuredOutputExemptionStorage';
 import type { IModelFetchService } from '../../core/ports/outbound/IModelFetchService';
 import type { ICommandStorage } from '../../core/ports/outbound/ICommandStorage';
 
@@ -51,6 +53,8 @@ export function createContainer() {
   const commandStorage: ICommandStorage = new BrowserCommandStorageAdapter();
   const customProviderStorage: ICustomProviderStorage =
     new BrowserCustomProviderStorageAdapter();
+  const structuredOutputExemptionStorage: IStructuredOutputExemptionStorage =
+    new BrowserStructuredOutputExemptionStorage();
   const modelFetchService: IModelFetchService = new ModelFetchService();
 
   return {
@@ -60,6 +64,7 @@ export function createContainer() {
     keySelectionStorage,
     modelStorage,
     customProviderStorage,
+    structuredOutputExemptionStorage,
 
     getCredentialsUseCase: new GetCredentialsUseCase(credentialStorage),
     addApiKeyUseCase: new AddApiKeyUseCase(credentialStorage),

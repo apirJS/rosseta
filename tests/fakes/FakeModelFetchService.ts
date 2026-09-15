@@ -19,6 +19,7 @@ export class FakeModelFetchService implements IModelFetchService {
     'zai',
     'openrouter',
     'opencode',
+    'huggingface',
   ]);
   private responses = new Map<string, ModelInfo[] | AppError>();
   lastCall: { provider: string; apiKey: string; baseURL?: string } | null =

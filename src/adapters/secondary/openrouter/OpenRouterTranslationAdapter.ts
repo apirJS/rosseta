@@ -7,12 +7,14 @@ import type { Result } from '../../../shared/types/Result';
 import type { AppError } from '../../../shared/errors';
 import type { Credential } from '../../../core/domain/credential/Credential';
 import type { UserPreferences } from '../../../core/domain/preferences/UserPreferences';
+import type { IStructuredOutputExemptionStorage } from '../../../core/ports/outbound/IStructuredOutputExemptionStorage';
 import { executeTranslation } from '../shared/ai-sdk-translation';
 
 export class OpenRouterTranslationAdapter implements ITranslationService {
   constructor(
     private readonly credential: Credential,
     private readonly userPreferences: UserPreferences,
+    private readonly structuredOutputExemptions: IStructuredOutputExemptionStorage,
   ) {}
 
   public async translateImage(
@@ -33,6 +35,7 @@ export class OpenRouterTranslationAdapter implements ITranslationService {
       targetLanguage,
       'OPENROUTER',
       this.userPreferences.includeDescription,
+      this.structuredOutputExemptions,
     );
   }
 }

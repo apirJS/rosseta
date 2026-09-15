@@ -6,6 +6,7 @@ import { FakeKeySelectionStorage } from '../../../../../tests/fakes/FakeKeySelec
 import { FakeUserPreferencesStorage } from '../../../../../tests/fakes/FakeUserPreferencesStorage';
 import { FakeModelStorage } from '../../../../../tests/fakes/FakeModelStorage';
 import { FakeTranslationStorage } from '../../../../../tests/fakes/FakeTranslationStorage';
+import { FakeStructuredOutputExemptionStorage } from '../../../../../tests/fakes/FakeStructuredOutputExemptionStorage';
 import { GetCredentialsUseCase } from '../../../../core/application/auth/GetCredentialUseCase';
 import { ResolveActiveCredentialUseCase } from '../../../../core/application/auth/ResolveActiveCredentialUseCase';
 import { GetPreferencesUseCase } from '../../../../core/application/preferences/GetPreferencesUseCase';
@@ -53,6 +54,8 @@ function createTestContainer() {
     updatePreferencesUseCase: new UpdatePreferencesUseCase(preferencesStorage),
     loadModelsUseCase: new LoadModelsUseCase(modelStorage),
     saveTranslationUseCase: new SaveTranslationUseCase(translationStorage),
+    structuredOutputExemptionStorage:
+      new FakeStructuredOutputExemptionStorage(),
   } as unknown as Container;
 
   return { container, preferencesStorage, modelStorage, translationStorage };

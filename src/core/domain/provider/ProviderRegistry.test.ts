@@ -110,7 +110,9 @@ describe('Domain: ProviderRegistry', () => {
         'groq',
         'mistral',
         'openai',
+        'openrouter',
         'xai',
+        'zai',
       ]);
     });
   });

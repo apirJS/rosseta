@@ -27,6 +27,6 @@ export class MistralTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'MISTRAL');
+    return executeTranslation(model, image, targetLanguage, 'MISTRAL', this.userPreferences.includeDescription);
   }
 }

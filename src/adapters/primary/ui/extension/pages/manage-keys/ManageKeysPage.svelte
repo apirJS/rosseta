@@ -7,7 +7,11 @@
     getPopupToastContext,
   } from '../../../shared/context';
   import { Icon, Select, ThemeToggle } from '../../../shared/components';
-  import { PROVIDERS } from '../../../../../../core/domain/credential/Provider';
+  import { maskApiKey } from '../../../shared/utils';
+  import {
+    PROVIDERS,
+    type AnyProvider,
+  } from '../../../../../../core/domain/credential/Provider';
   import { ProviderRegistry } from '../../../../../../core/domain/provider/ProviderRegistry';
   import {
     createManageKeysController,
@@ -62,17 +66,13 @@
     })),
   );
 
-  const selectedProviderName = $derived(
-    ProviderRegistry.getConfig(controller.state.selectedProvider).name,
-  );
-
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') controller.addApiKey();
   }
 </script>
 
 <div class="flex flex-col h-full w-full bg-background">
-  <div class="flex items-center p-4 pb-0">
+  <div class="flex items-center p-4 pb-0 gap-2">
     <button
       type="button"
       class="flex items-center text-sm text-muted hover:text-foreground cursor-pointer"
@@ -84,38 +84,37 @@
     >
       <Icon name="arrow-left" class="w-4 h-4" />
     </button>
-    <h2 class="flex-1 text-center text-base font-semibold text-foreground">
-      API Keys
-    </h2>
+
+    <div class="w-28 shrink-0">
+      <Select
+        id="provider-select"
+        value={controller.state.selectedProvider}
+        options={providerOptions}
+        onchange={(value) => controller.setProvider(value as AnyProvider)}
+      />
+    </div>
+    <div class="flex-1"></div>
+
     <ThemeToggle
       isDark={preferences.state.resolvedTheme === 'dark'}
       onToggle={preferences.toggleTheme}
     />
   </div>
 
-  <div class="flex-1 flex flex-col px-4 py-4 min-h-0 overflow-hidden">
+  <div class="flex-1 flex flex-col px-4 py-3 min-h-0 overflow-hidden">
     <div class="flex gap-2 mb-3">
-      <div class="w-28 shrink-0">
-        <Select
-          id="new-key-provider"
-          value={controller.state.selectedProvider}
-          options={providerOptions}
-          onchange={(value) =>
-            (controller.state.selectedProvider = value as typeof controller.state.selectedProvider)}
-        />
-      </div>
       <input
         type="password"
         class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary"
-        placeholder={`${selectedProviderName} API Key`}
-        bind:value={controller.state.apiKeyInput}
+        placeholder="Search or add key…"
+        bind:value={controller.state.keyInput}
         onkeydown={handleKeydown}
       />
       <button
         type="button"
-        class="flex items-center justify-center w-10 shrink-0 rounded-lg bg-primary text-primary-fg hover:opacity-90 cursor-pointer disabled:opacity-50"
+        class="flex items-center justify-center w-10 shrink-0 rounded-lg bg-primary text-primary-fg hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         onclick={() => controller.addApiKey()}
-        disabled={auth.state.loading}
+        disabled={!controller.canAddKey || auth.state.loading}
         aria-label="Add API key"
         title="Add API key"
       >
@@ -123,21 +122,21 @@
       </button>
     </div>
 
-    <div class="relative mb-3">
-      <input
-        type="text"
-        class="w-full pl-8 pr-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary"
-        placeholder="Search keys"
-        bind:value={controller.state.searchQuery}
-      />
-      <span
-        class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none"
-      >
-        <Icon name="search" class="w-4 h-4 text-muted" />
-      </span>
-    </div>
+    <div class="flex flex-col gap-1.5 overflow-y-auto flex-1">
+      {#if controller.canAddKey}
+        <button
+          type="button"
+          class="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-primary/50 px-3 py-2 text-left cursor-pointer"
+          onclick={() => controller.addApiKey()}
+          title="Add this key"
+        >
+          <Icon name="plus" class="w-4 h-4 text-primary shrink-0" />
+          <span class="text-sm text-muted truncate">
+            Add <span class="text-foreground font-medium">{maskApiKey(controller.state.keyInput.trim())}</span>
+          </span>
+        </button>
+      {/if}
 
-    <div class="flex flex-col gap-2 overflow-y-auto">
       {#each controller.visibleKeys as credential (credential.id)}
         <ApiKeyListItem
           {credential}
@@ -148,13 +147,13 @@
           onView={() => controller.viewKey(credential.id)}
         />
       {:else}
-        {#if controller.allKeys.length === 0}
-          <p class="text-sm text-muted text-center py-4">
-            No API keys yet. Add one above.
-          </p>
-        {:else}
-          <p class="text-sm text-muted text-center py-4">
-            No keys match your search.
+        {#if !controller.canAddKey}
+          <p class="text-sm text-muted text-center py-8">
+            {#if controller.providerKeys.length === 0}
+              No API keys for this provider yet. Add one above.
+            {:else}
+              No keys match your search.
+            {/if}
           </p>
         {/if}
       {/each}

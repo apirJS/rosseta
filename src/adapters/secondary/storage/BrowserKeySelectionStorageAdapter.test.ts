@@ -57,14 +57,14 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
     expect(storage.remove).toHaveBeenCalledWith('keySelectionMode');
   });
 
-  test('getMode() resets legacy auto-balance:zai to manual', async () => {
+  test('getMode() keeps auto-balance:zai now that zai is a built-in provider', async () => {
     seedStore({ keySelectionMode: 'auto-balance:zai' });
 
     const result = await adapter.getMode();
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.value).toBe('manual');
+      expect(result.data.value).toBe('auto-balance:zai');
     }
   });
 

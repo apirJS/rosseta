@@ -117,7 +117,7 @@ describe('Adapter: BrowserCredentialStorageAdapter', () => {
     }
   });
 
-  test('get() deletes legacy zai provider items instead of migrating', async () => {
+  test('get() keeps zai items now that zai is a built-in provider', async () => {
     seedStore({
       credentials: {
         id: 'creds-1',
@@ -127,7 +127,7 @@ describe('Adapter: BrowserCredentialStorageAdapter', () => {
             id: 'cred-1',
             type: 'API_KEY',
             provider: 'zai',
-            apiKey: 'legacy-xai-key-value',
+            apiKey: 'zai-key-value',
           },
         ],
       },
@@ -137,7 +137,8 @@ describe('Adapter: BrowserCredentialStorageAdapter', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.items).toHaveLength(0);
+      expect(result.data?.items).toHaveLength(1);
+      expect(result.data?.items[0].provider).toBe('zai');
     }
   });
 

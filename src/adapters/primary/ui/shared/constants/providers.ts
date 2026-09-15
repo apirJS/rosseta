@@ -8,6 +8,8 @@ export const PROVIDER_BADGE_COLORS: Record<string, string> = {
   anthropic: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
   mistral: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
   deepinfra: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
+  zai: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
+  openrouter: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
   'custom-provider':
     'bg-violet-500/15 text-violet-600 dark:text-violet-400',
 };
@@ -15,9 +17,11 @@ export const PROVIDER_BADGE_COLORS: Record<string, string> = {
 export const API_KEY_URLS: Partial<Record<Provider, string>> = {
   google: 'https://aistudio.google.com/apikey',
   groq: 'https://console.groq.com/keys',
-  xai: 'https://open.z.ai/apikey',
+  xai: 'https://console.x.ai',
   openai: 'https://platform.openai.com/api-keys',
   anthropic: 'https://console.anthropic.com/settings/keys',
   mistral: 'https://console.mistral.ai/api-keys/',
   deepinfra: 'https://deepinfra.com/dash/api_keys',
+  zai: 'https://z.ai/manage-apikey',
+  openrouter: 'https://openrouter.ai/settings/keys',
 };

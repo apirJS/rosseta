@@ -1,11 +1,13 @@
 export interface PromptParams {
   targetLanguageCode: string;
   targetLanguageName: string;
+  includeDescription?: boolean;
 }
 
 export function buildBasePrompt({
   targetLanguageCode,
   targetLanguageName,
+  includeDescription = true,
 }: PromptParams): string {
   return `**TASK: Exhaustive OCR → Translation**
 
@@ -34,10 +36,18 @@ Perform **exhaustive** OCR on the provided image. Extract **every single piece o
    - \`languageBcp47Code\`: \`"${targetLanguageCode}"\` (or copy the original code for number/symbol segments).
    - \`language\`: \`"${targetLanguageName}"\` (or copy the original name for number/symbol segments).
    - \`romanization\`: \`null\`.
-5) \`description\`: 1–2 sentence contextual summary of the extracted text, **written in ${targetLanguageName}**. If no context is evident, describe the elements briefly.
+5) \`description\`: ${
+    includeDescription
+      ? `Compact contextual summary of the extracted text, **written in ${targetLanguageName}**. If no context is evident, describe the elements briefly.`
+      : `always \`""\` (empty string).`
+  }
 
 **Example** (image containing "こんにちは" and "3.50"):
-{"success":true,"data":{"originalText":{"contents":[{"text":"こんにちは","languageBcp47Code":"ja-JP","language":"Japanese","romanization":"konnichiwa"},{"text":"3.50","languageBcp47Code":"number","language":"Number","romanization":null}]},"translatedText":{"contents":[{"text":"<こんにちは translated into ${targetLanguageName}>","languageBcp47Code":"${targetLanguageCode}","language":"${targetLanguageName}","romanization":null},{"text":"3.50","languageBcp47Code":"number","language":"Number","romanization":null}]},"description":"<1–2 sentence summary in ${targetLanguageName}>"}}
+{"success":true,"data":{"originalText":{"contents":[{"text":"こんにちは","languageBcp47Code":"ja-JP","language":"Japanese","romanization":"konnichiwa"},{"text":"3.50","languageBcp47Code":"number","language":"Number","romanization":null}]},"translatedText":{"contents":[{"text":"<こんにちは translated into ${targetLanguageName}>","languageBcp47Code":"${targetLanguageCode}","language":"${targetLanguageName}","romanization":null},{"text":"3.50","languageBcp47Code":"number","language":"Number","romanization":null}]},"description":${
+    includeDescription
+      ? `"<1–2 sentence summary in ${targetLanguageName}>"`
+      : `""`
+  }}}
 
 **Example failure** (image with no readable text):
 {"success":false,"error":"NO_TEXT_FOUND"}

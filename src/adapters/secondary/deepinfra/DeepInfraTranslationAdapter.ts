@@ -27,6 +27,6 @@ export class DeepInfraTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'DEEPINFRA');
+    return executeTranslation(model, image, targetLanguage, 'DEEPINFRA', this.userPreferences.includeDescription);
   }
 }

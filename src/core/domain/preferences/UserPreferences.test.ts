@@ -12,6 +12,7 @@ describe('Domain: UserPreferences', () => {
       expect(prefs.theme.value).toBe('system');
       expect(prefs.targetLanguage.code).toBe('en-US');
       expect(prefs.selectedModels).toEqual({});
+      expect(prefs.includeDescription).toBe(true);
       expect(prefs.shortcut).toBeNull();
     });
   });
@@ -93,6 +94,28 @@ describe('Domain: UserPreferences', () => {
       }
     });
 
+    test('reads includeDescription when it is a boolean', () => {
+      const result = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        includeDescription: false,
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.includeDescription).toBe(false);
+      }
+    });
+
+    test('defaults includeDescription to true when missing or invalid', () => {
+      const missing = UserPreferences.fromRaw({ id: 'prefs-1' });
+      expect(missing.success && missing.data.includeDescription).toBe(true);
+
+      const invalid = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        includeDescription: 'no',
+      } as unknown as Parameters<typeof UserPreferences.fromRaw>[0]);
+      expect(invalid.success && invalid.data.includeDescription).toBe(true);
+    });
+
     test('ignores legacy selectedModel', () => {
       const result = UserPreferences.fromRaw({
         id: 'prefs-1',
@@ -164,13 +187,22 @@ describe('Domain: UserPreferences', () => {
         google: 'gemini-2.0-flash',
       });
     });
+
+    test('withIncludeDescription returns new preferences with the flag set', () => {
+      const prefs = UserPreferences.createDefault('prefs-1');
+      const updated = prefs.withIncludeDescription(false);
+      expect(updated.includeDescription).toBe(false);
+      expect(prefs.includeDescription).toBe(true);
+      expect(updated.targetLanguage.code).toBe(prefs.targetLanguage.code);
+    });
   });
 
   describe('toProps round-trip', () => {
     test('round-trips through fromRaw', () => {
       const prefs = UserPreferences.createDefault('prefs-1')
         .withTargetLanguage(Language.create('ja-JP'))
-        .withSelectedModel('xai', 'grok-3');
+        .withSelectedModel('xai', 'grok-3')
+        .withIncludeDescription(false);
       const props = prefs.toProps();
 
       const result = UserPreferences.fromRaw(props);
@@ -178,6 +210,7 @@ describe('Domain: UserPreferences', () => {
       if (result.success) {
         expect(result.data.targetLanguage.code).toBe('ja-JP');
         expect(result.data.selectedModels).toEqual({ xai: 'grok-3' });
+        expect(result.data.includeDescription).toBe(false);
       }
     });
   });

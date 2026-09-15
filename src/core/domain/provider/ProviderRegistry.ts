@@ -163,3 +163,17 @@ ProviderRegistry.register({
   defaultModelId: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct',
   models: [],
 });
+
+ProviderRegistry.register({
+  id: 'zai',
+  name: 'Z.ai',
+  defaultModelId: 'glm-4.5v',
+  models: [],
+});
+
+ProviderRegistry.register({
+  id: 'openrouter',
+  name: 'OpenRouter',
+  defaultModelId: 'google/gemini-2.5-flash',
+  models: [],
+});

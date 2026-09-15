@@ -58,8 +58,8 @@
   "commands": {
     "START_EXTENSION": {
       "suggested_key": {
-        "default": "Ctrl+Space",
-        "mac": "Command+Space"
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
       },
       "description": "Start The Translation"
     }

@@ -165,6 +165,10 @@ const MODEL_FETCHERS: Record<string, ModelFetcher> = {
     fetchOpenAICompatibleModels(apiKey, 'https://api.mistral.ai/v1'),
   deepinfra: (apiKey) =>
     fetchOpenAICompatibleModels(apiKey, 'https://api.deepinfra.com/v1/openai'),
+  zai: (apiKey) =>
+    fetchOpenAICompatibleModels(apiKey, 'https://api.z.ai/api/paas/v4'),
+  openrouter: (apiKey) =>
+    fetchOpenAICompatibleModels(apiKey, 'https://openrouter.ai/api/v1'),
   anthropic: (apiKey) => fetchAnthropicModels(apiKey),
 };
 

@@ -7,7 +7,9 @@ export type Provider =
   | 'openai'
   | 'anthropic'
   | 'mistral'
-  | 'deepinfra';
+  | 'deepinfra'
+  | 'zai'
+  | 'openrouter';
 
 export const PROVIDERS: Provider[] = [
   'google',
@@ -17,6 +19,8 @@ export const PROVIDERS: Provider[] = [
   'anthropic',
   'mistral',
   'deepinfra',
+  'zai',
+  'openrouter',
 ];
 
 export const DEFAULT_PROVIDER: Provider = 'google';

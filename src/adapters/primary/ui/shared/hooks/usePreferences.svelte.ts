@@ -32,6 +32,7 @@ export class PreferencesState {
   resolvedTheme = $state<'dark' | 'light'>('light');
   targetLanguage = $state<Language>(getBrowserLanguage());
   selectedModels = $state<Record<string, string>>({});
+  includeDescription = $state(true);
   loading = $state(false);
   loaded = $state(false);
   shortcut = $state<string | null>(null);
@@ -74,6 +75,7 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
       state.theme = result.data.theme;
       state.targetLanguage = result.data.targetLanguage;
       state.selectedModels = { ...result.data.selectedModels };
+      state.includeDescription = result.data.includeDescription;
     }
 
     const shortcutResult =
@@ -119,6 +121,13 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     });
   }
 
+  async function setIncludeDescription(includeDescription: boolean) {
+    state.includeDescription = includeDescription;
+    await useCases.updatePreferences.execute({
+      preferences: { includeDescription },
+    });
+  }
+
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   mediaQuery.addEventListener('change', (e) => {
     if (state.theme.isSystem) {
@@ -134,5 +143,6 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     toggleTheme,
     setTargetLanguage,
     setSelectedModelFor,
+    setIncludeDescription,
   };
 }

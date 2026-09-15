@@ -6,7 +6,7 @@
     getPopupToastContext,
     getPreferencesStateContext,
   } from '../../../shared/context';
-  import { Icon, ThemeToggle } from '../../../shared/components';
+  import { Checkbox, Icon, ThemeToggle } from '../../../shared/components';
   import {
     DEFAULT_PROVIDER,
     isProvider,
@@ -238,6 +238,13 @@
             <LanguageSelector
               value={preferences.state.targetLanguage.code as LanguageCode}
               onchange={preferences.setTargetLanguage}
+            />
+
+            <Checkbox
+              label="Enable Description"
+              checked={preferences.state.includeDescription}
+              onChange={(e) =>
+                preferences.setIncludeDescription(e.currentTarget.checked)}
             />
 
             <div class="pt-2">

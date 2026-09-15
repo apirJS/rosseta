@@ -13,6 +13,8 @@
         "@ai-sdk/openai": "^4.0.66",
         "@ai-sdk/openai-compatible": "^3.0.48",
         "@ai-sdk/xai": "^4.0.58",
+        "@ai-sdk/zai": "^3.0.10",
+        "@openrouter/ai-sdk-provider": "^3.0.0",
         "@openrouter/sdk": "^1.2.123",
         "@tailwindcss/vite": "^4.3.3",
         "ai": "^7.0.99",
@@ -79,6 +81,8 @@
     "@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@5.0.40", "", { "dependencies": { "@ai-sdk/provider": "4.0.14", "@standard-schema/spec": "^1.1.0", "@workflow/serde": "4.1.0", "eventsource-parser": "^3.0.8", "undici": "^7.29.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-zsXPwSAQ9mRJ2hvyITaLOYUyuGrBmzFhJXOg4mllGmla1PfNxZcm4GwqMiV2xQaDgcgBMdUGxXkp9xekZZNIkg=="],
 
     "@ai-sdk/xai": ["@ai-sdk/xai@4.0.58", "", { "dependencies": { "@ai-sdk/provider": "4.0.14", "@ai-sdk/provider-utils": "5.0.40" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-7STmRResOmfHQ5CjKEeAcpOhiwmvZ2ztmXmofYa+30r7xX2bfz/R+tL2WaMwRODenf2ap2TLF1klNJVGornrfw=="],
+
+    "@ai-sdk/zai": ["@ai-sdk/zai@3.0.10", "", { "dependencies": { "@ai-sdk/openai-compatible": "3.0.48", "@ai-sdk/provider": "4.0.14", "@ai-sdk/provider-utils": "5.0.40" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-STD7TsI5M4BCiHw6bpIQ0ifSAdZFA7DeKn85bB1+8Ux1jPRWJzlZkLo65owPQUTFaF08BHSS8ZAQPvJmNON1Bg=="],
 
     "@asamuzakjp/css-color": ["@asamuzakjp/css-color@6.0.7", "", { "dependencies": { "@csstools/css-calc": "^3.3.0", "@csstools/css-color-parser": "^4.1.10", "@csstools/css-parser-algorithms": "^4.0.0", "@csstools/css-tokenizer": "^4.0.0", "lru-cache": "^11.5.2" } }, "sha512-vC/bk1Lz7Tn/EfU9/apOTBk80/8dyGyWMowPoV1tJ52muDGsDqt2HPT2klrFUiY60MQmQv9q8yIht15JnBgDGw=="],
 
@@ -157,6 +161,8 @@
     "@octokit/request-error": ["@octokit/request-error@7.1.2", "", { "dependencies": { "@octokit/types": "^18.0.0" } }, "sha512-XZRuT3xZ84D3gYErI1DZvhJ33dCWVV6uzBtWkaBB4TvA/L6eOeTZodxLFVB44bBEEo3vEx7y00UfX1tBLrtLRg=="],
 
     "@octokit/types": ["@octokit/types@18.0.0", "", { "dependencies": { "@octokit/openapi-types": "^29.0.1" } }, "sha512-l6bAF43PNxkJp6g+W4PjoUSSkxHomXw2nOum5CTftJz1NlV3vu93NImgOYtLf6CbBUb5j+fiuzW0PPQ5JTSvZA=="],
+
+    "@openrouter/ai-sdk-provider": ["@openrouter/ai-sdk-provider@3.0.0", "", { "peerDependencies": { "ai": "^7.0.0", "zod": "^3.25.76 || ^4.1.8" } }, "sha512-m9XTSWoODH2RM5OsZpaGiN7QRR8cdP5paBWq699Tu3JVmGPBKT8xF8XwV0ZBVVsjikD/JgWfak4VSsTR4wAVbg=="],
 
     "@openrouter/sdk": ["@openrouter/sdk@1.2.123", "", { "dependencies": { "zod": "^3.25.0 || ^4.0.0" } }, "sha512-vZbQyYyCh9dZ0FKex/1kerwdZCEtwMM1m8t76pbUkgtFYKLeN08EOhYedc4COPPEVhCBBYHJ9qzWMrMN8nzYYA=="],
 

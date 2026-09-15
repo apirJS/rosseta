@@ -16,6 +16,7 @@ const UserPreferencesSchema = z.object({
   targetLanguage: z.string().optional(),
   selectedModels: z.record(z.string(), z.string()).optional(),
   theme: z.enum(['dark', 'light', 'system']).optional(),
+  includeDescription: z.boolean().optional(),
 });
 
 export class BrowserUserPreferencesStorageAdapter implements IUserPreferencesStorage {

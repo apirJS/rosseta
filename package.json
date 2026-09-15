@@ -48,6 +48,8 @@
     "@ai-sdk/openai": "^4.0.66",
     "@ai-sdk/openai-compatible": "^3.0.48",
     "@ai-sdk/xai": "^4.0.58",
+    "@ai-sdk/zai": "^3.0.10",
+    "@openrouter/ai-sdk-provider": "^3.0.0",
     "@openrouter/sdk": "^1.2.123",
     "@tailwindcss/vite": "^4.3.3",
     "ai": "^7.0.99",

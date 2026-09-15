@@ -27,6 +27,6 @@ export class GoogleTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'GOOGLE');
+    return executeTranslation(model, image, targetLanguage, 'GOOGLE', this.userPreferences.includeDescription);
   }
 }

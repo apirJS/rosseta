@@ -1,9 +1,7 @@
 <script lang="ts">
   import { Icon } from '../../../../shared/components';
   import { maskApiKey } from '../../../../shared/utils';
-  import { PROVIDER_BADGE_COLORS } from '../../../../shared/constants/providers';
   import type { Credential } from '../../../../../../../core/domain/credential/Credential';
-  import { ProviderRegistry } from '../../../../../../../core/domain/provider/ProviderRegistry';
 
   interface Props {
     credential: Credential;
@@ -17,15 +15,6 @@
     $props();
 
   const maskedKey = $derived(maskApiKey(credential.apiKey.value));
-
-  const providerLabel = $derived(
-    ProviderRegistry.getConfig(credential.provider).name.toUpperCase(),
-  );
-
-  const badgeColor = $derived(
-    PROVIDER_BADGE_COLORS[credential.provider] ??
-      PROVIDER_BADGE_COLORS['custom-provider'],
-  );
 </script>
 
 <div
@@ -33,12 +22,6 @@
     ? 'bg-surface border-primary/50'
     : 'bg-surface border-border'}"
 >
-  <span
-    class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded {badgeColor}"
-  >
-    {providerLabel}
-  </span>
-
   <button
     type="button"
     class="flex-1 text-sm text-foreground truncate text-left cursor-pointer hover:text-primary transition-colors"

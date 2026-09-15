@@ -31,6 +31,8 @@ describe('Adapter: ModelFetchService', () => {
       'mistral',
       'deepinfra',
       'anthropic',
+      'zai',
+      'openrouter',
     ]) {
       expect(service.canFetch(provider)).toBe(true);
     }
@@ -77,6 +79,48 @@ describe('Adapter: ModelFetchService', () => {
     if (result.success) {
       expect(result.data).toHaveLength(1);
     }
+  });
+
+  test('fetchModels hits the Z.ai OpenAI-compatible endpoint', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ data: [{ id: 'glm-4.5v', object: 'model' }] }),
+    );
+
+    const result = await service.fetchModels('zai', 'zai-key');
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.map((m) => m.id)).toEqual(['glm-4.5v']);
+    }
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(url).toBe('https://api.z.ai/api/paas/v4/models');
+    expect(init.headers.Authorization).toBe('Bearer zai-key');
+  });
+
+  test('fetchModels hits the OpenRouter OpenAI-compatible endpoint', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        data: [{ id: 'google/gemini-2.5-flash', object: 'model' }],
+      }),
+    );
+
+    const result = await service.fetchModels('openrouter', 'or-key');
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.map((m) => m.id)).toEqual([
+        'google/gemini-2.5-flash',
+      ]);
+    }
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(url).toBe('https://openrouter.ai/api/v1/models');
+    expect(init.headers.Authorization).toBe('Bearer or-key');
   });
 
   test('fetchModels tolerates malformed response shape', async () => {

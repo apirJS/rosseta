@@ -1,4 +1,5 @@
 export { default as Button } from './Button.svelte';
+export { default as Checkbox } from './Checkbox.svelte';
 export { default as Divider } from './Divider.svelte';
 export { default as FormError } from './FormError.svelte';
 export { default as Icon } from './Icon.svelte';

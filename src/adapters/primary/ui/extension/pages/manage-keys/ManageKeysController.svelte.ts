@@ -10,8 +10,7 @@ const UNDO_WINDOW_MS = 5000;
 
 class ManageKeysState {
   selectedProvider = $state<AnyProvider>('google');
-  apiKeyInput = $state('');
-  searchQuery = $state('');
+  keyInput = $state('');
   viewingKeyId = $state<string | null>(null);
   pendingDeleteId = $state<string | null>(null);
 }
@@ -38,16 +37,25 @@ export function createManageKeysController(deps: ManageKeysDeps) {
 
   const allKeys = $derived(deps.credentials()?.items ?? []);
 
+  const providerKeys = $derived(
+    allKeys.filter((c) => c.provider === state.selectedProvider),
+  );
+
   const visibleKeys = $derived.by(() => {
     const pending = state.pendingDeleteId;
-    const base = pending ? allKeys.filter((c) => c.id !== pending) : allKeys;
-    const query = state.searchQuery.trim().toLowerCase();
+    const base = pending
+      ? providerKeys.filter((c) => c.id !== pending)
+      : providerKeys;
+    const query = state.keyInput.trim().toLowerCase();
     if (!query) return base;
-    return base.filter(
-      (c) =>
-        c.apiKey.value.toLowerCase().includes(query) ||
-        c.provider.toLowerCase().includes(query),
+    return base.filter((c) =>
+      c.apiKey.value.toLowerCase().includes(query),
     );
+  });
+
+  const canAddKey = $derived.by(() => {
+    const key = state.keyInput.trim();
+    return key !== '' && !allKeys.some((c) => c.apiKey.value === key);
   });
 
   const viewingKey = $derived.by(() => {
@@ -57,7 +65,7 @@ export function createManageKeysController(deps: ManageKeysDeps) {
   });
 
   async function addApiKey() {
-    const trimmed = state.apiKeyInput.trim();
+    const trimmed = state.keyInput.trim();
     if (!trimmed) return;
 
     if (allKeys.some((c) => c.apiKey.value === trimmed)) {
@@ -79,7 +87,7 @@ export function createManageKeysController(deps: ManageKeysDeps) {
       return;
     }
 
-    state.apiKeyInput = '';
+    state.keyInput = '';
     deps.toast.show({ type: 'success', message: 'API key added' });
 
     if (deps.modelsFor(state.selectedProvider).length === 0) {
@@ -146,6 +154,11 @@ export function createManageKeysController(deps: ManageKeysDeps) {
     state.pendingDeleteId = null;
   }
 
+  function setProvider(provider: AnyProvider) {
+    state.selectedProvider = provider;
+    state.keyInput = '';
+  }
+
   function setActiveKey(credential: Credential) {
     deps.setActiveKey(credential.id);
   }
@@ -170,13 +183,20 @@ export function createManageKeysController(deps: ManageKeysDeps) {
     get allKeys() {
       return allKeys;
     },
+    get providerKeys() {
+      return providerKeys;
+    },
     get visibleKeys() {
       return visibleKeys;
+    },
+    get canAddKey() {
+      return canAddKey;
     },
     get viewingKey() {
       return viewingKey;
     },
     addApiKey,
+    setProvider,
     requestDelete,
     commitPendingDelete,
     cancelPendingDelete,

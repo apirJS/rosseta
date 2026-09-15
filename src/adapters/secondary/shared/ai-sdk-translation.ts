@@ -38,11 +38,13 @@ export async function executeTranslation(
   image: EncodedImage,
   targetLanguage: Language,
   tag: string,
+  includeDescription = true,
 ): Promise<Result<Translation, AppError>> {
   try {
     const prompt = buildBasePrompt({
       targetLanguageCode: targetLanguage.code,
       targetLanguageName: targetLanguage.name,
+      includeDescription,
     });
 
     const { output } = await generateText({

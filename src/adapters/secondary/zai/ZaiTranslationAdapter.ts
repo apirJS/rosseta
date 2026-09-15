@@ -1,4 +1,4 @@
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { createZai } from '@ai-sdk/zai';
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
@@ -7,32 +7,32 @@ import type { Result } from '../../../shared/types/Result';
 import type { AppError } from '../../../shared/errors';
 import type { Credential } from '../../../core/domain/credential/Credential';
 import type { UserPreferences } from '../../../core/domain/preferences/UserPreferences';
-import type { CustomProviderConfig } from '../../../core/domain/provider/CustomProviderConfig';
 import { executeTranslation } from '../shared/ai-sdk-translation';
 
-export class OpenAICompatibleTranslationAdapter implements ITranslationService {
+export class ZaiTranslationAdapter implements ITranslationService {
   constructor(
     private readonly credential: Credential,
     private readonly userPreferences: UserPreferences,
-    private readonly providerConfig: CustomProviderConfig,
   ) {}
 
   public async translateImage(
     image: EncodedImage,
     targetLanguage: Language,
   ): Promise<Result<Translation, AppError>> {
-    const provider = createOpenAICompatible({
-      name: this.providerConfig.name,
-      baseURL: this.providerConfig.baseURL,
+    const zai = createZai({
       apiKey: this.credential.apiKey.value,
-      headers: this.providerConfig.headers,
-      queryParams: this.providerConfig.queryParams,
     });
 
-    const model = provider(
+    const model = zai(
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'CUSTOM', this.userPreferences.includeDescription);
+    return executeTranslation(
+      model,
+      image,
+      targetLanguage,
+      'ZAI',
+      this.userPreferences.includeDescription,
+    );
   }
 }

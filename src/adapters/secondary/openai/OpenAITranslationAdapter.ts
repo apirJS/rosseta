@@ -27,6 +27,6 @@ export class OpenAITranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'OPENAI');
+    return executeTranslation(model, image, targetLanguage, 'OPENAI', this.userPreferences.includeDescription);
   }
 }

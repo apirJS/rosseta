@@ -73,6 +73,43 @@ describe('Adapter: ai-sdk-translation', () => {
     expect(callArgs?.abortSignal).toBeDefined();
   });
 
+  test('prompt asks for a description summary by default', async () => {
+    generateTextMock.mockResolvedValueOnce({
+      output: VALID_TRANSLATION_RESPONSE,
+    });
+
+    await executeTranslation(fakeModel(), VALID_IMAGE, TARGET_LANGUAGE, 'TEST');
+
+    const callArgs = generateTextMock.mock.calls[0][0] as {
+      messages: { content: { text: string }[] }[];
+    };
+    const prompt = callArgs.messages[0].content[0].text;
+    expect(prompt).toContain('1–2 sentence contextual summary');
+    expect(prompt).not.toContain('"description":""');
+  });
+
+  test('prompt requests an empty description when includeDescription is false', async () => {
+    generateTextMock.mockResolvedValueOnce({
+      output: VALID_TRANSLATION_RESPONSE,
+    });
+
+    await executeTranslation(
+      fakeModel(),
+      VALID_IMAGE,
+      TARGET_LANGUAGE,
+      'TEST',
+      false,
+    );
+
+    const callArgs = generateTextMock.mock.calls[0][0] as {
+      messages: { content: { text: string }[] }[];
+    };
+    const prompt = callArgs.messages[0].content[0].text;
+    expect(prompt).toContain('always `""` (empty string)');
+    expect(prompt).toContain('"description":""');
+    expect(prompt).not.toContain('1–2 sentence');
+  });
+
   test('maps NO_TEXT_FOUND-style rejection to aiRejected', async () => {
     generateTextMock.mockResolvedValueOnce({
       output: { success: false, error: 'NO_TEXT_FOUND' },

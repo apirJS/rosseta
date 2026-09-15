@@ -52,6 +52,20 @@ describe('Adapter: BrowserUserPreferencesStorageAdapter', () => {
     }
   });
 
+  test('get() reads a stored includeDescription flag', async () => {
+    seedStore({
+      userPreferences: validPreferencesProps({
+        includeDescription: false,
+      }),
+    });
+
+    const result = await adapter.get();
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data?.includeDescription).toBe(false);
+    }
+  });
+
   test('get() ignores legacy selectedModel instead of migrating it', async () => {
     seedStore({
       userPreferences: {
@@ -125,6 +139,16 @@ describe('Adapter: BrowserUserPreferencesStorageAdapter', () => {
     expect(getResult.success).toBe(true);
     if (getResult.success) {
       expect(getResult.data?.targetLanguage.code).toBe('ja-JP');
+    }
+  });
+
+  test('set() persists includeDescription changes', async () => {
+    await adapter.set({ includeDescription: false });
+
+    const getResult = await adapter.get();
+    expect(getResult.success).toBe(true);
+    if (getResult.success) {
+      expect(getResult.data?.includeDescription).toBe(false);
     }
   });
 

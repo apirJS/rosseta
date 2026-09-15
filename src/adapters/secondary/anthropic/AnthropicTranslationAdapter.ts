@@ -27,6 +27,6 @@ export class AnthropicTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'ANTHROPIC');
+    return executeTranslation(model, image, targetLanguage, 'ANTHROPIC', this.userPreferences.includeDescription);
   }
 }

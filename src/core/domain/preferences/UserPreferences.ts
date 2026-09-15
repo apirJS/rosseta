@@ -10,6 +10,7 @@ export interface UserPreferencesProps {
   theme: ThemeValue;
   targetLanguage: LanguageCode;
   selectedModels: Record<string, string>;
+  includeDescription: boolean;
 }
 
 export class UserPreferences extends AggregateRoot<string> {
@@ -18,6 +19,7 @@ export class UserPreferences extends AggregateRoot<string> {
     private readonly _theme: Theme,
     private readonly _targetLanguage: Language,
     private readonly _selectedModels: Readonly<Record<string, string>>,
+    private readonly _includeDescription: boolean = true,
     private readonly _shortcut: string | null = null,
   ) {
     super(id);
@@ -33,6 +35,10 @@ export class UserPreferences extends AggregateRoot<string> {
 
   public get selectedModels(): Readonly<Record<string, string>> {
     return this._selectedModels;
+  }
+
+  public get includeDescription(): boolean {
+    return this._includeDescription;
   }
 
   public get shortcut(): string | null {
@@ -53,6 +59,7 @@ export class UserPreferences extends AggregateRoot<string> {
       theme: this._theme.value,
       targetLanguage: this._targetLanguage.code,
       selectedModels: { ...this._selectedModels },
+      includeDescription: this._includeDescription,
     };
   }
 
@@ -62,6 +69,7 @@ export class UserPreferences extends AggregateRoot<string> {
       theme: string;
       targetLanguage: string;
       selectedModels: Record<string, unknown>;
+      includeDescription: boolean;
     }>,
   ): Result<UserPreferences, DomainError> {
     if (!props.id) {
@@ -82,6 +90,9 @@ export class UserPreferences extends AggregateRoot<string> {
         themeResult.data,
         languageResult.data,
         selectedModels,
+        typeof props.includeDescription === 'boolean'
+          ? props.includeDescription
+          : true,
         null,
       ),
     );
@@ -93,6 +104,7 @@ export class UserPreferences extends AggregateRoot<string> {
       Theme.system(),
       Language.create('en-US'),
       {},
+      true,
       null,
     );
   }
@@ -103,6 +115,7 @@ export class UserPreferences extends AggregateRoot<string> {
       theme,
       this._targetLanguage,
       this._selectedModels,
+      this._includeDescription,
       this._shortcut,
     );
   }
@@ -113,6 +126,7 @@ export class UserPreferences extends AggregateRoot<string> {
       this._theme,
       language,
       this._selectedModels,
+      this._includeDescription,
       this._shortcut,
     );
   }
@@ -126,6 +140,18 @@ export class UserPreferences extends AggregateRoot<string> {
       this._theme,
       this._targetLanguage,
       { ...this._selectedModels, [provider]: modelId },
+      this._includeDescription,
+      this._shortcut,
+    );
+  }
+
+  public withIncludeDescription(includeDescription: boolean): UserPreferences {
+    return new UserPreferences(
+      this.id,
+      this._theme,
+      this._targetLanguage,
+      this._selectedModels,
+      includeDescription,
       this._shortcut,
     );
   }
@@ -136,6 +162,7 @@ export class UserPreferences extends AggregateRoot<string> {
       this._theme,
       this._targetLanguage,
       this._selectedModels,
+      this._includeDescription,
       shortcut,
     );
   }

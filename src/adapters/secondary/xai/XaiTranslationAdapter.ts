@@ -27,6 +27,6 @@ export class XaiTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'XAI');
+    return executeTranslation(model, image, targetLanguage, 'XAI', this.userPreferences.includeDescription);
   }
 }

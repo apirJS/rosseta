@@ -61,12 +61,28 @@ describe('UI Controller: ManageKeysController', () => {
     vi.clearAllMocks();
   });
 
-  test('lists all keys by default', () => {
+  test('lists only keys for the selected provider', () => {
     const { deps } = createDeps();
     const controller = createManageKeysController(deps);
 
     expect(controller.allKeys).toHaveLength(2);
-    expect(controller.visibleKeys).toHaveLength(2);
+    expect(controller.providerKeys.map((c) => c.id)).toEqual(['g1']);
+    expect(controller.visibleKeys.map((c) => c.id)).toEqual(['g1']);
+
+    controller.setProvider('groq');
+    expect(controller.providerKeys.map((c) => c.id)).toEqual(['q1']);
+    expect(controller.visibleKeys.map((c) => c.id)).toEqual(['q1']);
+  });
+
+  test('setProvider resets the key input', () => {
+    const { deps } = createDeps();
+    const controller = createManageKeysController(deps);
+    controller.state.keyInput = 'pending-key';
+
+    controller.setProvider('groq');
+
+    expect(controller.state.selectedProvider).toBe('groq');
+    expect(controller.state.keyInput).toBe('');
   });
 
   test('addApiKey with empty input does nothing', async () => {
@@ -81,7 +97,7 @@ describe('UI Controller: ManageKeysController', () => {
   test('addApiKey duplicate shows an error toast', async () => {
     const { deps, show } = createDeps();
     const controller = createManageKeysController(deps);
-    controller.state.apiKeyInput = 'AIzaGoogleKeyValue123';
+    controller.state.keyInput = 'AIzaGoogleKeyValue123';
 
     await controller.addApiKey();
 
@@ -95,12 +111,12 @@ describe('UI Controller: ManageKeysController', () => {
     const { deps, show } = createDeps();
     const controller = createManageKeysController(deps);
     controller.state.selectedProvider = 'groq';
-    controller.state.apiKeyInput = 'gsk_new_key_value';
+    controller.state.keyInput = 'gsk_new_key_value';
 
     await controller.addApiKey();
 
     expect(deps.addApiKey).toHaveBeenCalledWith('gsk_new_key_value', 'groq');
-    expect(controller.state.apiKeyInput).toBe('');
+    expect(controller.state.keyInput).toBe('');
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'success', message: 'API key added' }),
     );
@@ -111,7 +127,7 @@ describe('UI Controller: ManageKeysController', () => {
       addApiKey: vi.fn().mockResolvedValue('Storage is full'),
     });
     const controller = createManageKeysController(deps);
-    controller.state.apiKeyInput = 'gsk_new_key_value';
+    controller.state.keyInput = 'gsk_new_key_value';
 
     await controller.addApiKey();
 
@@ -122,14 +138,14 @@ describe('UI Controller: ManageKeysController', () => {
         description: 'Storage is full',
       }),
     );
-    expect(controller.state.apiKeyInput).toBe('gsk_new_key_value');
+    expect(controller.state.keyInput).toBe('gsk_new_key_value');
   });
 
   test('addApiKey auto-fetches models when the provider has none stored', async () => {
     const { deps } = createDeps();
     const controller = createManageKeysController(deps);
     controller.state.selectedProvider = 'groq';
-    controller.state.apiKeyInput = 'gsk_new_key_value';
+    controller.state.keyInput = 'gsk_new_key_value';
 
     await controller.addApiKey();
 
@@ -143,22 +159,35 @@ describe('UI Controller: ManageKeysController', () => {
       ]),
     });
     const controller = createManageKeysController(deps);
-    controller.state.apiKeyInput = 'gsk_new_key_value';
+    controller.state.keyInput = 'gsk_new_key_value';
 
     await controller.addApiKey();
 
     expect(deps.fetchModels).not.toHaveBeenCalled();
   });
 
-  test('search filters by key value and provider', () => {
+  test('search filters keys by key value within the selected provider', () => {
     const { deps } = createDeps();
     const controller = createManageKeysController(deps);
 
-    controller.state.searchQuery = 'groq';
-    expect(controller.visibleKeys.map((c) => c.id)).toEqual(['q1']);
-
-    controller.state.searchQuery = 'aizaGoogle';
+    controller.state.keyInput = 'aizaGoogle';
     expect(controller.visibleKeys.map((c) => c.id)).toEqual(['g1']);
+
+    controller.state.keyInput = 'gsk_groqKeyValue123';
+    expect(controller.visibleKeys).toHaveLength(0);
+  });
+
+  test('canAddKey is false for empty input and exact existing keys', () => {
+    const { deps } = createDeps();
+    const controller = createManageKeysController(deps);
+
+    expect(controller.canAddKey).toBe(false);
+
+    controller.state.keyInput = 'gsk_brand_new_key';
+    expect(controller.canAddKey).toBe(true);
+
+    controller.state.keyInput = 'AIzaGoogleKeyValue123';
+    expect(controller.canAddKey).toBe(false);
   });
 
   describe('delete with undo', () => {
@@ -177,7 +206,7 @@ describe('UI Controller: ManageKeysController', () => {
       controller.requestDelete('g1');
 
       expect(controller.state.pendingDeleteId).toBe('g1');
-      expect(controller.visibleKeys.map((c) => c.id)).toEqual(['q1']);
+      expect(controller.visibleKeys).toHaveLength(0);
       expect(deps.removeApiKey).not.toHaveBeenCalled();
 
       vi.advanceTimersByTime(5000);
@@ -198,7 +227,7 @@ describe('UI Controller: ManageKeysController', () => {
       await vi.runAllTicks();
 
       expect(deps.removeApiKey).not.toHaveBeenCalled();
-      expect(controller.visibleKeys).toHaveLength(2);
+      expect(controller.visibleKeys.map((c) => c.id)).toEqual(['g1']);
     });
 
     test('requestDelete while pending cancels the previous timer', async () => {

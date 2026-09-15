@@ -27,6 +27,6 @@ export class GroqTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'GROQ');
+    return executeTranslation(model, image, targetLanguage, 'GROQ', this.userPreferences.includeDescription);
   }
 }

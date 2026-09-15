@@ -25,6 +25,7 @@
 
   $effect(() => {
     controller.load();
+    return () => controller.destroy();
   });
 </script>
 

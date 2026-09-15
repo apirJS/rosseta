@@ -250,5 +250,28 @@ describe('UI Controller: OverlayController', () => {
       expect(detachMock).not.toHaveBeenCalled();
       cleanup();
     });
+
+    test('micro-drag selection (< 10px) does NOT translate', async () => {
+      const { controller, cleanup } = createController(detachMock);
+
+      controller.handlePointerDown({
+        currentTarget: mockTarget,
+        pointerId: 1,
+        clientX: 100,
+        clientY: 100,
+      } as unknown as PointerEvent);
+
+      const pointerUpHandler = eventListeners['pointerup'];
+
+      await pointerUpHandler({
+        clientX: 105,
+        clientY: 105,
+        pointerId: 1,
+      } as unknown as PointerEvent);
+
+      expect(sendMessageToRuntime).not.toHaveBeenCalled();
+      expect(detachMock).not.toHaveBeenCalled();
+      cleanup();
+    });
   });
 });

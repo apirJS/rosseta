@@ -115,20 +115,6 @@
     </div>
 
     <div class="flex flex-col gap-1.5 overflow-y-auto flex-1">
-      {#if controller.canAddModel}
-        <button
-          type="button"
-          class="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-primary/50 px-3 py-2 text-left cursor-pointer"
-          onclick={() => controller.addModel()}
-          title="Add this model"
-        >
-          <Icon name="plus" class="w-4 h-4 text-primary shrink-0" />
-          <span class="text-sm text-muted truncate">
-            Add <span class="text-foreground font-medium">{controller.state.modelInput.trim()}</span>
-          </span>
-        </button>
-      {/if}
-
       {#each controller.filteredModels as model (model.id)}
         {@const isSelected = model.id === controller.selectedModelId}
         <div

@@ -172,7 +172,9 @@ export function createManageKeysController(deps: ManageKeysDeps) {
   }
 
   function destroy() {
-    if (deleteTimer) {
+    if (state.pendingDeleteId) {
+      void commitPendingDelete();
+    } else if (deleteTimer) {
       clearTimeout(deleteTimer);
       deleteTimer = null;
     }

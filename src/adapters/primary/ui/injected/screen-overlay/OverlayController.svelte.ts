@@ -126,7 +126,8 @@ export class OverlayController {
       const left = Math.min(finalX, initialX);
       const top = Math.min(finalY, initialY);
 
-      if (width > 0 && height > 0) {
+      const MIN_CROP_DIMENSION = 10;
+      if (width >= MIN_CROP_DIMENSION && height >= MIN_CROP_DIMENSION) {
         await this.handleSelectionComplete(left, top, width, height);
       }
     };

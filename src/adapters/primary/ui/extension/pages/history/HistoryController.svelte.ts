@@ -38,9 +38,24 @@ export function createHistoryController() {
 
     if (state.searchQuery.trim()) {
       const query = state.searchQuery.toLowerCase();
-      items = items.filter((t) =>
-        t.original.some((seg) => seg.text.toLowerCase().includes(query)),
-      );
+      items = items.filter((t) => {
+        const matchOriginal = t.original.some(
+          (seg) =>
+            seg.text.toLowerCase().includes(query) ||
+            seg.language.name.toLowerCase().includes(query) ||
+            seg.language.code.toLowerCase().includes(query) ||
+            (seg.romanization && seg.romanization.toLowerCase().includes(query)),
+        );
+        const matchTranslated = t.translated.some(
+          (seg) =>
+            seg.text.toLowerCase().includes(query) ||
+            seg.language.name.toLowerCase().includes(query) ||
+            seg.language.code.toLowerCase().includes(query) ||
+            (seg.romanization && seg.romanization.toLowerCase().includes(query)),
+        );
+        const matchDescription = t.description.toLowerCase().includes(query);
+        return matchOriginal || matchTranslated || matchDescription;
+      });
     }
 
     return items;
@@ -109,6 +124,10 @@ export function createHistoryController() {
     });
   }
 
+  function destroy() {
+    commitPendingDelete();
+  }
+
   return {
     state,
     get filtered() {
@@ -120,5 +139,6 @@ export function createHistoryController() {
     deleteItem,
     undoDelete,
     openItem,
+    destroy,
   };
 }

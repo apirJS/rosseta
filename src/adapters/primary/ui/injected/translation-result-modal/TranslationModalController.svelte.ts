@@ -131,18 +131,26 @@ export class TranslationModalController {
     text: string,
     target: 'original' | 'translated' | 'description',
   ): Promise<void> {
+    let success = false;
     try {
       await navigator.clipboard.writeText(text);
+      success = true;
     } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } catch {
+        success = false;
+      }
     }
+
+    if (!success) return;
 
     if (target === 'original') this.originalCopy = 'copied';
     else if (target === 'translated') this.translatedCopy = 'copied';

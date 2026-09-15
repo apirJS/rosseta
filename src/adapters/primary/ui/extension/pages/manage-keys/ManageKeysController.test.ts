@@ -244,17 +244,16 @@ describe('UI Controller: ManageKeysController', () => {
       expect(deps.removeApiKey).toHaveBeenCalledWith('q1');
     });
 
-    test('destroy cancels the pending delete', async () => {
+    test('destroy commits the pending delete', async () => {
       const { deps } = createDeps();
       const controller = createManageKeysController(deps);
 
       controller.requestDelete('g1');
       controller.destroy();
 
-      vi.advanceTimersByTime(6000);
       await vi.runAllTicks();
 
-      expect(deps.removeApiKey).not.toHaveBeenCalled();
+      expect(deps.removeApiKey).toHaveBeenCalledWith('g1');
     });
 
     test('deleting the last key clears all stored models', async () => {

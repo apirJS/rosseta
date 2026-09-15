@@ -177,3 +177,10 @@ ProviderRegistry.register({
   defaultModelId: 'google/gemini-2.5-flash',
   models: [],
 });
+
+ProviderRegistry.register({
+  id: 'opencode',
+  name: 'OpenCode',
+  defaultModelId: 'deepseek-v4-flash-vision-exp',
+  models: [],
+});

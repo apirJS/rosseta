@@ -53,6 +53,28 @@ export class UserPreferences extends AggregateRoot<string> {
     return this.getModelIdFor(provider).length > 0;
   }
 
+  /**
+   * Resolves the model id to use for a provider, validated against the
+   * models actually available. Falls back to the registry default, then
+   * the first available model, when the saved selection is stale. With no
+   * available models there is nothing to validate against, so the current
+   * effective id is returned unchanged.
+   */
+  public resolveModelIdFor(
+    provider: string,
+    availableModels: ReadonlyArray<{ id: string }>,
+  ): string {
+    const saved = this._selectedModels[provider];
+    if (saved && availableModels.some((m) => m.id === saved)) return saved;
+
+    const defaultId = ProviderRegistry.getDefaultModelId(provider);
+    if (defaultId && availableModels.some((m) => m.id === defaultId)) {
+      return defaultId;
+    }
+
+    return availableModels[0]?.id ?? saved ?? defaultId;
+  }
+
   public toProps(): UserPreferencesProps {
     return {
       id: this.id,

@@ -84,7 +84,7 @@ describe('Adapter: ai-sdk-translation', () => {
       messages: { content: { text: string }[] }[];
     };
     const prompt = callArgs.messages[0].content[0].text;
-    expect(prompt).toContain('1–2 sentence contextual summary');
+    expect(prompt).toContain('Compact contextual summary');
     expect(prompt).not.toContain('"description":""');
   });
 

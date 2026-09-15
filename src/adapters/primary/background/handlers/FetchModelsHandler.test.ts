@@ -13,6 +13,9 @@ import {
   FakeCustomProviderStorage,
 } from '../../../../../tests/fakes/FakeCustomProviderStorage';
 import {
+  FakeUserPreferencesStorage,
+} from '../../../../../tests/fakes/FakeUserPreferencesStorage';
+import {
   GetCredentialsUseCase,
 } from '../../../../core/application/auth/GetCredentialUseCase';
 import {
@@ -54,7 +57,7 @@ function createTestContainer() {
 
   const container = {
     getCredentialsUseCase: new GetCredentialsUseCase(credentialStorage),
-    fetchModelsUseCase: new FetchModelsUseCase(modelStorage, fetchService),
+    fetchModelsUseCase: new FetchModelsUseCase(modelStorage, fetchService, new FakeUserPreferencesStorage()),
     getCustomProvidersUseCase: new GetCustomProvidersUseCase(
       customProviderStorage,
     ),
@@ -130,6 +133,7 @@ describe('Adapter: FetchModelsHandler', () => {
       fetchModelsUseCase: new FetchModelsUseCase(
         new FakeModelStorage(),
         fetchService,
+        new FakeUserPreferencesStorage(),
       ),
       getCustomProvidersUseCase: new GetCustomProvidersUseCase(
         customProviderStorage,
@@ -159,6 +163,7 @@ describe('Adapter: FetchModelsHandler', () => {
       fetchModelsUseCase: new FetchModelsUseCase(
         new FakeModelStorage(),
         fetchService,
+        new FakeUserPreferencesStorage(),
       ),
       getCustomProvidersUseCase: new GetCustomProvidersUseCase(
         customProviderStorage,

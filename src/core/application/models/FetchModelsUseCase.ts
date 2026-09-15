@@ -1,6 +1,10 @@
 import type { IFetchModelsUseCase } from '../../ports/inbound/models/IFetchModelsUseCase';
-import type { IModelStorage, StoredModel } from '../../ports/outbound/IModelStorage';
+import type {
+  IModelStorage,
+  StoredModel,
+} from '../../ports/outbound/IModelStorage';
 import type { IModelFetchService } from '../../ports/outbound/IModelFetchService';
+import type { IUserPreferencesStorage } from '../../ports/outbound/IUserPreferencesStorage';
 import { ProviderRegistry } from '../../domain/provider/ProviderRegistry';
 import { success, failure, type Result } from '../../../shared/types/Result';
 import type { AppError } from '../../../shared/errors';
@@ -9,6 +13,7 @@ export class FetchModelsUseCase implements IFetchModelsUseCase {
   constructor(
     private readonly modelStorage: IModelStorage,
     private readonly modelFetchService: IModelFetchService,
+    private readonly preferencesStorage: IUserPreferencesStorage,
   ) {}
 
   async execute(
@@ -46,6 +51,33 @@ export class FetchModelsUseCase implements IFetchModelsUseCase {
       merged.map((m) => ({ id: m.id, name: m.name })),
     );
 
+    await this.repairSelectedModel(provider, merged);
+
     return success(merged);
+  }
+
+  private async repairSelectedModel(
+    provider: string,
+    models: StoredModel[],
+  ): Promise<void> {
+    const prefsResult = await this.preferencesStorage.get();
+    if (!prefsResult.success || !prefsResult.data) return;
+
+    const preferences = prefsResult.data;
+    const selectedModels = preferences.selectedModels;
+
+    if (models.length === 0) {
+      if (!(provider in selectedModels)) return;
+      const { [provider]: _removed, ...rest } = selectedModels;
+      await this.preferencesStorage.set({ selectedModels: rest });
+      return;
+    }
+
+    const resolved = preferences.resolveModelIdFor(provider, models);
+    if (resolved === preferences.getModelIdFor(provider)) return;
+
+    await this.preferencesStorage.set({
+      selectedModels: { ...selectedModels, [provider]: resolved },
+    });
   }
 }

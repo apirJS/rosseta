@@ -33,6 +33,7 @@ describe('Adapter: ModelFetchService', () => {
       'anthropic',
       'zai',
       'openrouter',
+      'opencode',
     ]) {
       expect(service.canFetch(provider)).toBe(true);
     }
@@ -121,6 +122,29 @@ describe('Adapter: ModelFetchService', () => {
     ];
     expect(url).toBe('https://openrouter.ai/api/v1/models');
     expect(init.headers.Authorization).toBe('Bearer or-key');
+  });
+
+  test('fetchModels hits the OpenCode Zen OpenAI-compatible endpoint', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        data: [{ id: 'deepseek-v4-flash-vision-exp', object: 'model' }],
+      }),
+    );
+
+    const result = await service.fetchModels('opencode', 'zen-key');
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.map((m) => m.id)).toEqual([
+        'deepseek-v4-flash-vision-exp',
+      ]);
+    }
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(url).toBe('https://opencode.ai/zen/v1/models');
+    expect(init.headers.Authorization).toBe('Bearer zen-key');
   });
 
   test('fetchModels tolerates malformed response shape', async () => {

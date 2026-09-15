@@ -3,6 +3,7 @@ import type { Container } from '../../../../shared/di/container-factory';
 import { failure, type Result } from '../../../../shared/types/Result';
 import { AuthError, ValidationError } from '../../../../shared/errors';
 import { UserPreferences } from '../../../../core/domain/preferences/UserPreferences';
+import type { StoredModel } from '../../../../core/ports/outbound/IModelStorage';
 import { isCustomProviderId } from '../../../../core/domain/provider/CustomProviderConfig';
 import { createTranslationAdapter } from '../../../secondary/TranslationAdapterFactory';
 import { TranslateImageUseCase } from '../../../../core/application/translation/TranslateImageUseCase';
@@ -76,8 +77,24 @@ export class TranslateImageHandler {
       return failure(userPreferencesResult.error);
     }
 
-    const preferences =
+    let preferences =
       userPreferencesResult.data ?? UserPreferences.createDefault(uuidv4());
+
+    const modelsResult = await this.container.loadModelsUseCase.execute(
+      activeCredential.provider,
+    );
+    if (modelsResult.success) {
+      preferences = await this.repairStaleModelSelection(
+        preferences,
+        activeCredential.provider,
+        modelsResult.data,
+      );
+    } else {
+      console.warn(
+        '[TranslateImageHandler] Could not load stored models, skipping model validation:',
+        modelsResult.error,
+      );
+    }
 
     if (!preferences.hasSelectedModel(activeCredential.provider)) {
       const error = ValidationError.invalidInput(
@@ -158,5 +175,33 @@ export class TranslateImageHandler {
     });
 
     return { success: true, data: undefined };
+  }
+
+  /**
+   * Falls back to the registry default or first stored model when the
+   * saved selection is no longer in the stored model list, and persists
+   * the repair. Best-effort: a persist failure keeps the in-memory repair.
+   */
+  private async repairStaleModelSelection(
+    preferences: UserPreferences,
+    provider: string,
+    models: StoredModel[],
+  ): Promise<UserPreferences> {
+    if (models.length === 0) return preferences;
+
+    const resolved = preferences.resolveModelIdFor(provider, models);
+    if (resolved === preferences.getModelIdFor(provider)) return preferences;
+
+    const repaired = preferences.withSelectedModel(provider, resolved);
+    const updateResult = await this.container.updatePreferencesUseCase.execute(
+      { preferences: { selectedModels: repaired.selectedModels } },
+    );
+    if (!updateResult.success) {
+      console.warn(
+        '[TranslateImageHandler] Could not persist repaired model selection:',
+        updateResult.error,
+      );
+    }
+    return repaired;
   }
 }

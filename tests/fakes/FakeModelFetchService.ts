@@ -18,6 +18,7 @@ export class FakeModelFetchService implements IModelFetchService {
     'anthropic',
     'zai',
     'openrouter',
+    'opencode',
   ]);
   private responses = new Map<string, ModelInfo[] | AppError>();
   lastCall: { provider: string; apiKey: string; baseURL?: string } | null =

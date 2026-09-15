@@ -169,6 +169,8 @@ const MODEL_FETCHERS: Record<string, ModelFetcher> = {
     fetchOpenAICompatibleModels(apiKey, 'https://api.z.ai/api/paas/v4'),
   openrouter: (apiKey) =>
     fetchOpenAICompatibleModels(apiKey, 'https://openrouter.ai/api/v1'),
+  opencode: (apiKey) =>
+    fetchOpenAICompatibleModels(apiKey, 'https://opencode.ai/zen/v1'),
   anthropic: (apiKey) => fetchAnthropicModels(apiKey),
 };
 

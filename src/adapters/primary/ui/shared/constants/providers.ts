@@ -10,6 +10,7 @@ export const PROVIDER_BADGE_COLORS: Record<string, string> = {
   deepinfra: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
   zai: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
   openrouter: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
+  opencode: 'bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400',
   'custom-provider':
     'bg-violet-500/15 text-violet-600 dark:text-violet-400',
 };
@@ -24,4 +25,5 @@ export const API_KEY_URLS: Partial<Record<Provider, string>> = {
   deepinfra: 'https://deepinfra.com/dash/api_keys',
   zai: 'https://z.ai/manage-apikey',
   openrouter: 'https://openrouter.ai/settings/keys',
+  opencode: 'https://opencode.ai/auth',
 };

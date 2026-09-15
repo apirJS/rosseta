@@ -9,7 +9,8 @@ export type Provider =
   | 'mistral'
   | 'deepinfra'
   | 'zai'
-  | 'openrouter';
+  | 'openrouter'
+  | 'opencode';
 
 export const PROVIDERS: Provider[] = [
   'google',
@@ -21,6 +22,7 @@ export const PROVIDERS: Provider[] = [
   'deepinfra',
   'zai',
   'openrouter',
+  'opencode',
 ];
 
 export const DEFAULT_PROVIDER: Provider = 'google';

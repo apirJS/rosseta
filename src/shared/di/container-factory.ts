@@ -92,7 +92,11 @@ export function createContainer() {
     ),
 
     loadModelsUseCase: new LoadModelsUseCase(modelStorage),
-    fetchModelsUseCase: new FetchModelsUseCase(modelStorage, modelFetchService),
+    fetchModelsUseCase: new FetchModelsUseCase(
+      modelStorage,
+      modelFetchService,
+      userPreferencesStorage,
+    ),
     addCustomModelUseCase: new AddCustomModelUseCase(modelStorage),
     removeCustomModelUseCase: new RemoveCustomModelUseCase(modelStorage),
     clearModelsUseCase: new ClearModelsUseCase(modelStorage),

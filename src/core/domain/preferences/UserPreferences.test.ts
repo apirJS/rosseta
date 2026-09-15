@@ -48,6 +48,59 @@ describe('Domain: UserPreferences', () => {
     });
   });
 
+  describe('resolveModelIdFor', () => {
+    const MODELS = [{ id: 'gemini-2.5-flash' }, { id: 'm1' }];
+
+    test('keeps a saved selection that is still available', () => {
+      const prefs = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        selectedModels: { google: 'm1' },
+      });
+      expect(prefs.success && prefs.data.resolveModelIdFor('google', MODELS)).toBe('m1');
+    });
+
+    test('falls back to the registry default when the saved selection is stale', () => {
+      const prefs = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        selectedModels: { google: 'dead-model' },
+      });
+      expect(
+        prefs.success && prefs.data.resolveModelIdFor('google', MODELS),
+      ).toBe('gemini-2.5-flash');
+    });
+
+    test('falls back to the first available model when the default is absent too', () => {
+      const prefs = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        selectedModels: { google: 'dead-model' },
+      });
+      expect(
+        prefs.success &&
+          prefs.data.resolveModelIdFor('google', [{ id: 'm1' }, { id: 'm2' }]),
+      ).toBe('m1');
+    });
+
+    test('resolves the default for a provider with nothing saved', () => {
+      const prefs = UserPreferences.createDefault('prefs-1');
+      expect(prefs.resolveModelIdFor('google', MODELS)).toBe(
+        'gemini-2.5-flash',
+      );
+    });
+
+    test('returns the current effective id when no models are available', () => {
+      const saved = UserPreferences.fromRaw({
+        id: 'prefs-1',
+        selectedModels: { google: 'stale-model' },
+      });
+      expect(
+        saved.success && saved.data.resolveModelIdFor('google', []),
+      ).toBe('stale-model');
+
+      const unsaved = UserPreferences.createDefault('prefs-1');
+      expect(unsaved.resolveModelIdFor('google', [])).toBe('gemini-2.5-flash');
+    });
+  });
+
   describe('fromRaw', () => {
     test('accepts valid raw props', () => {
       const result = UserPreferences.fromRaw({

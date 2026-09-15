@@ -12,6 +12,7 @@ import { MistralTranslationAdapter } from './mistral/MistralTranslationAdapter';
 import { DeepInfraTranslationAdapter } from './deepinfra/DeepInfraTranslationAdapter';
 import { ZaiTranslationAdapter } from './zai/ZaiTranslationAdapter';
 import { OpenRouterTranslationAdapter } from './openrouter/OpenRouterTranslationAdapter';
+import { OpenCodeTranslationAdapter } from './opencode/OpenCodeTranslationAdapter';
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
 
 export function createTranslationAdapter(
@@ -51,6 +52,8 @@ export function createTranslationAdapter(
       return new ZaiTranslationAdapter(credential, preferences);
     case 'openrouter':
       return new OpenRouterTranslationAdapter(credential, preferences);
+    case 'opencode':
+      return new OpenCodeTranslationAdapter(credential, preferences);
     default: {
       const _exhaustive: never = credential.provider;
       throw new Error(`Unknown provider: ${_exhaustive}`);

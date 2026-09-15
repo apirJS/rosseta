@@ -9,6 +9,7 @@ import { MistralTranslationAdapter } from './mistral/MistralTranslationAdapter';
 import { DeepInfraTranslationAdapter } from './deepinfra/DeepInfraTranslationAdapter';
 import { ZaiTranslationAdapter } from './zai/ZaiTranslationAdapter';
 import { OpenRouterTranslationAdapter } from './openrouter/OpenRouterTranslationAdapter';
+import { OpenCodeTranslationAdapter } from './opencode/OpenCodeTranslationAdapter';
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
 import { CustomProviderConfig } from '../../core/domain/provider/CustomProviderConfig';
 import { Credential } from '../../core/domain/credential/Credential';
@@ -54,6 +55,7 @@ describe('Adapter: TranslationAdapterFactory', () => {
     deepinfra: DeepInfraTranslationAdapter,
     zai: ZaiTranslationAdapter,
     openrouter: OpenRouterTranslationAdapter,
+    opencode: OpenCodeTranslationAdapter,
   };
 
   for (const provider of Object.keys(expectedAdapters) as Provider[]) {

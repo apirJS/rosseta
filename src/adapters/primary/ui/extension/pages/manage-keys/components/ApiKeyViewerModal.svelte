@@ -32,7 +32,7 @@
   ></button>
 
   <div
-    class="relative z-10 bg-background border border-border rounded-xl p-5 mx-4 max-w-[340px] w-full shadow-xl"
+    class="relative z-10 bg-background border border-border rounded-xl p-5 mx-4 max-w-85 w-full shadow-xl"
   >
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-sm font-semibold text-foreground">Full API Key</h3>
@@ -54,7 +54,7 @@
       </div>
       <button
         type="button"
-        class="p-2 text-muted hover:text-foreground transition-colors cursor-pointer rounded-lg border border-border hover:border-primary/40 flex-shrink-0"
+        class="p-2 text-muted hover:text-foreground transition-colors cursor-pointer rounded-lg border border-border hover:border-primary/40 shrink-0"
         aria-label="Copy API key"
         onclick={copyToClipboard}
       >

@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { Select } from '../../../../shared/components';
-  import {
-    getCustomProvidersStateContext,
-  } from '../../../../shared/context';
-  import { PROVIDERS } from '../../../../../../../core/domain/credential/Provider';
-  import { ProviderRegistry } from '../../../../../../../core/domain/provider/ProviderRegistry';
+  import Select from './Select.svelte';
+  import { getCustomProvidersStateContext } from '../context';
+  import { PROVIDERS } from '../../../../../core/domain/credential/Provider';
+  import { ProviderRegistry } from '../../../../../core/domain/provider/ProviderRegistry';
 
   interface Props {
     value: string;

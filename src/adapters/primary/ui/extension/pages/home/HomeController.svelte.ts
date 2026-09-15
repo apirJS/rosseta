@@ -7,6 +7,10 @@ export type TranslationView =
   | 'custom-providers'
   | 'history';
 
+export type MenuDestination = Exclude<TranslationView, 'main'>;
+
+export type PopupNavigation = ReturnType<typeof createHomeController>;
+
 class TranslationControllerState {
   currentView = $state<TranslationView>('main');
   slideDirection = $state<'forward' | 'back'>('forward');
@@ -58,6 +62,16 @@ export function createHomeController() {
     state.isMenuOpen = false;
   }
 
+  function navigateTo(view: TranslationView) {
+    if (view === 'main') {
+      showMain();
+      return;
+    }
+    state.slideDirection = 'forward';
+    state.currentView = view;
+    state.isMenuOpen = false;
+  }
+
   return {
     state,
     showMain,
@@ -65,6 +79,7 @@ export function createHomeController() {
     showManageModels,
     showCustomProviders,
     showHistory,
+    navigateTo,
     toggleMenu,
     closeMenu,
     startTranslation,

@@ -81,6 +81,36 @@ export class TranslationModalController {
     return `${first.language.name} (${first.language.code})`;
   });
 
+  private hoveredLangLabel = $state<string | null>(null);
+  private hoveredSegmentIndex = $state<number | null>(null);
+  private hoveredSide = $state<'original' | 'translated' | null>(null);
+
+  public readonly displayedLangLabel = $derived(
+    this.hoveredLangLabel ?? this.detectedLanguageLabel,
+  );
+
+  public readonly originalCrossHighlight = $derived(
+    this.hoveredSide === 'translated' ? this.hoveredSegmentIndex : null,
+  );
+
+  public readonly translatedCrossHighlight = $derived(
+    this.hoveredSide === 'original' ? this.hoveredSegmentIndex : null,
+  );
+
+  public setHoveredLanguageLabel = (label: string | null) => {
+    this.hoveredLangLabel = label;
+  };
+
+  public hoverOriginalSegment = (index: number | null) => {
+    this.hoveredSegmentIndex = index;
+    this.hoveredSide = index != null ? 'original' : null;
+  };
+
+  public hoverTranslatedSegment = (index: number | null) => {
+    this.hoveredSegmentIndex = index;
+    this.hoveredSide = index != null ? 'translated' : null;
+  };
+
   constructor(props: {
     original: SegmentPayload[];
     translated: SegmentPayload[];

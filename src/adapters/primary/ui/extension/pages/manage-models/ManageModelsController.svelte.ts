@@ -10,7 +10,6 @@ class ManageModelsState {
 }
 
 export interface ManageModelsDeps {
-  providers: Array<{ id: string; name: string }>;
   modelsFor: (provider: string) => StoredModel[];
   addModel: (
     provider: string,
@@ -142,7 +141,6 @@ export function createManageModelsController(deps: ManageModelsDeps) {
     get selectedModelId() {
       return selectedModelId;
     },
-    providers: deps.providers,
     setProvider,
     addModel,
     removeModel,

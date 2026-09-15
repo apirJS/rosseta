@@ -4,9 +4,9 @@
     type SegmentPayload,
   } from './TranslationModalController.svelte';
   import ModalHeader from './components/ModalHeader.svelte';
+  import ModalSection from './components/ModalSection.svelte';
   import TextSection from './components/TextSection.svelte';
   import DescriptionSection from './components/DescriptionSection.svelte';
-  import CopyButton from './components/CopyButton.svelte';
 
   interface Props {
     id: string;
@@ -26,29 +26,6 @@
     description,
     detachModal,
   });
-
-  let hoveredLangLabel = $state<string | null>(null);
-
-  let hoveredSegmentIndex = $state<number | null>(null);
-  let hoveredSide = $state<'original' | 'translated' | null>(null);
-
-  const displayedLangLabel = $derived(
-    hoveredLangLabel ?? ctrl.detectedLanguageLabel,
-  );
-
-  function handleSegmentHover(label: string | null) {
-    hoveredLangLabel = label;
-  }
-
-  function handleOriginalIndexHover(index: number | null) {
-    hoveredSegmentIndex = index;
-    hoveredSide = index != null ? 'original' : null;
-  }
-
-  function handleTranslatedIndexHover(index: number | null) {
-    hoveredSegmentIndex = index;
-    hoveredSide = index != null ? 'translated' : null;
-  }
 
   let backdropEl: HTMLDivElement;
   $effect(() => {
@@ -77,70 +54,48 @@
     />
 
     <div class="modal-body">
-      <div class="section">
-        <div class="section-header">
-          <span class="section-label"
-            >Original <span class="section-label-tag"
-              >— {displayedLangLabel}</span
-            ></span
-          >
-          <CopyButton
-            small
-            state={ctrl.originalCopy}
-            onclick={ctrl.copyOriginal}
-          />
-        </div>
+      <ModalSection
+        label="Original"
+        labelTag={ctrl.displayedLangLabel}
+        copyState={ctrl.originalCopy}
+        oncopy={ctrl.copyOriginal}
+      >
         <TextSection
           segments={ctrl.original}
           langColorMap={ctrl.langColorMap}
           isMultiLang={ctrl.isMultiLang}
           hasRomanization={ctrl.originalHasRomanization}
-          onSegmentHover={handleSegmentHover}
-          crossHighlightIndex={hoveredSide === 'translated'
-            ? hoveredSegmentIndex
-            : null}
-          onSegmentIndexHover={handleOriginalIndexHover}
+          onSegmentHover={ctrl.setHoveredLanguageLabel}
+          crossHighlightIndex={ctrl.originalCrossHighlight}
+          onSegmentIndexHover={ctrl.hoverOriginalSegment}
         />
-      </div>
+      </ModalSection>
 
-      <div class="section">
-        <div class="section-header">
-          <span class="section-label"
-            >Translated <span class="section-label-tag"
-              >— {ctrl.targetLanguageLabel}</span
-            ></span
-          >
-          <CopyButton
-            small
-            state={ctrl.translatedCopy}
-            onclick={ctrl.copyTranslated}
-          />
-        </div>
+      <ModalSection
+        label="Translated"
+        labelTag={ctrl.targetLanguageLabel}
+        copyState={ctrl.translatedCopy}
+        oncopy={ctrl.copyTranslated}
+      >
         <TextSection
           segments={ctrl.translated}
           langColorMap={ctrl.langColorMap}
           isMultiLang={false}
           hasRomanization={ctrl.translatedHasRomanization}
-          crossHighlightIndex={hoveredSide === 'original'
-            ? hoveredSegmentIndex
-            : null}
-          onSegmentIndexHover={handleTranslatedIndexHover}
+          crossHighlightIndex={ctrl.translatedCrossHighlight}
+          onSegmentIndexHover={ctrl.hoverTranslatedSegment}
         />
-      </div>
+      </ModalSection>
 
       {#if ctrl.description}
-        <div class="section">
-          <div class="section-header">
-            <span class="section-label">Description</span>
-            <CopyButton
-              small
-              state={ctrl.descriptionCopy}
-              onclick={ctrl.copyDescription}
-              label="Copy description"
-            />
-          </div>
+        <ModalSection
+          label="Description"
+          copyState={ctrl.descriptionCopy}
+          oncopy={ctrl.copyDescription}
+          copyLabel="Copy description"
+        >
           <DescriptionSection text={ctrl.description} />
-        </div>
+        </ModalSection>
       {/if}
     </div>
 

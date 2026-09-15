@@ -23,10 +23,6 @@ function createDeps(overrides: Partial<ManageModelsDeps> = {}) {
   const { toast, show } = createToastFake();
 
   const deps: ManageModelsDeps = {
-    providers: [
-      { id: 'google', name: 'Google' },
-      { id: 'groq', name: 'Groq' },
-    ],
     modelsFor: vi.fn().mockReturnValue([
       { id: 'm1', name: 'Model 1', source: 'fetched' as const },
       { id: 'm2', name: 'Model 2', source: 'manual' as const },

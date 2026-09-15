@@ -22,7 +22,7 @@
   import { useCustomProviders } from '../shared/hooks/useCustomProviders.svelte';
   import { PopupToastContainer } from '../shared/components';
   import { PopupToastController } from '../shared/toast/PopupToastController.svelte';
-  import HomePage from './pages/home/HomePage.svelte';
+  import PopupRouter from './PopupRouter.svelte';
 
   interface Props {
     authUseCases: AuthUseCases;
@@ -67,5 +67,5 @@
   setCustomProvidersStateContext(customProviders);
 </script>
 
-<HomePage />
+<PopupRouter />
 <PopupToastContainer />

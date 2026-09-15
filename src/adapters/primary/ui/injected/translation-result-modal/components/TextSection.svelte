@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SegmentPayload } from '../TranslationModalController.svelte';
+  import ResizeHandle from './ResizeHandle.svelte';
 
   interface Props {
     segments: SegmentPayload[];
@@ -21,12 +22,12 @@
     onSegmentIndexHover,
   }: Props = $props();
 
-  let textBoxEl: HTMLDivElement;
+  let textBoxEl = $state<HTMLDivElement>();
 
   let hoveredIndex = $state<number | null>(null);
+  let isResizing = $state(false);
 
   const activeIndex = $derived(hoveredIndex ?? crossHighlightIndex);
-  let isResizing = $state(false);
 
   function handleTextContentPointer(e: PointerEvent) {
     if (isResizing) return;
@@ -66,73 +67,6 @@
     if (isResizing) return;
     hoveredIndex = null;
     onSegmentIndexHover?.(null);
-  }
-
-  function freezeSiblingSections(currentSection: HTMLElement): () => void {
-    const parent = currentSection.parentElement;
-    if (!parent) return () => {};
-
-    const siblings = Array.from(
-      parent.querySelectorAll(':scope > .section'),
-    ).filter((el): el is HTMLElement => el !== currentSection);
-
-    const saved = siblings.map((el) => ({
-      el,
-      flex: el.style.flex,
-      height: el.style.height,
-      minHeight: el.style.minHeight,
-    }));
-
-    for (const sib of siblings) {
-      const h = sib.getBoundingClientRect().height;
-      sib.style.height = `${h}px`;
-      sib.style.flex = 'none';
-      sib.style.minHeight = '0';
-    }
-
-    return () => {
-      for (const { el, flex, height, minHeight } of saved) {
-        el.style.flex = flex;
-        el.style.height = height;
-        el.style.minHeight = minHeight;
-      }
-    };
-  }
-
-  function handleResizePointerDown(e: PointerEvent) {
-    const handle = e.currentTarget as HTMLElement;
-    handle.setPointerCapture(e.pointerId);
-    isResizing = true;
-
-    const startY = e.clientY;
-    const startHeight = textBoxEl.getBoundingClientRect().height;
-    const section = textBoxEl.closest('.section') as HTMLElement | null;
-
-    const unfreezesiblings = section
-      ? freezeSiblingSections(section)
-      : () => {};
-
-    const onMove = (e: PointerEvent) => {
-      const delta = e.clientY - startY;
-      const newHeight = Math.max(60, startHeight + delta);
-      textBoxEl.style.height = `${newHeight}px`;
-      textBoxEl.style.flex = 'none';
-      if (section) {
-        section.style.flex = 'none';
-        section.style.minHeight = '0';
-      }
-    };
-
-    const onUp = (e: PointerEvent) => {
-      handle.releasePointerCapture(e.pointerId);
-      handle.removeEventListener('pointermove', onMove);
-      handle.removeEventListener('pointerup', onUp);
-      isResizing = false;
-      unfreezesiblings();
-    };
-
-    handle.addEventListener('pointermove', onMove);
-    handle.addEventListener('pointerup', onUp);
   }
 </script>
 
@@ -188,9 +122,12 @@
     </div>
   {/if}
 </div>
-<button
-  type="button"
-  class="resize-handle"
-  aria-label="Resize text section"
-  onpointerdown={handleResizePointerDown}
-></button>
+{#if textBoxEl}
+  <ResizeHandle
+    box={textBoxEl}
+    minHeight={60}
+    ariaLabel="Resize text section"
+    onresizestart={() => (isResizing = true)}
+    onresizeend={() => (isResizing = false)}
+  />
+{/if}

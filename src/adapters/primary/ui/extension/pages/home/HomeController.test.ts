@@ -101,4 +101,25 @@ describe('UI Controller: HomeController', () => {
 
     closeSpy.mockRestore();
   });
+
+  test('navigateTo switches to any view and closes the menu', () => {
+    const controller = createHomeController();
+    controller.toggleMenu();
+
+    controller.navigateTo('manage-models');
+
+    expect(controller.state.currentView).toBe('manage-models');
+    expect(controller.state.slideDirection).toBe('forward');
+    expect(controller.state.isMenuOpen).toBe(false);
+  });
+
+  test('navigateTo returns to main with back direction', () => {
+    const controller = createHomeController();
+    controller.navigateTo('history');
+
+    controller.navigateTo('main');
+
+    expect(controller.state.currentView).toBe('main');
+    expect(controller.state.slideDirection).toBe('back');
+  });
 });

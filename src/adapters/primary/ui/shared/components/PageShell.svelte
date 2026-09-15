@@ -1,47 +1,53 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import BackButton from './BackButton.svelte';
   import ThemeToggle from './ThemeToggle.svelte';
-  import Icon from './Icon.svelte';
 
   interface Props {
     children: Snippet;
-    showBack?: boolean;
     onback?: () => void;
+    start?: Snippet;
+    title?: string;
+    footer?: Snippet;
     isDark?: boolean;
     onToggleTheme?: () => void;
   }
 
   const {
     children,
-    showBack = false,
     onback,
+    start,
+    title,
+    footer,
     isDark = false,
     onToggleTheme,
   }: Props = $props();
 </script>
 
 <div class="flex flex-col h-full w-full bg-background">
-  <div class="flex justify-between items-center p-4 pb-0">
-    {#if showBack && onback}
-      <button
-        type="button"
-        class="flex items-center text-sm text-muted hover:text-foreground cursor-pointer"
-        onclick={onback}
-      >
-        <Icon name="arrow-left" class="w-4 h-4 mr-1" />
-        Back
-      </button>
+  <header class="flex items-center p-4 pb-0 gap-2">
+    {#if start}
+      {@render start()}
+    {:else if onback}
+      <BackButton {onback} />
+    {/if}
+    {#if title}
+      <h2 class="flex-1 text-center text-base font-semibold text-foreground truncate">
+        {title}
+      </h2>
     {:else}
-      <div></div>
+      <div class="flex-1"></div>
     {/if}
     {#if onToggleTheme}
       <ThemeToggle {isDark} onToggle={onToggleTheme} />
     {/if}
-  </div>
+  </header>
 
-  <div
-    class="flex-1 flex flex-col justify-center px-4 pb-4 min-h-0 overflow-hidden"
-  >
+  <div class="flex-1 flex flex-col px-4 py-3 min-h-0 overflow-hidden">
     {@render children()}
   </div>
+
+  {#if footer}
+    {@render footer()}
+  {/if}
 </div>

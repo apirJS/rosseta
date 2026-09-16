@@ -9,7 +9,7 @@ export default defineConfig({
     outDir: `dist/${process.env.TARGET || 'chrome'}`,
     copyPublicDir: true,
     emptyOutDir: false,
-    minify: process.env.NODE_ENV === 'development' ? false : 'esbuild',
+    minify: process.env.NODE_ENV === 'development' ? false : 'oxc',
     sourcemap: process.env.NODE_ENV === 'development',
     rollupOptions: {
       output: {

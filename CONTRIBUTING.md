@@ -91,16 +91,18 @@ This project follows **Domain-Driven Design (DDD)** with a **Hexagonal (Ports & 
 src/
 ├── core/                          # Framework-free business logic
 │   ├── domain/
-│   │   ├── credential/            # ApiKey, Credential, Credentials, Provider
+│   │   ├── credential/            # ApiKey, Credential, Credentials, Provider, KeySelectionMode
+│   │   ├── image/                 # EncodedImage
 │   │   ├── preferences/           # UserPreferences, AiModel, Theme
 │   │   ├── provider/              # ProviderRegistry, CustomProviderConfig
 │   │   └── translation/           # Translation, Language, TextSegment
 │   ├── application/               # Use cases (one class per action)
-│   │   ├── auth/                  # Add/Remove API keys, set active key
+│   │   ├── auth/                  # Add/Remove API keys, active key, key-selection mode
+│   │   ├── command/               # Keyboard shortcut lookup
 │   │   ├── models/                # Fetch/Load/Add/Remove/Clear models
 │   │   ├── preferences/           # Get/Update user preferences
 │   │   ├── provider/              # Custom provider config CRUD
-│   │   └── translation/           # Save, Get, Delete, ClearAll translations
+│   │   └── translation/           # Translate, Save, Get, Delete, ClearAll
 │   └── ports/
 │       ├── inbound/               # Use case interfaces (driven side)
 │       └── outbound/              # Storage & service interfaces (driving side)
@@ -111,13 +113,16 @@ src/
 │   │   ├── content/               # Content script (overlay, toast, modal)
 │   │   └── ui/
 │   │       ├── extension/         # Popup UI (pages, components)
-│   │       ├── injected/          # In-page translation modal
+│   │       ├── injected/          # In-page overlay, toast, translation modal
 │   │       └── shared/            # Hooks, context, constants, components
 │   └── secondary/                 # Infrastructure (driven adapters)
 │       ├── google/ groq/ xai/     # @ai-sdk/* translation adapters (thin)
 │       ├── openai/ anthropic/ ... # one directory per provider
+│       ├── huggingface/ opencode/ # incl. Hugging Face + OpenCode
+│       ├── openai-compatible/     # custom providers (base URL + headers)
 │       ├── model-fetchers/        # ModelFetchService (provider /models APIs)
-│       ├── shared/                # executeTranslation, prompt, schema, mapper
+│       ├── shared/                # executeTranslation, prompt, schema,
+│       │                          # parse-translation-json, response mapper
 │       └── storage/               # Browser storage adapters (Zod-validated)
 │
 ├── shared/                        # Cross-cutting concerns
@@ -127,7 +132,7 @@ src/
 │   └── types/                     # Result<T, E>, shared type utilities
 │
 └── tests/
-    └── fakes/                     # In-memory test doubles
+    └── fakes/                     # In-memory test doubles (one per outbound port)
 ```
 
 ## Development Workflow
@@ -136,13 +141,26 @@ src/
 
 | Command                     | Description                                     |
 | --------------------------- | ----------------------------------------------- |
+| `bun run dev:chrome`        | Vite dev server (true HMR for the popup)        |
+| `bun run dev:firefox`       | Vite dev server for Firefox (no popup HMR)      |
 | `bun run build:dev:chrome`  | Development build with watch mode (Chrome)      |
 | `bun run build:dev:firefox` | Development build with watch mode (Firefox)     |
 | `bun run build:prod`        | Production build for both browsers              |
-| `bun run test:logic`        | Run domain, application, and adapter unit tests |
-| `bun run test:ui`           | Run Svelte component tests (Vitest + jsdom)     |
+| `bun run test:logic`        | Domain, application, background, content, adapter tests |
+| `bun run test:ui`           | Svelte component + `*.svelte.ts` controller tests (Vitest + jsdom) |
 | `bun run test`              | Run all tests                                   |
 | `bun run check`             | Type-check Svelte files and Node config         |
+
+> [!IMPORTANT]
+> Tests run on two runners, split by **path**, not by config. A file in the wrong
+> place silently never runs:
+>
+> - `bun run test:logic` (bun) covers `src/shared`, `src/core`,
+>   `src/adapters/primary/{background,content}`, `src/adapters/secondary`.
+> - `bun run test:ui` (vitest) covers `src/adapters/primary/ui` only — that is
+>   where the Svelte compiler is needed for `$state`/`$derived` in `*.svelte.ts`.
+>
+> Import from `bun:test` in the first scope and from `vitest` in the second.
 
 ### Recommended Dev Loop
 
@@ -150,8 +168,8 @@ src/
 # Terminal 1: Watch build
 bun run build:dev:chrome
 
-# Terminal 2: Run tests on change
-bun test --watch src/core src/adapters
+# Terminal 2: Run logic tests on change
+bun run test:logic
 
 # Before committing
 bun run check && bun run test
@@ -224,6 +242,7 @@ Use descriptive prefixes to indicate the layer:
 - `Application:` for use cases
 - `Adapter:` for storage, API, and UI adapters
 - `Service:` for application services
+- `UI Controller:` for `*Controller.svelte.ts` factories (vitest scope)
 
 ### Running Tests
 
@@ -308,10 +327,14 @@ test(translation): add ClearAllTranslationsUseCase tests
 One of the most common contributions is adding support for a new AI provider. The checklist below covers **every file** that needs changes — follow it in order.
 
 > [!IMPORTANT]
-> New providers **must** support:
+> New providers **must** support **multilingual image understanding** (vision) —
+> Rosseta sends screenshots of selected regions for translation.
 >
-> 1. **Multilingual image understanding** (vision) — Rosseta sends screenshots of selected regions for translation
-> 2. **Structured outputs** (JSON mode / response schema) — Rosseta expects a typed JSON response from the model
+> Structured outputs (`json_schema` / response schema) are strongly preferred but
+> **not required**: `executeTranslation()` detects a model that rejects the
+> `json_schema` response format, caches it in `structuredOutputExemptModels`
+> (keyed `provider:modelId`), and falls back to prompt-only JSON mode with a
+> manual parse + repair retry on every later call.
 
 ### Domain layer
 
@@ -347,7 +370,7 @@ ProviderRegistry.register({
 
 #### 3. Create the translation adapter
 
-Create `src/adapters/secondary/<provider>/YourProviderTranslationAdapter.ts`. Each adapter is a thin class that creates the `@ai-sdk/*` client and delegates to the shared `executeTranslation()`:
+Create `src/adapters/secondary/<provider>/YourProviderTranslationAdapter.ts`. Each adapter is a thin class that creates the `@ai-sdk/*` client, resolves the model id for **its own** provider, and delegates to the shared `executeTranslation()`. Copy an existing adapter (e.g. [GroqTranslationAdapter.ts](src/adapters/secondary/groq/GroqTranslationAdapter.ts)) verbatim and swap the client — every adapter has this exact shape:
 
 ```typescript
 import { createYourProvider } from '@ai-sdk/your-provider';
@@ -356,6 +379,7 @@ export class YourProviderTranslationAdapter implements ITranslationService {
   constructor(
     private readonly credential: Credential,
     private readonly userPreferences: UserPreferences,
+    private readonly structuredOutputExemptions: IStructuredOutputExemptionStorage,
   ) {}
 
   public async translateImage(
@@ -363,13 +387,22 @@ export class YourProviderTranslationAdapter implements ITranslationService {
     targetLanguage: Language,
   ): Promise<Result<Translation, AppError>> {
     const client = createYourProvider({ apiKey: this.credential.apiKey.value });
-    const model = client(this.userPreferences.selectedModel.id);
-    return executeTranslation(model, image, targetLanguage, 'YOUR_PROVIDER');
+    const model = client(
+      this.userPreferences.getModelIdFor(this.credential.provider),
+    );
+    return executeTranslation(
+      model,
+      image,
+      targetLanguage,
+      'YOUR_PROVIDER', // uppercase log tag
+      this.userPreferences.includeDescription,
+      this.structuredOutputExemptions,
+    );
   }
 }
 ```
 
-The prompt, response schema, and domain mapping live in `src/adapters/secondary/shared/` — do not duplicate them per provider.
+The prompt, response schema, parse/repair fallback, and domain mapping live in `src/adapters/secondary/shared/` — do not duplicate them per provider.
 
 #### 4. Wire into the adapter factory
 
@@ -383,19 +416,19 @@ The prompt, response schema, and domain mapping live in `src/adapters/secondary/
 
 #### 6. Add UI metadata
 
-**File:** `src/adapters/primary/ui/shared/constants/providers.ts` — add a badge color entry and the API key management URL.
+**File:** `src/adapters/primary/ui/shared/constants/providers.ts` — add a `PROVIDER_BADGE_COLORS` entry and the API key URL to `API_KEY_URLS`.
 
-**File:** `src/adapters/primary/ui/shared/hooks/useProviderCycle` does not exist anymore; the Manage Keys page reads the provider list straight from `PROVIDERS`.
+The Manage Keys page reads the provider list straight from `PROVIDERS`, so no other UI edit is needed.
 
 ### Tests & fixtures
 
 #### 7. Update tests
 
-**File:** `src/adapters/secondary/TranslationAdapterFactory.test.ts` — add your provider to the `expectedAdapters` map (the test loops over it).
+**File:** `src/adapters/secondary/TranslationAdapterFactory.test.ts` — add your provider class to the `expectedAdapters` map (the test loops over it and asserts the factory returns the right class for each provider).
 
 **File:** `src/adapters/secondary/model-fetchers/ModelFetchService.test.ts` — cover your fetcher, including error status mapping.
 
-**File:** `tests/test-fixtures.ts` — add a credential factory if the e2e tests need one.
+**File:** `tests/test-fixtures.ts` — add a credential factory only if the e2e tests need one.
 
 ---
 

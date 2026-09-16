@@ -12,6 +12,7 @@ export interface TranslationData {
       languageBcp47Code: string;
       language: string;
       romanization: string | null;
+      blockIndex: number;
     }[];
   };
   translatedText: {
@@ -20,9 +21,10 @@ export interface TranslationData {
       languageBcp47Code: string;
       language: string;
       romanization: string | null;
+      blockIndex: number;
     }[];
   };
-  description: string;
+  description?: string | null;
 }
 
 export function mapResponseToDomain(
@@ -32,6 +34,13 @@ export function mapResponseToDomain(
 ): Result<Translation, AppError> {
   const originalSegments: TextSegment[] = [];
   const translatedSegments: TextSegment[] = [];
+
+  if (data.originalText.contents.length !== data.translatedText.contents.length) {
+    console.error(
+      `[${tag}] Segment count mismatch — original: ${data.originalText.contents.length}, translated: ${data.translatedText.contents.length}`,
+    );
+    return failure(TranslationError.malformedResponse());
+  }
 
   for (const item of data.originalText.contents) {
     const bcp47Code = item.languageBcp47Code;
@@ -56,6 +65,7 @@ export function mapResponseToDomain(
       item.text,
       lang,
       item.romanization,
+      item.blockIndex,
     );
     if (!segmentResult.success) {
       console.error(`[${tag}] TextSegment.create failed:`, segmentResult.error);
@@ -70,6 +80,7 @@ export function mapResponseToDomain(
       item.text,
       targetLanguage,
       item.romanization,
+      item.blockIndex,
     );
     if (!segmentResult.success) {
       console.error(
@@ -86,7 +97,7 @@ export function mapResponseToDomain(
     uuidv4(),
     originalSegments,
     translatedSegments,
-    data.description,
+    data.description ?? '',
     new Date(),
   );
 

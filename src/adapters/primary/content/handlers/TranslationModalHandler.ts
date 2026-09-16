@@ -11,11 +11,13 @@ export interface TranslationModalPayload {
     language: { code: string; name: string };
     text: string;
     romanization: string | null;
+    blockIndex: number;
   }[];
   translated: {
     language: { code: string; name: string };
     text: string;
     romanization: string | null;
+    blockIndex: number;
   }[];
   description: string;
   createdAt: Date;
@@ -30,11 +32,13 @@ export function serializeForModal(
       language: { code: s.language.code, name: s.language.name },
       text: s.text,
       romanization: s.romanization,
+      blockIndex: s.blockIndex,
     })),
     translated: translation.translated.map((s) => ({
       language: { code: s.language.code, name: s.language.name },
       text: s.text,
       romanization: s.romanization,
+      blockIndex: s.blockIndex,
     })),
     description: translation.description,
     createdAt: translation.createdAt,

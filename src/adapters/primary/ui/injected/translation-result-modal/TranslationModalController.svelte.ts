@@ -4,6 +4,27 @@ export interface SegmentPayload {
   language: { code: string; name: string };
   text: string;
   romanization: string | null;
+  blockIndex: number;
+}
+
+export interface IndexedSegmentPayload extends SegmentPayload {
+  index: number;
+}
+
+export function groupSegmentsIntoBlocks(
+  segments: SegmentPayload[],
+): IndexedSegmentPayload[][] {
+  const blocks: IndexedSegmentPayload[][] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    const current = blocks[blocks.length - 1];
+    if (current && current[0].blockIndex === segment.blockIndex) {
+      current.push({ ...segment, index: i });
+    } else {
+      blocks.push([{ ...segment, index: i }]);
+    }
+  }
+  return blocks;
 }
 
 export class TranslationModalController {
@@ -23,13 +44,27 @@ export class TranslationModalController {
   public readonly description: string;
   private readonly detachModal: () => void;
 
+  public readonly originalBlocks = $derived.by(() =>
+    groupSegmentsIntoBlocks(this.original),
+  );
+
+  public readonly translatedBlocks = $derived.by(() =>
+    groupSegmentsIntoBlocks(this.translated),
+  );
+
   public readonly originalText = $derived.by(() =>
-    this.original.map((s) => s.text).join(' '),
+    TranslationModalController.joinBlocks(this.originalBlocks),
   );
 
   public readonly translatedText = $derived.by(() =>
-    this.translated.map((s) => s.text).join(' '),
+    TranslationModalController.joinBlocks(this.translatedBlocks),
   );
+
+  private static joinBlocks(blocks: IndexedSegmentPayload[][]): string {
+    return blocks
+      .map((block) => block.map((s) => s.text).join(' '))
+      .join('\n');
+  }
 
   public readonly originalHasRomanization = $derived.by(() =>
     this.original.some((s) => s.romanization != null),

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { SegmentPayload } from '../TranslationModalController.svelte';
+  import type { IndexedSegmentPayload } from '../TranslationModalController.svelte';
   import ResizeHandle from './ResizeHandle.svelte';
 
   interface Props {
-    segments: SegmentPayload[];
+    blocks: IndexedSegmentPayload[][];
     langColorMap: Map<string, number>;
     isMultiLang: boolean;
     hasRomanization: boolean;
@@ -13,7 +13,7 @@
   }
 
   const {
-    segments,
+    blocks,
     langColorMap,
     isMultiLang,
     hasRomanization,
@@ -29,6 +29,8 @@
 
   const activeIndex = $derived(hoveredIndex ?? crossHighlightIndex);
 
+  const flatSegments = $derived(blocks.flat());
+
   function handleTextContentPointer(e: PointerEvent) {
     if (isResizing) return;
     const target = (e.target as HTMLElement).closest<HTMLElement>(
@@ -38,8 +40,8 @@
     const i = Number(target.dataset.segIndex);
     hoveredIndex = i;
     onSegmentIndexHover?.(i);
-    if (isMultiLang && segments[i]) {
-      const segment = segments[i];
+    if (isMultiLang && flatSegments[i]) {
+      const segment = flatSegments[i];
       const label = `${segment.language.name} (${segment.language.code})`;
       onSegmentHover?.(label);
     }
@@ -78,26 +80,30 @@
     onpointermove={handleTextContentPointer}
     onpointerleave={handleTextContentLeave}
   >
-    {#each segments as segment, i}
-      {#if isMultiLang}
-        <span
-          data-seg-index={i}
-          class="text-segment lang-gray-{langColorMap.get(
-            segment.language.code,
-          )}"
-          class:seg-highlight={activeIndex === i}
-        >
-          {segment.text}
-        </span>{' '}
-      {:else}
-        <span
-          data-seg-index={i}
-          class="text-segment"
-          class:seg-highlight={activeIndex === i}
-        >
-          {segment.text}
-        </span>{' '}
-      {/if}
+    {#each blocks as block}
+      <span class="text-block">
+        {#each block as segment}
+          {#if isMultiLang}
+            <span
+              data-seg-index={segment.index}
+              class="text-segment lang-gray-{langColorMap.get(
+                segment.language.code,
+              )}"
+              class:seg-highlight={activeIndex === segment.index}
+            >
+              {segment.text}
+            </span>{' '}
+          {:else}
+            <span
+              data-seg-index={segment.index}
+              class="text-segment"
+              class:seg-highlight={activeIndex === segment.index}
+            >
+              {segment.text}
+            </span>{' '}
+          {/if}
+        {/each}
+      </span>
     {/each}
   </div>
   {#if hasRomanization}
@@ -108,15 +114,21 @@
       onpointermove={handleRomPointer}
       onpointerleave={handleRomLeave}
     >
-      {#each segments as segment, i}
-        {#if segment.romanization}
-          <span
-            data-seg-index={i}
-            class="rom-segment"
-            class:rom-highlight={activeIndex === i}
-          >
-            {segment.romanization}
-          </span>{' '}
+      {#each blocks as block}
+        {#if block.some((segment) => segment.romanization)}
+          <span class="text-block">
+            {#each block as segment}
+              {#if segment.romanization}
+                <span
+                  data-seg-index={segment.index}
+                  class="rom-segment"
+                  class:rom-highlight={activeIndex === segment.index}
+                >
+                  {segment.romanization}
+                </span>{' '}
+              {/if}
+            {/each}
+          </span>
         {/if}
       {/each}
     </div>

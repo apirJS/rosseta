@@ -232,6 +232,7 @@ describe('Adapter: MessageRouter', () => {
           language: { code: 'ja-JP', name: 'Japanese' },
           text: 'こんにちは',
           romanization: 'konnichiwa',
+          blockIndex: 0,
         },
       ],
       translated: [
@@ -239,6 +240,7 @@ describe('Adapter: MessageRouter', () => {
           language: { code: 'en-US', name: 'English' },
           text: 'Hello',
           romanization: null,
+          blockIndex: 0,
         },
       ],
       description: 'A greeting',

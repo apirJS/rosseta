@@ -51,6 +51,29 @@ describe('Domain: TextSegment', () => {
         expect(result.data.romanization).toBeNull();
       }
     });
+
+    test('defaults blockIndex to 0 when omitted', () => {
+      const result = TextSegment.create('Hello', english);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.blockIndex).toBe(0);
+      }
+    });
+
+    test('preserves an explicit blockIndex', () => {
+      const result = TextSegment.create('Hello', english, null, 3);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.blockIndex).toBe(3);
+      }
+    });
+
+    test('normalizes an invalid blockIndex to 0', () => {
+      const negative = TextSegment.create('Hello', english, null, -2);
+      const fractional = TextSegment.create('Hello', english, null, 1.5);
+      expect(negative.success && negative.data.blockIndex).toBe(0);
+      expect(fractional.success && fractional.data.blockIndex).toBe(0);
+    });
   });
 
   // ==================== CREATE (failure path) ====================

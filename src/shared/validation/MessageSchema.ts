@@ -37,6 +37,7 @@ export const MessageSchema = z.discriminatedUnion('action', [
           }),
           text: z.string(),
           romanization: z.string().nullable(),
+          blockIndex: z.number().int().nonnegative(),
         }),
       ),
       translated: z.array(
@@ -47,6 +48,7 @@ export const MessageSchema = z.discriminatedUnion('action', [
           }),
           text: z.string(),
           romanization: z.string().nullable(),
+          blockIndex: z.number().int().nonnegative(),
         }),
       ),
       description: z.string(),
@@ -80,6 +82,7 @@ export const MessageSchema = z.discriminatedUnion('action', [
           }),
           text: z.string(),
           romanization: z.string().nullable(),
+          blockIndex: z.number().int().nonnegative(),
         }),
       ),
       translated: z.array(
@@ -90,6 +93,7 @@ export const MessageSchema = z.discriminatedUnion('action', [
           }),
           text: z.string(),
           romanization: z.string().nullable(),
+          blockIndex: z.number().int().nonnegative(),
         }),
       ),
       description: z.string(),

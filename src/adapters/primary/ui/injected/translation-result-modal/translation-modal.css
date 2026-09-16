@@ -238,7 +238,11 @@
   font-weight: 400;
   color: var(--modal-fg);
   line-height: 1.5;
-  display: inline;
+  display: block;
+}
+
+.text-block {
+  display: block;
 }
 
 .text-segment {

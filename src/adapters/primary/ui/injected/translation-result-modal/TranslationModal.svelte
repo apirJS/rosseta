@@ -61,7 +61,7 @@
         oncopy={ctrl.copyOriginal}
       >
         <TextSection
-          segments={ctrl.original}
+          blocks={ctrl.originalBlocks}
           langColorMap={ctrl.langColorMap}
           isMultiLang={ctrl.isMultiLang}
           hasRomanization={ctrl.originalHasRomanization}
@@ -78,7 +78,7 @@
         oncopy={ctrl.copyTranslated}
       >
         <TextSection
-          segments={ctrl.translated}
+          blocks={ctrl.translatedBlocks}
           langColorMap={ctrl.langColorMap}
           isMultiLang={false}
           hasRomanization={ctrl.translatedHasRomanization}

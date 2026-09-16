@@ -19,12 +19,12 @@ import {
 import { mapResponseToDomain } from './translation-response-mapper';
 import { buildBasePrompt } from './prompt-base';
 import {
-  translationDataSchema,
-  type TranslationSchemaOutput,
+  createTranslationDataSchema,
+  type TranslationResponse,
 } from './translation-schema';
 import { parseTranslationResponse } from './parse-translation-json';
 
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 const VISION_REJECTION_PATTERNS: RegExp[] = [
   /content must be a string/i,
@@ -60,7 +60,7 @@ function modelCacheKey(model: LanguageModel): string | null {
 }
 
 function interpretParsedTranslation(
-  parsed: Result<TranslationSchemaOutput, AppError>,
+  parsed: Result<TranslationResponse, AppError>,
   targetLanguage: Language,
   tag: string,
 ): Result<Translation, AppError> {
@@ -160,21 +160,37 @@ export async function executeTranslation(
     includeDescription,
   });
 
+  const filePart = {
+    type: 'file' as const,
+    data: { type: 'data' as const, data: image.base64Data },
+    mediaType: image.mimeType,
+  };
+
   const messages = [
     {
       role: 'user' as const,
       content: [
-        { type: 'text' as const, text: prompt },
         {
-          type: 'file' as const,
-          data: { type: 'data' as const, data: image.base64Data },
-          mediaType: image.mimeType,
+          type: 'text' as const,
+          text: 'Extract and translate all text in this image.',
         },
+        filePart,
       ],
     },
   ];
 
   const modelKey = modelCacheKey(model);
+
+  async function markExemptFromStructuredOutput(): Promise<void> {
+    if (!exemptions || !modelKey) return;
+    const markResult = await exemptions.exemptModel(modelKey);
+    if (!markResult.success) {
+      console.warn(
+        `[${tag}] Could not persist structured-output exemption:`,
+        markResult.error,
+      );
+    }
+  }
 
   async function translateViaPlainGeneration(): Promise<
     Result<Translation, AppError>
@@ -182,7 +198,38 @@ export async function executeTranslation(
     try {
       const { text } = await generateText({
         model,
+        instructions: prompt,
         messages,
+        temperature: 0,
+        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      return interpretParsedTranslation(
+        parseTranslationResponse(text),
+        targetLanguage,
+        tag,
+      );
+    } catch (error: unknown) {
+      return mapGenerationError(error, tag);
+    }
+  }
+
+  async function translateViaRepair(
+    previousText: string,
+  ): Promise<Result<Translation, AppError>> {
+    const repairInstruction = `Your previous response could not be parsed as the required JSON. Respond with ONLY the JSON object described in the system instructions — no prose, no markdown fences, no extra keys. If the image contains no readable text, return {"success":false,"error":"NO_TEXT_FOUND"}.\n\nPrevious response:\n"""\n${previousText.slice(0, 4000)}\n"""`;
+    try {
+      const { text } = await generateText({
+        model,
+        instructions: prompt,
+        messages: [
+          {
+            role: 'user' as const,
+            content: [
+              { type: 'text' as const, text: repairInstruction },
+              filePart,
+            ],
+          },
+        ],
         temperature: 0,
         abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
@@ -215,7 +262,10 @@ export async function executeTranslation(
   try {
     const { output } = await generateText({
       model,
-      output: Output.object({ schema: translationDataSchema }),
+      instructions: prompt,
+      output: Output.object({
+        schema: createTranslationDataSchema(includeDescription),
+      }),
       messages,
       temperature: 0,
       abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -241,25 +291,21 @@ export async function executeTranslation(
       console.warn(
         `[${tag}] Model does not support the json_schema response format — retrying without it`,
       );
-      if (exemptions && modelKey) {
-        const markResult = await exemptions.exemptModel(modelKey);
-        if (!markResult.success) {
-          console.warn(
-            `[${tag}] Could not persist structured-output exemption:`,
-            markResult.error,
-          );
-        }
-      }
+      await markExemptFromStructuredOutput();
       return translateViaPlainGeneration();
     }
 
     if (NoObjectGeneratedError.isInstance(error)) {
-      console.warn(`[${tag}] Recovering response via manual JSON parsing`);
-      return interpretParsedTranslation(
-        parseTranslationResponse(error.text ?? ''),
-        targetLanguage,
-        tag,
-      );
+      const parsed = parseTranslationResponse(error.text ?? '');
+      if (parsed.success) {
+        console.warn(`[${tag}] Recovering response via manual JSON parsing`);
+        // The model emitted our exact JSON contract but the provider's
+        // structured-output path still rejected it — skip that path next time.
+        await markExemptFromStructuredOutput();
+        return interpretParsedTranslation(parsed, targetLanguage, tag);
+      }
+      console.warn(`[${tag}] Response unparseable — attempting repair retry`);
+      return translateViaRepair(error.text ?? '');
     }
 
     return mapGenerationError(error, tag);

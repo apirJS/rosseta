@@ -48,17 +48,24 @@ export function createActiveKeyIndicatorController(
     providerCredentials.length >= 2 ? [deps.getProvider()] : [],
   );
 
+  /**
+   * Mirrors `ResolveActiveCredentialUseCase`, which silently falls back to
+   * manual when the auto-balance provider has fewer than 2 keys. Without the
+   * same guard the trigger would advertise "Auto ⟳" for a mode the background
+   * is no longer honouring — e.g. after the user deletes one of two keys.
+   */
+  const isAutoBalanceActive = $derived(
+    currentMode.isAutoBalance &&
+      currentMode.autoBalanceProvider === deps.getProvider() &&
+      hasMultiple,
+  );
+
   function getDisplayLabel(cred: Credential): string {
     return maskApiKey(cred.apiKey.value);
   }
 
   function getTriggerLabel(): string {
-    if (
-      currentMode.isAutoBalance &&
-      currentMode.autoBalanceProvider === deps.getProvider()
-    ) {
-      return 'Auto ⟳';
-    }
+    if (isAutoBalanceActive) return 'Auto ⟳';
     if (providerActive) return getDisplayLabel(providerActive);
     return '—';
   }
@@ -73,9 +80,27 @@ export function createActiveKeyIndicatorController(
 
   async function selectKey(cred: Credential) {
     if (!currentMode.isManual) {
-      await deps.auth.setKeySelectionMode(KeySelectionMode.manual());
+      const modeError = await deps.auth.setKeySelectionMode(
+        KeySelectionMode.manual(),
+      );
+      if (modeError) {
+        deps.toast.show({
+          type: 'error',
+          message: 'Could not switch to manual key selection',
+          description: modeError,
+        });
+        return;
+      }
     }
-    await deps.auth.setActiveKey(cred.id);
+    const error = await deps.auth.setActiveKey(cred.id);
+    if (error) {
+      deps.toast.show({
+        type: 'error',
+        message: 'Could not switch API key',
+        description: error,
+      });
+      return;
+    }
     state.isOpen = false;
   }
 

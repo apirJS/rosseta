@@ -7,6 +7,7 @@ export class TextSegment extends ValueObject {
   private constructor(
     private readonly _text: string,
     private readonly _language: Language,
+    private readonly _blockIndex: number,
     private readonly _romanization?: string | null,
   ) {
     super();
@@ -16,13 +17,22 @@ export class TextSegment extends ValueObject {
     text: string,
     language: Language,
     romanization?: string | null,
+    blockIndex = 0,
   ): Result<TextSegment, DomainError> {
     if (!text || text.trim().length === 0) {
       return failure(new DomainError('TextSegment text cannot be empty'));
     }
 
+    const normalizedBlockIndex =
+      Number.isInteger(blockIndex) && blockIndex >= 0 ? blockIndex : 0;
+
     return success(
-      new TextSegment(text.trim(), language, romanization?.trim() || null),
+      new TextSegment(
+        text.trim(),
+        language,
+        normalizedBlockIndex,
+        romanization?.trim() || null,
+      ),
     );
   }
 
@@ -32,6 +42,10 @@ export class TextSegment extends ValueObject {
 
   public get language(): Language {
     return this._language;
+  }
+
+  public get blockIndex(): number {
+    return this._blockIndex;
   }
 
   public get romanization(): string | null {

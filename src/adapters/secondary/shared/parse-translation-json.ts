@@ -1,6 +1,6 @@
 import {
   translationDataLenientSchema,
-  type TranslationSchemaOutput,
+  type TranslationResponse,
 } from './translation-schema';
 import { success, failure, type Result } from '../../../shared/types/Result';
 import { TranslationError, type AppError } from '../../../shared/errors';
@@ -43,7 +43,7 @@ export function extractJsonObject(text: string): string | null {
 
 export function parseTranslationResponse(
   text: string,
-): Result<TranslationSchemaOutput, AppError> {
+): Result<TranslationResponse, AppError> {
   const candidate = extractJsonObject(text.trim());
   if (candidate === null) {
     return failure(TranslationError.malformedResponse());

@@ -8,12 +8,14 @@ export interface TranslationProps {
     languageCode: string;
     languageName: string;
     romanization: string | null;
+    blockIndex: number;
   }[];
   translated: {
     text: string;
     languageCode: string;
     languageName: string;
     romanization: string | null;
+    blockIndex: number;
   }[];
   description: string;
   createdAt: string;
@@ -48,12 +50,14 @@ export class Translation extends AggregateRoot<string> {
         languageCode: s.language.code,
         languageName: s.language.name,
         romanization: s.romanization,
+        blockIndex: s.blockIndex,
       })),
       translated: this.translated.map((s) => ({
         text: s.text,
         languageCode: s.language.code,
         languageName: s.language.name,
         romanization: s.romanization,
+        blockIndex: s.blockIndex,
       })),
       description: this.description,
       createdAt: this.createdAt.toISOString(),

@@ -41,13 +41,31 @@ export function createMainPageController(deps: MainPageDeps) {
     deps.auth.state.credentials?.getActive() ?? null,
   );
 
-  const activeProvider = $derived.by(() => {
+  /**
+   * The provider auto-balance is actually rotating over, or null.
+   *
+   * Deliberately mirrors `ResolveActiveCredentialUseCase`, which falls back to
+   * the manually-active credential whenever the stored auto-balance provider
+   * has fewer than 2 keys. Trusting the stored mode alone would let the popup
+   * show (and pick a model for) one provider while the background translates
+   * with the active credential of another.
+   */
+  const effectiveAutoBalanceProvider = $derived.by(() => {
     const mode = deps.auth.state.keySelectionMode;
-    if (mode.isAutoBalance) {
-      return mode.autoBalanceProvider ?? DEFAULT_PROVIDER;
-    }
-    return activeCredential?.provider ?? DEFAULT_PROVIDER;
+    if (!mode.isAutoBalance) return null;
+
+    const provider = mode.autoBalanceProvider;
+    if (!provider) return null;
+
+    const keys = deps.auth.state.credentials?.getByProvider(provider) ?? [];
+    return keys.length >= 2 ? provider : null;
   });
+
+  const activeProvider = $derived(
+    effectiveAutoBalanceProvider ??
+      activeCredential?.provider ??
+      DEFAULT_PROVIDER,
+  );
 
   const effectiveProvider = $derived(state.selectedProvider ?? activeProvider);
 
@@ -92,17 +110,15 @@ export function createMainPageController(deps: MainPageDeps) {
     const keys = credentials.getByProvider(effectiveProvider);
     if (keys.length === 0) return;
 
-    const mode = deps.auth.state.keySelectionMode;
-    if (mode.isAutoBalance && mode.autoBalanceProvider === effectiveProvider) {
-      return;
-    }
+    // Only skip the active-key sync while auto-balance is genuinely rotating;
+    // a stale mode must still pin an active key for the shown provider.
+    if (effectiveAutoBalanceProvider === effectiveProvider) return;
 
     const active = credentials.getActive();
     if (active && active.provider === effectiveProvider) return;
 
     void deps.auth.setActiveKey(keys[0].id);
   });
-
   $effect(() => {
     if (
       state.selectedProvider !== null &&

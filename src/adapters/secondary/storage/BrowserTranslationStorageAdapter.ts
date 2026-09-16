@@ -18,6 +18,7 @@ const TextSegmentSchema = z.object({
   languageCode: z.string(),
   languageName: z.string(),
   romanization: z.string().nullable(),
+  blockIndex: z.number().int().nonnegative(),
 });
 
 const TranslationPropsSchema = z.object({
@@ -161,6 +162,7 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
         seg.text,
         langResult.data,
         seg.romanization,
+        seg.blockIndex,
       );
       if (!segResult.success) {
         console.warn(
@@ -185,6 +187,7 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
         seg.text,
         langResult.data,
         seg.romanization,
+        seg.blockIndex,
       );
       if (!segResult.success) {
         console.warn(

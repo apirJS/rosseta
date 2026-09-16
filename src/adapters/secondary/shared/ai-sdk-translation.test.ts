@@ -19,6 +19,7 @@ import {
   StorageError,
 } from '../../../shared/errors';
 import { FakeStructuredOutputExemptionStorage } from '../../../../tests/fakes/FakeStructuredOutputExemptionStorage';
+import { failure } from '../../../shared/types/Result';
 
 const GROQ_RESPONSE_FORMAT_ERROR =
   'This model does not support response format `json_schema`. See supported models at https://console.groq.com/docs/structured-outputs#supported-models';
@@ -132,14 +133,15 @@ describe('Adapter: ai-sdk-translation', () => {
     await executeTranslation(fakeModel(), VALID_IMAGE, TARGET_LANGUAGE, 'TEST');
 
     const callArgs = generateTextMock.mock.calls[0][0] as {
-      messages: { content: { text: string }[] }[];
+      instructions: string;
     };
-    const prompt = callArgs.messages[0].content[0].text;
-    expect(prompt).toContain('Compact contextual summary');
-    expect(prompt).not.toContain('"description":""');
+    const systemPrompt = callArgs.instructions;
+    expect(systemPrompt).toContain('compact contextual summary');
+    expect(systemPrompt).toContain('"description":"..."');
+    expect(systemPrompt).not.toContain('"description":""');
   });
 
-  test('prompt requests an empty description when includeDescription is false', async () => {
+  test('prompt omits the description field entirely when includeDescription is false', async () => {
     generateTextMock.mockResolvedValueOnce({
       output: VALID_TRANSLATION_RESPONSE,
     });
@@ -153,12 +155,13 @@ describe('Adapter: ai-sdk-translation', () => {
     );
 
     const callArgs = generateTextMock.mock.calls[0][0] as {
-      messages: { content: { text: string }[] }[];
+      instructions: string;
     };
-    const prompt = callArgs.messages[0].content[0].text;
-    expect(prompt).toContain('always `""` (empty string)');
-    expect(prompt).toContain('"description":""');
-    expect(prompt).not.toContain('1–2 sentence');
+    const systemPrompt = callArgs.instructions;
+    expect(systemPrompt).not.toContain('description');
+    expect(systemPrompt).toContain(
+      '{"originalText":{"contents":[ENTRY,...]},"translatedText":{"contents":[ENTRY,...]}}',
+    );
   });
 
   test('maps NO_TEXT_FOUND-style rejection to aiRejected', async () => {
@@ -224,9 +227,11 @@ describe('Adapter: ai-sdk-translation', () => {
   });
 
   test('maps unrecoverable NoObjectGeneratedError to malformedResponse', async () => {
-    generateTextMock.mockRejectedValueOnce(
-      noObjectGeneratedError('Sorry, I cannot process this image.'),
-    );
+    generateTextMock
+      .mockRejectedValueOnce(
+        noObjectGeneratedError('Sorry, I cannot process this image.'),
+      )
+      .mockResolvedValueOnce({ text: 'Still not JSON.' });
 
     const result = await executeTranslation(
       fakeModel(),
@@ -239,6 +244,35 @@ describe('Adapter: ai-sdk-translation', () => {
     if (!result.success) {
       expect(result.error.code).toBe(ErrorCode.TRANSLATION_MALFORMED_RESPONSE);
     }
+    expect(generateTextMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('repairs an unparseable structured response with a follow-up call', async () => {
+    const payload =
+      '```json\n' + JSON.stringify(VALID_TRANSLATION_RESPONSE) + '\n```';
+    generateTextMock
+      .mockRejectedValueOnce(
+        noObjectGeneratedError('Here is the answer, definitely not JSON'),
+      )
+      .mockResolvedValueOnce({ text: payload });
+
+    const result = await executeTranslation(
+      fakeModel(),
+      VALID_IMAGE,
+      TARGET_LANGUAGE,
+      'TEST',
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.original[0].text).toBe('こんにちは');
+      expect(result.data.translated[0].text).toBe('Hello');
+    }
+    expect(generateTextMock).toHaveBeenCalledTimes(2);
+    const repairCall = generateTextMock.mock.calls[1][0] as {
+      output?: unknown;
+    };
+    expect(repairCall.output).toBeUndefined();
   });
 
   test('maps 429 to rateLimited', async () => {
@@ -751,6 +785,78 @@ describe('Adapter: ai-sdk-translation', () => {
 
       expect(result.success).toBe(true);
       expect(exemptions.isExemptCalls).toEqual([]);
+    });
+
+    test('caches the exemption when a manual JSON recovery succeeds', async () => {
+      const exemptions = new FakeStructuredOutputExemptionStorage();
+      generateTextMock.mockRejectedValueOnce(
+        noObjectGeneratedError(JSON.stringify(VALID_TRANSLATION_RESPONSE)),
+      );
+
+      const result = await executeTranslation(
+        fakeModel(),
+        VALID_IMAGE,
+        TARGET_LANGUAGE,
+        'TEST',
+        true,
+        exemptions,
+      );
+
+      expect(result.success).toBe(true);
+      expect(exemptions.exemptCalls).toEqual(['test-provider:test-model']);
+      expect(exemptions.isExempted('test-provider:test-model')).toBe(true);
+    });
+
+    test('keeps a recovered translation when the exemption write fails', async () => {
+      const exemptions = new FakeStructuredOutputExemptionStorage();
+      generateTextMock.mockRejectedValueOnce(
+        noObjectGeneratedError(JSON.stringify(VALID_TRANSLATION_RESPONSE)),
+      );
+
+      const originalExemptModel = exemptions.exemptModel.bind(exemptions);
+      exemptions.exemptModel = async (modelKey: string) => {
+        await originalExemptModel(modelKey);
+        return failure(StorageError.writeFailed('exemptions'));
+      };
+
+      const result = await executeTranslation(
+        fakeModel(),
+        VALID_IMAGE,
+        TARGET_LANGUAGE,
+        'TEST',
+        true,
+        exemptions,
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.translated[0].text).toBe('Hello');
+      }
+      expect(exemptions.exemptCalls).toEqual(['test-provider:test-model']);
+    });
+
+    test('does not cache an exemption when the response needs a repair retry', async () => {
+      const exemptions = new FakeStructuredOutputExemptionStorage();
+      generateTextMock
+        .mockRejectedValueOnce(
+          noObjectGeneratedError('Sorry, I cannot process this image.'),
+        )
+        .mockResolvedValueOnce({
+          text: JSON.stringify(VALID_TRANSLATION_RESPONSE),
+        });
+
+      const result = await executeTranslation(
+        fakeModel(),
+        VALID_IMAGE,
+        TARGET_LANGUAGE,
+        'TEST',
+        true,
+        exemptions,
+      );
+
+      expect(result.success).toBe(true);
+      expect(generateTextMock).toHaveBeenCalledTimes(2);
+      expect(exemptions.exemptCalls).toEqual([]);
     });
   });
 });

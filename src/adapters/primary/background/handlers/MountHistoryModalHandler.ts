@@ -11,11 +11,13 @@ interface MountHistoryModalPayload {
     language: { code: string; name: string };
     text: string;
     romanization: string | null;
+    blockIndex: number;
   }[];
   translated: {
     language: { code: string; name: string };
     text: string;
     romanization: string | null;
+    blockIndex: number;
   }[];
   description: string;
   createdAt: Date;

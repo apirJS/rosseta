@@ -164,8 +164,6 @@ export class OverlayController {
     }
   }
 
-  private static readonly MAX_CROP_DIMENSION = 1500;
-
   private cropImage(
     sourceUrl: string,
     x: number,
@@ -186,15 +184,8 @@ export class OverlayController {
         const scaleX = img.naturalWidth / window.innerWidth;
         const scaleY = img.naturalHeight / window.innerHeight;
 
-        let cropW = width * scaleX;
-        let cropH = height * scaleY;
-
-        const maxDim = OverlayController.MAX_CROP_DIMENSION;
-        if (cropW > maxDim || cropH > maxDim) {
-          const ratio = Math.min(maxDim / cropW, maxDim / cropH);
-          cropW = Math.round(cropW * ratio);
-          cropH = Math.round(cropH * ratio);
-        }
+        const cropW = Math.round(width * scaleX);
+        const cropH = Math.round(height * scaleY);
 
         canvas.width = cropW;
         canvas.height = cropH;

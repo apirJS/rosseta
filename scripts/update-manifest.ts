@@ -17,9 +17,7 @@ async function updateManifest(): Promise<void> {
     process.exit(1);
   }
 
-  const cleanVersion = rawVersion
-    .replace(/-[a-zA-Z]+\./, '.')
-    .replace(/-[a-zA-Z]+/, '');
+  const cleanVersion = rawVersion.split('-')[0];
 
   const manifestPath = resolve(import.meta.dir, '../manifest.json');
   const file = Bun.file(manifestPath);

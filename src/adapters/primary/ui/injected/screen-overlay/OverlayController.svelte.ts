@@ -59,7 +59,10 @@ export class OverlayController {
   }
 
   public handleKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') this.detachOverlay();
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.detachOverlay();
   };
 
   public handlePointerDown = (e: PointerEvent) => {

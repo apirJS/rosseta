@@ -21,7 +21,7 @@
   });
 </script>
 
-<svelte:window onkeydown={controller.handleKeydown} />
+<svelte:window onkeydowncapture={controller.handleKeydown} />
 
 <div
   bind:this={overlayEl}

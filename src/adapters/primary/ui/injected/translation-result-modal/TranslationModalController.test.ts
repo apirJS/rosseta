@@ -329,24 +329,6 @@ describe('UI Controller: TranslationModalController', () => {
     expect(detachMock).toHaveBeenCalled();
   });
 
-  test('handleKeydown Escape calls close()', () => {
-    const detachMock = vi.fn();
-    const ctrl = createController({ detachModal: detachMock });
-
-    ctrl.handleKeydown({ key: 'Escape' } as KeyboardEvent);
-
-    expect(detachMock).toHaveBeenCalled();
-  });
-
-  test('handleKeydown non-Escape does not close', () => {
-    const detachMock = vi.fn();
-    const ctrl = createController({ detachModal: detachMock });
-
-    ctrl.handleKeydown({ key: 'Enter' } as KeyboardEvent);
-
-    expect(detachMock).not.toHaveBeenCalled();
-  });
-
   // ── langColorMap ───────────────────────────────────────────
 
   test('langColorMap assigns consistent indices per language code', () => {

@@ -233,10 +233,6 @@ export class TranslationModalController {
     this.copyTimers.set(target, timer);
   }
 
-  public handleKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') this.close();
-  };
-
   public close = () => {
     for (const timer of this.copyTimers.values()) clearTimeout(timer);
     this.copyTimers.clear();

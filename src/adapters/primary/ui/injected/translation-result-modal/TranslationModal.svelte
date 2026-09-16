@@ -38,7 +38,6 @@
   role="presentation"
   bind:this={backdropEl}
   tabindex="-1"
-  onkeydown={ctrl.handleKeydown}
   onpointerdown={() => backdropEl?.focus()}
 >
   <div

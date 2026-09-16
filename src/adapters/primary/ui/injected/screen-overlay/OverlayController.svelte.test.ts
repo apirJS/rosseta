@@ -112,21 +112,36 @@ describe('UI Controller: OverlayController', () => {
 
   // ── Keyboard ───────────────────────────────────────────────
 
-  test('Escape key detaches overlay', () => {
+  test('Escape key detaches overlay and stops the event', () => {
     const { controller, cleanup } = createController(detachMock);
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
 
-    controller.handleKeydown({ key: 'Escape' } as KeyboardEvent);
+    controller.handleKeydown({
+      key: 'Escape',
+      preventDefault,
+      stopPropagation,
+    } as unknown as KeyboardEvent);
 
     expect(detachMock).toHaveBeenCalled();
+    expect(preventDefault).toHaveBeenCalled();
+    expect(stopPropagation).toHaveBeenCalled();
     cleanup();
   });
 
   test('other keys do not detach overlay', () => {
     const { controller, cleanup } = createController(detachMock);
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
 
-    controller.handleKeydown({ key: 'Enter' } as KeyboardEvent);
+    controller.handleKeydown({
+      key: 'Enter',
+      preventDefault,
+      stopPropagation,
+    } as unknown as KeyboardEvent);
 
     expect(detachMock).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
     cleanup();
   });
 

@@ -10,11 +10,13 @@ Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone). Su
 
 ## Demo
 
-![Selecting a region on a webpage for translation](demo/usage_sample_2.png)
+![Rosseta demo banner 1](demo/chrome_banner_big_1.png)
 
-![Translation result showing Japanese text translated to Indonesian with romanization](demo/usage_sample_1.png)
+![Rosseta demo banner 2](demo/chrome_banner_big_2.png)
 
-![Popup views](demo/popup_views.png)
+![Rosseta demo banner 4](demo/chrome_banner_big_4.png)
+
+![Rosseta demo banner 3](demo/chrome_banner_big_3.png)
 
 ---
 

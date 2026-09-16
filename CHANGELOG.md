@@ -1,3 +1,261 @@
+## [2.0.0](https://github.com/apirJS/rosseta/compare/v1.3.1...v2.0.0) (2026-09-16)
+
+### ⚠ BREAKING CHANGES
+
+* the auth/login flow and all pre-rewrite storage formats
+are replaced by the multi-provider credential system.
+
+* feat: add Z.ai and OpenRouter providers, description toggle, and manage-keys redesign
+
+- add zai and openrouter as built-in providers: translation adapters,
+  registry entries, OpenAI-compatible model fetching, badge colors, and
+  API key URLs (@ai-sdk/zai, @openrouter/ai-sdk-provider)
+- add includeDescription preference with a custom Checkbox component on
+  the home page; when disabled, the prompt skips the contextual summary
+  and the LLM returns an empty description, saving output tokens
+- redesign Manage API Keys to match Manage Models: provider select in the
+  header, single search-or-add input with a dashed add-suggestion row
+  (masked key), key list scoped to the selected provider, and provider
+  badge removed from list items
+- change the default start-extension shortcut from Ctrl+Space to Ctrl+Shift+Y
+
+* feat: add Z.ai and OpenRouter providers, description toggle, and manage-keys redesign
+
+- add zai, openrouter, and opencode as built-in providers: translation
+  adapters, registry entries, OpenAI-compatible model fetching, badge
+  colors, and API key URLs (@ai-sdk/zai, @openrouter/ai-sdk-provider;
+  opencode reuses @ai-sdk/openai-compatible against
+  https://opencode.ai/zen/v1)
+- add includeDescription preference with a custom Checkbox component on
+  the home page; when disabled, the prompt skips the contextual summary
+  and the LLM returns an empty description, saving output tokens
+- redesign Manage API Keys to match Manage Models: provider select in the
+  header, single search-or-add input with a dashed add-suggestion row
+  (masked key), key list scoped to the selected provider, and provider
+  badge removed from list items
+- change the default start-extension shortcut from Ctrl+Space to Ctrl+Shift+Y
+- handle stale model selections: new UserPreferences.resolveModelIdFor
+  validates the saved/default model against the available list;
+  TranslateImageHandler repairs and persists a stale selection before
+  translating, and FetchModelsUseCase repairs the selection after a fetch
+  removes the selected model
+
+* feat: add hugging face provider, retry mechanism for non structured-output model
+
+* chore: change legacy initiation method for Google provider
+
+* feat: improve history search, remove duplicated Add button
+
+* refactor: one component serve one purpose, separation between smart & dumb components
+
+* ci: add [skip publish] flag detection
+
+* fix: missing back buttons on manage keys and models pages
+
+* docs: readme, and demos
+
+* feat: group text visually, simplifying prompt
+
+* fix: honor manual key choice and unstructured-output fallback
+
+Manage Keys' "set active" now switches the key-selection mode back to
+manual before pinning the credential, so an explicit key choice is no
+longer ignored while auto-balance is enabled. The ACTIVE badge is hidden
+unless the mode is manual, matching the home dropdown.
+
+Unwrap RetryError before classifying generation failures: retryable
+errors (429, 5xx, relayed upstream rejections) are only wrapped after
+retries are exhausted, so rate limits, server errors, vision rejections
+and json_schema fallbacks were misreported or skipped. Retry the repair
+prompt when the plain (non-structured) path returns unparseable JSON,
+matching the structured path.
+
+Fix the stale auto-balance UI test to seed the two keys the round robin
+requires and cover the single-key fallback.
+
+* docs: update CONTRIBUTING.md
+
+* ci: relase as draft first, so I can manually approve for store publish
+
+* docs: update readme
+
+* fix: pressing Esc shouldn't close the result modal, pressing Esc should cancel overlay
+
+* fix(build): use oxc minifier instead of deprecated esbuild
+
+* ci: use built-in GITHUB_TOKEN for semantic-release
+* the auth/login flow and all pre-rewrite storage formats
+are replaced by the multi-provider credential system.
+
+* feat: add Z.ai and OpenRouter providers, description toggle, and manage-keys redesign
+
+- add zai and openrouter as built-in providers: translation adapters,
+  registry entries, OpenAI-compatible model fetching, badge colors, and
+  API key URLs (@ai-sdk/zai, @openrouter/ai-sdk-provider)
+- add includeDescription preference with a custom Checkbox component on
+  the home page; when disabled, the prompt skips the contextual summary
+  and the LLM returns an empty description, saving output tokens
+- redesign Manage API Keys to match Manage Models: provider select in the
+  header, single search-or-add input with a dashed add-suggestion row
+  (masked key), key list scoped to the selected provider, and provider
+  badge removed from list items
+- change the default start-extension shortcut from Ctrl+Space to Ctrl+Shift+Y
+
+* feat: add Z.ai and OpenRouter providers, description toggle, and manage-keys redesign
+
+- add zai, openrouter, and opencode as built-in providers: translation
+  adapters, registry entries, OpenAI-compatible model fetching, badge
+  colors, and API key URLs (@ai-sdk/zai, @openrouter/ai-sdk-provider;
+  opencode reuses @ai-sdk/openai-compatible against
+  https://opencode.ai/zen/v1)
+- add includeDescription preference with a custom Checkbox component on
+  the home page; when disabled, the prompt skips the contextual summary
+  and the LLM returns an empty description, saving output tokens
+- redesign Manage API Keys to match Manage Models: provider select in the
+  header, single search-or-add input with a dashed add-suggestion row
+  (masked key), key list scoped to the selected provider, and provider
+  badge removed from list items
+- change the default start-extension shortcut from Ctrl+Space to Ctrl+Shift+Y
+- handle stale model selections: new UserPreferences.resolveModelIdFor
+  validates the saved/default model against the available list;
+  TranslateImageHandler repairs and persists a stale selection before
+  translating, and FetchModelsUseCase repairs the selection after a fetch
+  removes the selected model
+
+* feat: add hugging face provider, retry mechanism for non structured-output model
+
+* chore: change legacy initiation method for Google provider
+
+* feat: improve history search, remove duplicated Add button
+
+* refactor: one component serve one purpose, separation between smart & dumb components
+
+* ci: add [skip publish] flag detection
+
+* fix: missing back buttons on manage keys and models pages
+
+* docs: readme, and demos
+
+* feat: group text visually, simplifying prompt
+
+* fix: honor manual key choice and unstructured-output fallback
+
+Manage Keys' "set active" now switches the key-selection mode back to
+manual before pinning the credential, so an explicit key choice is no
+longer ignored while auto-balance is enabled. The ACTIVE badge is hidden
+unless the mode is manual, matching the home dropdown.
+
+Unwrap RetryError before classifying generation failures: retryable
+errors (429, 5xx, relayed upstream rejections) are only wrapped after
+retries are exhausted, so rate limits, server errors, vision rejections
+and json_schema fallbacks were misreported or skipped. Retry the repair
+prompt when the plain (non-structured) path returns unparseable JSON,
+matching the structured path.
+
+Fix the stale auto-balance UI test to seed the two keys the round robin
+requires and cover the single-key fallback.
+
+* docs: update CONTRIBUTING.md
+
+* ci: relase as draft first, so I can manually approve for store publish
+
+* docs: update readme
+
+* fix: pressing Esc shouldn't close the result modal, pressing Esc should cancel overlay
+
+* fix(build): use oxc minifier instead of deprecated esbuild
+* the auth/login flow and all pre-rewrite storage formats
+are replaced by the multi-provider credential system.
+
+* feat: add Z.ai and OpenRouter providers, description toggle, and manage-keys redesign
+
+- add zai and openrouter as built-in providers: translation adapters,
+  registry entries, OpenAI-compatible model fetching, badge colors, and
+  API key URLs (@ai-sdk/zai, @openrouter/ai-sdk-provider)
+- add includeDescription preference with a custom Checkbox component on
+  the home page; when disabled, the prompt skips the contextual summary
+  and the LLM returns an empty description, saving output tokens
+- redesign Manage API Keys to match Manage Models: provider select in the
+  header, single search-or-add input with a dashed add-suggestion row
+  (masked key), key list scoped to the selected provider, and provider
+  badge removed from list items
+- change the default start-extension shortcut from Ctrl+Space to Ctrl+Shift+Y
+
+* feat: add Z.ai and OpenRouter providers, description toggle, and manage-keys redesign
+
+- add zai, openrouter, and opencode as built-in providers: translation
+  adapters, registry entries, OpenAI-compatible model fetching, badge
+  colors, and API key URLs (@ai-sdk/zai, @openrouter/ai-sdk-provider;
+  opencode reuses @ai-sdk/openai-compatible against
+  https://opencode.ai/zen/v1)
+- add includeDescription preference with a custom Checkbox component on
+  the home page; when disabled, the prompt skips the contextual summary
+  and the LLM returns an empty description, saving output tokens
+- redesign Manage API Keys to match Manage Models: provider select in the
+  header, single search-or-add input with a dashed add-suggestion row
+  (masked key), key list scoped to the selected provider, and provider
+  badge removed from list items
+- change the default start-extension shortcut from Ctrl+Space to Ctrl+Shift+Y
+- handle stale model selections: new UserPreferences.resolveModelIdFor
+  validates the saved/default model against the available list;
+  TranslateImageHandler repairs and persists a stale selection before
+  translating, and FetchModelsUseCase repairs the selection after a fetch
+  removes the selected model
+
+* feat: add hugging face provider, retry mechanism for non structured-output model
+
+* chore: change legacy initiation method for Google provider
+
+* feat: improve history search, remove duplicated Add button
+
+* refactor: one component serve one purpose, separation between smart & dumb components
+
+* ci: add [skip publish] flag detection
+
+* fix: missing back buttons on manage keys and models pages
+
+* docs: readme, and demos
+
+* feat: group text visually, simplifying prompt
+
+* fix: honor manual key choice and unstructured-output fallback
+
+Manage Keys' "set active" now switches the key-selection mode back to
+manual before pinning the credential, so an explicit key choice is no
+longer ignored while auto-balance is enabled. The ACTIVE badge is hidden
+unless the mode is manual, matching the home dropdown.
+
+Unwrap RetryError before classifying generation failures: retryable
+errors (429, 5xx, relayed upstream rejections) are only wrapped after
+retries are exhausted, so rate limits, server errors, vision rejections
+and json_schema fallbacks were misreported or skipped. Retry the repair
+prompt when the plain (non-structured) path returns unparseable JSON,
+matching the structured path.
+
+Fix the stale auto-balance UI test to seed the two keys the round robin
+requires and cover the single-key fallback.
+
+* docs: update CONTRIBUTING.md
+
+* ci: relase as draft first, so I can manually approve for store publish
+
+* docs: update readme
+
+* fix: pressing Esc shouldn't close the result modal, pressing Esc should cancel overlay
+
+### Features
+
+* rewrite how we port and interact with LLM provider ([#1](https://github.com/apirJS/rosseta/issues/1)) ([933959f](https://github.com/apirJS/rosseta/commit/933959f000877f3022e616c37ad584600999bb49))
+* rewrite how we use and port a LLM provider ([#2](https://github.com/apirJS/rosseta/issues/2)) ([54c7d9f](https://github.com/apirJS/rosseta/commit/54c7d9f9cd1f0a77a38eda31ac8a11b630a80224))
+
+### Bug Fixes
+
+* **deps:** revert conventionalcommits preset to v9 for semantic-release compatibility ([#4](https://github.com/apirJS/rosseta/issues/4)) ([3609664](https://github.com/apirJS/rosseta/commit/3609664070906d3b9aecd075c08aeb34c779f614))
+
+### Continuous Integration
+
+* use built-in GITHUB_TOKEN for semantic-release ([#3](https://github.com/apirJS/rosseta/issues/3)) ([8a7dd70](https://github.com/apirJS/rosseta/commit/8a7dd70709327647b94f0b0ae8efcef522efbf98))
+
 ## [1.3.1](https://github.com/apirJS/rosseta/compare/v1.3.0...v1.3.1) (2026-03-06)
 
 ### Bug Fixes

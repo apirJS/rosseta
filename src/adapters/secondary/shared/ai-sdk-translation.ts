@@ -4,6 +4,7 @@ import {
   APICallError,
   NoOutputGeneratedError,
   NoObjectGeneratedError,
+  RetryError,
   type LanguageModel,
 } from 'ai';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
@@ -53,6 +54,14 @@ function isResponseFormatUnsupported(message: string): boolean {
   );
 }
 
+function unwrapRetryError(error: unknown): unknown {
+  let current = error;
+  for (let depth = 0; depth < 5 && RetryError.isInstance(current); depth++) {
+    current = current.lastError;
+  }
+  return current;
+}
+
 function modelCacheKey(model: LanguageModel): string | null {
   if (typeof model !== 'object' || model === null) return null;
   if (!('provider' in model) || !('modelId' in model)) return null;
@@ -88,6 +97,8 @@ function mapGenerationError(
   if (error instanceof AppError) {
     return failure(error);
   }
+
+  error = unwrapRetryError(error);
 
   if (NoOutputGeneratedError.isInstance(error)) {
     console.error(`[${tag}] Response failed schema validation:`, error.cause);
@@ -203,11 +214,14 @@ export async function executeTranslation(
         temperature: 0,
         abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      return interpretParsedTranslation(
-        parseTranslationResponse(text),
-        targetLanguage,
-        tag,
+      const parsed = parseTranslationResponse(text);
+      if (parsed.success) {
+        return interpretParsedTranslation(parsed, targetLanguage, tag);
+      }
+      console.warn(
+        `[${tag}] Plain response unparseable — attempting repair retry`,
       );
+      return await translateViaRepair(text);
     } catch (error: unknown) {
       return mapGenerationError(error, tag);
     }
@@ -280,13 +294,15 @@ export async function executeTranslation(
 
     return mapResponseToDomain(output.data, targetLanguage, tag);
   } catch (error: unknown) {
-    if (error instanceof AppError) {
-      return failure(error);
+    const normalized = unwrapRetryError(error);
+
+    if (normalized instanceof AppError) {
+      return failure(normalized);
     }
 
     if (
-      APICallError.isInstance(error) &&
-      isResponseFormatUnsupported(error.message)
+      APICallError.isInstance(normalized) &&
+      isResponseFormatUnsupported(normalized.message)
     ) {
       console.warn(
         `[${tag}] Model does not support the json_schema response format — retrying without it`,
@@ -295,8 +311,8 @@ export async function executeTranslation(
       return translateViaPlainGeneration();
     }
 
-    if (NoObjectGeneratedError.isInstance(error)) {
-      const parsed = parseTranslationResponse(error.text ?? '');
+    if (NoObjectGeneratedError.isInstance(normalized)) {
+      const parsed = parseTranslationResponse(normalized.text ?? '');
       if (parsed.success) {
         console.warn(`[${tag}] Recovering response via manual JSON parsing`);
         // The model emitted our exact JSON contract but the provider's
@@ -305,9 +321,9 @@ export async function executeTranslation(
         return interpretParsedTranslation(parsed, targetLanguage, tag);
       }
       console.warn(`[${tag}] Response unparseable — attempting repair retry`);
-      return translateViaRepair(error.text ?? '');
+      return translateViaRepair(normalized.text ?? '');
     }
 
-    return mapGenerationError(error, tag);
+    return mapGenerationError(normalized, tag);
   }
 }

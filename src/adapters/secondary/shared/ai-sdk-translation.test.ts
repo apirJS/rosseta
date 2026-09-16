@@ -4,6 +4,7 @@ import {
   APICallError,
   NoOutputGeneratedError,
   NoObjectGeneratedError,
+  RetryError,
 } from 'ai';
 import { executeTranslation } from './ai-sdk-translation';
 import {
@@ -66,6 +67,16 @@ function noObjectGeneratedError(text: string): NoObjectGeneratedError {
     response: {} as never,
     usage: {} as never,
     finishReason: 'stop',
+  });
+}
+
+function retryError(lastError: unknown): RetryError {
+  return new RetryError({
+    message: `Failed after 3 attempts. Last error: ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`,
+    reason: 'maxRetriesExceeded',
+    errors: [lastError],
   });
 }
 
@@ -277,6 +288,22 @@ describe('Adapter: ai-sdk-translation', () => {
 
   test('maps 429 to rateLimited', async () => {
     generateTextMock.mockRejectedValueOnce(apiError(429));
+
+    const result = await executeTranslation(
+      fakeModel(),
+      VALID_IMAGE,
+      TARGET_LANGUAGE,
+      'TEST',
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe(ErrorCode.TRANSLATION_RATE_LIMITED);
+    }
+  });
+
+  test('unwraps a RetryError around a 429 into rateLimited', async () => {
+    generateTextMock.mockRejectedValueOnce(retryError(apiError(429)));
 
     const result = await executeTranslation(
       fakeModel(),
@@ -505,6 +532,29 @@ describe('Adapter: ai-sdk-translation', () => {
     }
   });
 
+  test('unwraps a RetryError around a 5xx vision rejection into modelNoVision', async () => {
+    generateTextMock.mockRejectedValueOnce(
+      retryError(
+        apiErrorWithMessage(
+          502,
+          'Upstream request failed: [400] Model only supports text input.',
+        ),
+      ),
+    );
+
+    const result = await executeTranslation(
+      fakeModel(),
+      VALID_IMAGE,
+      TARGET_LANGUAGE,
+      'TEST',
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe(ErrorCode.TRANSLATION_MODEL_NO_VISION);
+    }
+  });
+
   test('maps AbortError to NetworkError timeout', async () => {
     const abortError = new Error('Aborted');
     abortError.name = 'AbortError';
@@ -616,6 +666,30 @@ describe('Adapter: ai-sdk-translation', () => {
       expect(exemptions.exemptCalls).toEqual(['test-provider:test-model']);
     });
 
+    test('retries when the relay reports the format as unsupported after retries', async () => {
+      const exemptions = new FakeStructuredOutputExemptionStorage();
+      generateTextMock
+        .mockRejectedValueOnce(
+          retryError(apiErrorWithMessage(502, GROQ_RESPONSE_FORMAT_ERROR)),
+        )
+        .mockResolvedValueOnce({
+          text: JSON.stringify(VALID_TRANSLATION_RESPONSE),
+        });
+
+      const result = await executeTranslation(
+        fakeModel(),
+        VALID_IMAGE,
+        TARGET_LANGUAGE,
+        'TEST',
+        true,
+        exemptions,
+      );
+
+      expect(result.success).toBe(true);
+      expect(generateTextMock).toHaveBeenCalledTimes(2);
+      expect(exemptions.exemptCalls).toEqual(['test-provider:test-model']);
+    });
+
     test('falls back from a foreign-class response-format rejection', async () => {
       const exemptions = new FakeStructuredOutputExemptionStorage();
       generateTextMock
@@ -707,7 +781,8 @@ describe('Adapter: ai-sdk-translation', () => {
       const exemptions = new FakeStructuredOutputExemptionStorage();
       generateTextMock
         .mockRejectedValueOnce(apiErrorWithMessage(400, GROQ_RESPONSE_FORMAT_ERROR))
-        .mockResolvedValueOnce({ text: 'Sorry, I cannot process this image.' });
+        .mockResolvedValueOnce({ text: 'Sorry, I cannot process this image.' })
+        .mockResolvedValueOnce({ text: 'Still not JSON.' });
 
       const result = await executeTranslation(
         fakeModel(),
@@ -722,6 +797,32 @@ describe('Adapter: ai-sdk-translation', () => {
       if (!result.success) {
         expect(result.error.code).toBe(ErrorCode.TRANSLATION_MALFORMED_RESPONSE);
       }
+      expect(generateTextMock).toHaveBeenCalledTimes(3);
+    });
+
+    test('repairs an unparseable plain-model response with a follow-up call', async () => {
+      const exemptions = new FakeStructuredOutputExemptionStorage();
+      exemptions.seedExempt('test-provider:test-model');
+      const payload =
+        '```json\n' + JSON.stringify(VALID_TRANSLATION_RESPONSE) + '\n```';
+      generateTextMock
+        .mockResolvedValueOnce({ text: 'Here you go, no JSON here.' })
+        .mockResolvedValueOnce({ text: payload });
+
+      const result = await executeTranslation(
+        fakeModel(),
+        VALID_IMAGE,
+        TARGET_LANGUAGE,
+        'TEST',
+        true,
+        exemptions,
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.translated[0].text).toBe('Hello');
+      }
+      expect(generateTextMock).toHaveBeenCalledTimes(2);
     });
 
     test('maps errors thrown by the plain retry through the shared chain', async () => {

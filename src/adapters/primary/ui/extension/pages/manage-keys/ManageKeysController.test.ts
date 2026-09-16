@@ -6,6 +6,7 @@ import {
 import { ApiKey } from '../../../../../../core/domain/credential/ApiKey';
 import { Credential } from '../../../../../../core/domain/credential/Credential';
 import { Credentials } from '../../../../../../core/domain/credential/Credentials';
+import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import { success } from '../../../../../../shared/types/Result';
 import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
@@ -41,7 +42,9 @@ function createDeps(overrides: Partial<ManageKeysDeps> = {}) {
     credentials: () => credentials,
     addApiKey: vi.fn().mockResolvedValue(null),
     removeApiKey: vi.fn().mockResolvedValue(null),
-    setActiveKey: vi.fn(),
+    setActiveKey: vi.fn().mockResolvedValue(null),
+    currentKeySelectionMode: () => KeySelectionMode.manual(),
+    setKeySelectionMode: vi.fn().mockResolvedValue(null),
     modelsFor: vi.fn().mockReturnValue([]),
     fetchModels: vi.fn().mockResolvedValue(
       success<StoredModel[]>([
@@ -296,5 +299,79 @@ describe('UI Controller: ManageKeysController', () => {
 
     controller.closeViewer();
     expect(controller.viewingKey).toBeNull();
+  });
+
+  describe('setActiveKey', () => {
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    test('drops out of auto-balance before activating the chosen key', async () => {
+      const { deps } = createDeps({
+        currentKeySelectionMode: () => KeySelectionMode.autoBalance('groq'),
+      });
+      const controller = createManageKeysController(deps);
+
+      controller.setActiveKey(
+        makeCredential('q1', 'gsk_groqKeyValue123', 'groq'),
+      );
+      await flush();
+
+      expect(deps.setKeySelectionMode).toHaveBeenCalledWith(
+        KeySelectionMode.manual(),
+      );
+      expect(deps.setActiveKey).toHaveBeenCalledWith('q1');
+    });
+
+    test('keeps manual mode untouched', async () => {
+      const { deps } = createDeps();
+      const controller = createManageKeysController(deps);
+
+      controller.setActiveKey(
+        makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'),
+      );
+      await flush();
+
+      expect(deps.setKeySelectionMode).not.toHaveBeenCalled();
+      expect(deps.setActiveKey).toHaveBeenCalledWith('g1');
+    });
+
+    test('does not activate the key when leaving auto-balance fails', async () => {
+      const { deps, show } = createDeps({
+        currentKeySelectionMode: () => KeySelectionMode.autoBalance('groq'),
+        setKeySelectionMode: vi.fn().mockResolvedValue('Storage is full'),
+      });
+      const controller = createManageKeysController(deps);
+
+      controller.setActiveKey(
+        makeCredential('q1', 'gsk_groqKeyValue123', 'groq'),
+      );
+      await flush();
+
+      expect(deps.setActiveKey).not.toHaveBeenCalled();
+      expect(show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Could not switch to manual key selection',
+        }),
+      );
+    });
+
+    test('surfaces an activation failure', async () => {
+      const { deps, show } = createDeps({
+        setActiveKey: vi.fn().mockResolvedValue('Credential not found'),
+      });
+      const controller = createManageKeysController(deps);
+
+      controller.setActiveKey(
+        makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'),
+      );
+      await flush();
+
+      expect(show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Could not switch API key',
+        }),
+      );
+    });
   });
 });

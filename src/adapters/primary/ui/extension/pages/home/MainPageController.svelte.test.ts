@@ -97,10 +97,28 @@ describe('UI Controller: MainPageController', () => {
 
   test('uses the auto-balance provider when the mode is auto-balance', () => {
     const { deps } = createDeps();
+    deps.auth.state.credentials = makeCredentials(
+      [
+        makeCredential('google', 'gk1'),
+        makeCredential('groq', 'rk1'),
+        makeCredential('groq', 'rk2'),
+      ],
+      'gk1',
+    );
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('groq');
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveProvider).toBe('groq');
+
+    cleanup();
+  });
+
+  test('ignores auto-balance and keeps the active provider when the provider has one key', () => {
+    const { deps } = createDeps();
+    deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('groq');
+    const { controller, cleanup } = createController(deps);
+
+    expect(controller.effectiveProvider).toBe('google');
 
     cleanup();
   });

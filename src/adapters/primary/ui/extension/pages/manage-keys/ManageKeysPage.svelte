@@ -45,9 +45,9 @@
     credentials: () => auth.state.credentials,
     addApiKey: auth.addApiKey,
     removeApiKey: auth.removeApiKey,
-    setActiveKey: (credentialId) => {
-      void auth.setActiveKey(credentialId);
-    },
+    setActiveKey: auth.setActiveKey,
+    currentKeySelectionMode: () => auth.state.keySelectionMode,
+    setKeySelectionMode: auth.setKeySelectionMode,
     modelsFor: models.modelsFor,
     fetchModels: models.fetchModels,
     clearAllModels: async () => {
@@ -98,8 +98,8 @@
     {#each controller.visibleKeys as credential (credential.id)}
       <ApiKeyListItem
         {credential}
-        isActive={auth.state.credentials?.activeCredentialId ===
-          credential.id}
+        isActive={auth.state.keySelectionMode.isManual &&
+          auth.state.credentials?.activeCredentialId === credential.id}
         onSetActive={() => controller.setActiveKey(credential)}
         onDelete={() => controller.requestDelete(credential.id)}
         onView={() => controller.viewKey(credential.id)}

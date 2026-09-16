@@ -1,6 +1,7 @@
 import type { AnyProvider } from '../../../../../../core/domain/credential/Provider';
 import type { Credential } from '../../../../../../core/domain/credential/Credential';
 import type { Credentials } from '../../../../../../core/domain/credential/Credentials';
+import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import type { Result } from '../../../../../../shared/types/Result';
 import type { AppError } from '../../../../../../shared/errors';
@@ -22,7 +23,9 @@ export interface ManageKeysDeps {
     provider: AnyProvider,
   ) => Promise<string | null>;
   removeApiKey: (credentialId: string) => Promise<string | null>;
-  setActiveKey: (credentialId: string) => void;
+  setActiveKey: (credentialId: string) => Promise<string | null>;
+  currentKeySelectionMode: () => KeySelectionMode;
+  setKeySelectionMode: (mode: KeySelectionMode) => Promise<string | null>;
   modelsFor: (provider: string) => StoredModel[];
   fetchModels: (
     provider: string,
@@ -160,7 +163,32 @@ export function createManageKeysController(deps: ManageKeysDeps) {
   }
 
   function setActiveKey(credential: Credential) {
-    deps.setActiveKey(credential.id);
+    void applyActiveKey(credential);
+  }
+
+  async function applyActiveKey(credential: Credential) {
+    if (!deps.currentKeySelectionMode().isManual) {
+      const modeError = await deps.setKeySelectionMode(
+        KeySelectionMode.manual(),
+      );
+      if (modeError) {
+        deps.toast.show({
+          type: 'error',
+          message: 'Could not switch to manual key selection',
+          description: modeError,
+        });
+        return;
+      }
+    }
+
+    const error = await deps.setActiveKey(credential.id);
+    if (error) {
+      deps.toast.show({
+        type: 'error',
+        message: 'Could not switch API key',
+        description: error,
+      });
+    }
   }
 
   function viewKey(credentialId: string) {

@@ -403,4 +403,4 @@ The prompt, response schema, and domain mapping live in `src/adapters/secondary/
 
 If something is unclear or you'd like to discuss a larger change before starting, open an issue and we'll figure it out together.
 
-Happy contributing! 🚀
+Happy contributing!

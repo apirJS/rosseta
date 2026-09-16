@@ -26,10 +26,11 @@
 
 <div class="flex flex-col h-full w-full bg-background">
   <header class="flex items-center p-4 pb-0 gap-2">
+    {#if onback}
+      <BackButton {onback} />
+    {/if}
     {#if start}
       {@render start()}
-    {:else if onback}
-      <BackButton {onback} />
     {/if}
     {#if title}
       <h2 class="flex-1 text-center text-base font-semibold text-foreground truncate">

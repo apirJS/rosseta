@@ -90,6 +90,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, architecture deta
 - [x] Release to Chrome Web Store and Firefox Add-ons
 - [ ] More AI providers
 
+
+---
+
+## Known Issues
+I forgot about thiss... (will fix this on 2.0.1)
+
+- **Custom provider headers and query params are ignored when fetching models.** For a custom OpenAI-compatible endpoint, *Manage Models -> Fetch* sends only the base URL and API key, so endpoints that require extra headers (e.g. OpenRouter's `HTTP-Referer`) or query parameters (e.g. an `api-version`) may fail to list their models. Translation is unaffected.
+- **Custom header and query param values are not validated.** Invalid header names, or values containing control characters such as newlines, are accepted when saving and only surface later as a generic request error.
+
+Both are planned to be addressed in a follow-up release.
+
 ---
 
 ## Privacy

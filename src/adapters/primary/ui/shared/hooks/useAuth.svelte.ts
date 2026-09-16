@@ -2,15 +2,13 @@ import { getAuthContext } from '../context';
 import { ApiKey } from '../../../../../core/domain/credential/ApiKey';
 import type { Credentials } from '../../../../../core/domain/credential/Credentials';
 import { KeySelectionMode } from '../../../../../core/domain/credential/KeySelectionMode';
-
-const ERROR_TIMEOUT_MS = 5000;
+import type { AnyProvider } from '../../../../../core/domain/credential/Provider';
 
 export class AuthState {
   credentials = $state<Credentials | null>(null);
   keySelectionMode = $state<KeySelectionMode>(KeySelectionMode.manual());
   loading = $state(false);
-  error = $state<string | null>(null);
-  isAuthenticated = $derived(
+  hasKeys = $derived(
     this.credentials !== null && this.credentials.hasKeys(),
   );
 }
@@ -18,26 +16,6 @@ export class AuthState {
 export function useAuth() {
   const useCases = getAuthContext();
   const state = new AuthState();
-  let errorTimeout: ReturnType<typeof setTimeout> | null = null;
-
-  function setError(message: string) {
-    if (errorTimeout) {
-      clearTimeout(errorTimeout);
-    }
-    state.error = message;
-    errorTimeout = setTimeout(() => {
-      state.error = null;
-      errorTimeout = null;
-    }, ERROR_TIMEOUT_MS);
-  }
-
-  function clearError() {
-    if (errorTimeout) {
-      clearTimeout(errorTimeout);
-      errorTimeout = null;
-    }
-    state.error = null;
-  }
 
   async function checkAuth() {
     const result = await useCases.getCredentials.execute();
@@ -54,75 +32,65 @@ export function useAuth() {
     }
   }
 
-  async function setKeySelectionMode(mode: KeySelectionMode) {
+  async function setKeySelectionMode(
+    mode: KeySelectionMode,
+  ): Promise<string | null> {
     const result = await useCases.setKeySelectionMode.execute(mode);
     if (result.success) {
       state.keySelectionMode = mode;
-    } else {
-      setError(result.error.userMessage);
+      return null;
     }
+    return result.error.message;
   }
 
-  async function addApiKey(rawApiKey: string) {
+  async function addApiKey(
+    rawApiKey: string,
+    provider: AnyProvider,
+  ): Promise<string | null> {
     state.loading = true;
-    clearError();
 
-    const apiKeyResult = ApiKey.create(rawApiKey);
+    const apiKeyResult = ApiKey.createWithProvider(rawApiKey, provider);
     if (!apiKeyResult.success) {
-      setError(apiKeyResult.error.message);
       state.loading = false;
-      return;
+      return apiKeyResult.error.message;
     }
 
     const result = await useCases.addApiKey.execute({
       apiKey: apiKeyResult.data,
     });
 
+    state.loading = false;
     if (result.success) {
       state.credentials = result.data;
-    } else {
-      setError(result.error.userMessage);
+      return null;
     }
-
-    state.loading = false;
+    return result.error.message;
   }
 
-  async function removeApiKey(credentialId: string) {
+  async function removeApiKey(credentialId: string): Promise<string | null> {
     state.loading = true;
-    clearError();
 
     const result = await useCases.removeApiKey.execute(credentialId);
 
+    state.loading = false;
     if (result.success) {
       state.credentials = result.data;
-    } else {
-      setError(result.error.userMessage);
+      return null;
     }
-
-    state.loading = false;
+    return result.error.message;
   }
 
-  async function setActiveKey(credentialId: string) {
-    if (!state.credentials) return;
+  async function setActiveKey(credentialId: string): Promise<string | null> {
+    if (!state.credentials) return 'No credentials loaded';
 
     const result = await useCases.setActiveKey.execute(credentialId);
     if (result.success) {
       state.credentials = result.data;
+      return null;
     }
+    return result.error.message;
   }
 
-  async function logout() {
-    if (!state.credentials) return;
-    const allIds = state.credentials.items.map((c) => c.id);
-    for (const id of allIds) {
-      const result = await useCases.removeApiKey.execute(id);
-      if (result.success) {
-        state.credentials = result.data;
-      }
-    }
-  }
-
-  // Check auth status on creation
   checkAuth();
 
   return {
@@ -131,6 +99,5 @@ export function useAuth() {
     removeApiKey,
     setActiveKey,
     setKeySelectionMode,
-    logout,
   };
 }

@@ -1,27 +1,16 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Container } from '../../../../shared/di/container-factory';
 import { failure, type Result } from '../../../../shared/types/Result';
-import { AuthError } from '../../../../shared/errors';
+import { AuthError, ValidationError } from '../../../../shared/errors';
 import { UserPreferences } from '../../../../core/domain/preferences/UserPreferences';
+import type { StoredModel } from '../../../../core/ports/outbound/IModelStorage';
+import { isCustomProviderId } from '../../../../core/domain/provider/CustomProviderConfig';
 import { createTranslationAdapter } from '../../../secondary/TranslationAdapterFactory';
 import { TranslateImageUseCase } from '../../../../core/application/translation/TranslateImageUseCase';
 import { TabNotifier } from '../services/TabNotifier';
 import { serializeForModal } from '../../content/handlers/TranslationModalHandler';
 import { sendMessageToTab } from '../../../../shared/messaging';
 
-/**
- * Handles the TRANSLATE_IMAGE message action.
- *
- * Orchestrates the full translation pipeline:
- * 1. Validate credentials
- * 2. Fetch user preferences
- * 3. Create provider-specific translation adapter
- * 4. Execute translation use case
- * 5. Auto-save to history
- * 6. Send result to content script for modal display
- *
- * Reports progress via toast notifications at each step.
- */
 export class TranslateImageHandler {
   constructor(private readonly container: Container) {}
 
@@ -34,7 +23,6 @@ export class TranslateImageHandler {
 
     await notifier.showLoading(toastId, 'Translating...');
 
-    // --- Credential check ---
     const credentialsResult =
       await this.container.getCredentialsUseCase.execute();
     if (!credentialsResult.success) {
@@ -52,11 +40,11 @@ export class TranslateImageHandler {
 
     const credentials = credentialsResult.data;
     if (!credentials) {
-      console.error('[TranslateImageHandler] User not authenticated');
+      console.error('[TranslateImageHandler] No credentials stored');
       await notifier.showError(
         toastId,
-        'Not Authenticated',
-        'Please set your API key in the extension settings.',
+        'No API Key',
+        'Add an API key in the extension popup.',
       );
       return failure(AuthError.notAuthenticated());
     }
@@ -70,15 +58,14 @@ export class TranslateImageHandler {
       );
       await notifier.showError(
         toastId,
-        'Not Authenticated',
-        'Please set your API key in the extension settings.',
+        'No API Key',
+        'Add an API key in the extension popup.',
       );
       return failure(resolveResult.error);
     }
 
     const activeCredential = resolveResult.data;
 
-    // --- Preferences ---
     const userPreferencesResult =
       await this.container.getPreferencesUseCase.execute();
     if (!userPreferencesResult.success) {
@@ -90,13 +77,63 @@ export class TranslateImageHandler {
       return failure(userPreferencesResult.error);
     }
 
-    const preferences =
+    let preferences =
       userPreferencesResult.data ?? UserPreferences.createDefault(uuidv4());
 
-    // --- Translation ---
+    const modelsResult = await this.container.loadModelsUseCase.execute(
+      activeCredential.provider,
+    );
+    if (modelsResult.success) {
+      preferences = await this.repairStaleModelSelection(
+        preferences,
+        activeCredential.provider,
+        modelsResult.data,
+      );
+    } else {
+      console.warn(
+        '[TranslateImageHandler] Could not load stored models, skipping model validation:',
+        modelsResult.error,
+      );
+    }
+
+    if (!preferences.hasSelectedModel(activeCredential.provider)) {
+      const error = ValidationError.invalidInput(
+        `No model selected for ${activeCredential.provider}. Pick one under Manage Models.`,
+      );
+      await notifier.showError(toastId, 'No Model Selected', error.message);
+      return failure(error);
+    }
+
+    let customProviderConfig;
+    if (isCustomProviderId(activeCredential.provider)) {
+      const configResult =
+        await this.container.getCustomProvidersUseCase.execute();
+      if (!configResult.success) {
+        await notifier.showError(
+          toastId,
+          'Configuration Error',
+          configResult.error.message,
+        );
+        return failure(configResult.error);
+      }
+
+      customProviderConfig = configResult.data.find(
+        (config) => config.id === activeCredential.provider,
+      );
+      if (!customProviderConfig) {
+        const error = ValidationError.invalidInput(
+          'Custom provider is not configured. Set it up under Custom Providers.',
+        );
+        await notifier.showError(toastId, 'Configuration Error', error.message);
+        return failure(error);
+      }
+    }
+
     const translationService = createTranslationAdapter(
       activeCredential,
       preferences,
+      customProviderConfig,
+      this.container.structuredOutputExemptionStorage,
     );
     const translateImageUseCase = new TranslateImageUseCase(translationService);
 
@@ -113,14 +150,13 @@ export class TranslateImageHandler {
       await notifier.showError(
         toastId,
         'Translation Failed!',
-        translationResult.error.message,
+        translationResult.error.userMessage,
       );
       return failure(translationResult.error);
     }
 
     const translation = translationResult.data;
 
-    // --- Auto-save to history ---
     const saveResult = await this.container.saveTranslationUseCase.execute({
       translation,
     });
@@ -131,7 +167,6 @@ export class TranslateImageHandler {
       );
     }
 
-    // --- Notify success & mount modal ---
     await notifier.showSuccess(toastId, 'Translation Success!');
 
     const modalPayload = serializeForModal(translation);
@@ -141,5 +176,33 @@ export class TranslateImageHandler {
     });
 
     return { success: true, data: undefined };
+  }
+
+  /**
+   * Falls back to the registry default or first stored model when the
+   * saved selection is no longer in the stored model list, and persists
+   * the repair. Best-effort: a persist failure keeps the in-memory repair.
+   */
+  private async repairStaleModelSelection(
+    preferences: UserPreferences,
+    provider: string,
+    models: StoredModel[],
+  ): Promise<UserPreferences> {
+    if (models.length === 0) return preferences;
+
+    const resolved = preferences.resolveModelIdFor(provider, models);
+    if (resolved === preferences.getModelIdFor(provider)) return preferences;
+
+    const repaired = preferences.withSelectedModel(provider, resolved);
+    const updateResult = await this.container.updatePreferencesUseCase.execute(
+      { preferences: { selectedModels: repaired.selectedModels } },
+    );
+    if (!updateResult.success) {
+      console.warn(
+        '[TranslateImageHandler] Could not persist repaired model selection:',
+        updateResult.error,
+      );
+    }
+    return repaired;
   }
 }

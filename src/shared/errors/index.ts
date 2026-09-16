@@ -5,3 +5,4 @@ export { TranslationError } from './TranslationError';
 export { NetworkError } from './NetworkError';
 export { StorageError } from './StorageError';
 export { BrowserError } from './BrowserError';
+export { ValidationError } from './ValidationError';

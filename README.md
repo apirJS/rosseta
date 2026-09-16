@@ -2,55 +2,80 @@
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/flbdkalgeiekpnchpakdpaabcehpnlln?style=flat&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/rosseta/flbdkalgeiekpnchpakdpaabcehpnlln) [![Firefox Add-ons](https://img.shields.io/amo/v/rosseta?style=flat&logo=firefox&logoColor=white&label=Firefox%20Add-ons)](https://addons.mozilla.org/en-US/firefox/addon/rosseta/)
 
-A browser extension that translates text from any region of a webpage. Select an area on screen, and the extension captures, extracts, and translates the text using AI — all without leaving the page.
+A browser extension that translates text from any region of a webpage. Draw a selection box over the text, images, or UI elements on screen. The extension captures that region as a screenshot, sends it to a vision LLM for OCR, and renders the translated text in an overlay on the page.
 
-_Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone) — the ancient artifact that unlocked the mystery of Egyptian hieroglyphs. Just as the stone bridged languages carved in stone, Rosseta bridges languages rendered on screen._
-
-> Successor of [select-and-translate](https://github.com/apirJS/select-and-translate) — rebuilt from scratch with a proper architecture.
-
-Built with **Svelte 5**, **TypeScript**, **Tailwind CSS v4**, and a **DDD + Hexagonal architecture**.
+Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone). Successor of [select-and-translate](https://github.com/apirJS/select-and-translate), rebuilt from scratch.
 
 ---
 
 ## Demo
 
-**▶️ YouTube Demo: [COMING SOON](#)**
+![Rosseta demo banner 1](demo/chrome_banner_big_1.png)
 
-![Translation result — Japanese text translated to Indonesian with romanization](demo/usage_sample_1.png)
+![Rosseta demo banner 2](demo/chrome_banner_big_2.png)
 
-![Translation result — selecting a region on a webpage](demo/usage_sample_2.png)
+![Rosseta demo banner 4](demo/chrome_banner_big_4.png)
 
-![Popup settings — model selection and target language](demo/popup.png)
+![Rosseta demo banner 3](demo/chrome_banner_big_3.png)
 
 ---
 
 ## Features
 
-- 🖱️ **Region select** — Draw a box on any part of a page, including images, and get an instant translation overlay with romanization
-- 🤖 **Multi-provider** — Switch between Gemini, Groq, and Z.ai models on the fly
-- 🔑 **Key management** — Multiple API keys per provider with auto-rotation
-- 🌐 **Proxy support** — Route all API calls through your own relay server
-- 📜 **History** — Every translation saved locally, searchable
-- 🌙 **Dark mode** — System-aware with manual toggle
+### Region-based translation
 
-### Supported languages
+Select any area of a page by drawing a rectangle over it. This works on regular text, embedded images, video subtitles, UI labels, buttons, or anything else visible on screen. The extension screenshots the selected region, runs OCR through a vision model, segments the text by language, and displays both the original and translated text in an in-page modal.
 
-Language availability depends on the provider:
+### Romanization
 
-| Provider       | Languages | Reference                                                                                        |
-| -------------- | --------- | ------------------------------------------------------------------------------------------------ |
-| Gemini         | 110+      | [Supported languages](https://cloud.google.com/vertex-ai/generative-ai/docs/models#expandable-1) |
-| Groq (Llama 4) | 12        | [Model card](https://github.com/marketplace/models/azureml-meta/Llama-4-Scout-17B-16E-Instruct)  |
-| Z.ai (GLM-4V)  | 26        | [Model card](https://replicate.com/cuuupid/glm-4v-9b/readme)                                     |
+For non-Latin scripts (Japanese, Chinese, Korean, Arabic, Thai, etc.), the translation result includes romanization alongside the original text. For example, Japanese text shows its reading in romaji.
 
-The extension auto-filters the language list based on the active provider.
+### Context description
+
+Each translation result can include a brief contextual summary describing what was captured. This is written in the target language. It can be turned off in settings to reduce token usage.
+
+### Multi-segment output
+
+The OCR output is segmented by visually distinct blocks, not merged into a single blob. Each heading, label, timestamp, button, and caption is its own segment with its own language tag and translation. Mixed-language text within a single block is split by language.
+
+### 11 built-in AI providers
+
+Rosseta supports the following providers out of the box: Google, Groq, xAI, OpenAI, Anthropic, Mistral, DeepInfra, Z.ai, OpenRouter, OpenCode, and Hugging Face.
+
+Model lists are fetched directly from the provider's API at runtime. You can also add models manually.
+
+### Custom OpenAI-compatible endpoints
+
+Point Rosseta at any OpenAI-compatible API by providing a base URL, optional custom headers, and optional query parameters. Useful for self-hosted models, corporate proxies, or providers not yet built in.
+
+### Multiple API keys per provider
+
+You can store multiple API keys for each provider. The extension supports round-robin key rotation across keys for the same provider, cycling to the next key after each request.
+
+### Translation history
+
+Every translation is automatically saved locally. History is searchable and can be cleared individually or all at once.
+
+### Keyboard shortcut
+
+Default shortcut: `Ctrl+Shift+Y` (Windows/Linux) or `Cmd+Shift+Y` (macOS). This triggers the selection overlay directly without opening the popup. The shortcut is customizable through your browser's extension shortcut settings.
+
+### Cross-browser
+
+Runs on both Chrome and Firefox as a Manifest V3 extension.
 
 ---
 
 ## Install
 
-- **Chrome** — [Install from Chrome Web Store](https://chromewebstore.google.com/detail/rosseta/flbdkalgeiekpnchpakdpaabcehpnlln)
-- **Firefox** — [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/rosseta/)
+- **Chrome**: [Install from Chrome Web Store](https://chromewebstore.google.com/detail/rosseta/flbdkalgeiekpnchpakdpaabcehpnlln)
+- **Firefox**: [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/rosseta/)
+
+---
+
+## Tech stack
+
+Built with Svelte 5 (runes), TypeScript (strict, no `any`), Tailwind CSS v4, and a DDD + Hexagonal (Ports & Adapters) architecture. Translation calls go through the Vercel AI SDK (`@ai-sdk/*`).
 
 ---
 
@@ -60,89 +85,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, architecture deta
 
 ---
 
-## Proxy Setup (Optional)
-
-Rosseta can route all API requests through a proxy server instead of calling the AI provider directly. Useful when your network blocks provider domains, you want to hide your IP, or you need request logging on your own server.
-
-<details>
-<summary><strong>How it works</strong></summary>
-
-The proxy URL **replaces the base URL** of the API. Rosseta appends the original path and query string to your proxy URL:
-
-| Provider | Original URL                                                                      | Proxied URL (`https://my-proxy.com`)           |
-| -------- | --------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Gemini   | `generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key=...` | `my-proxy.com/{model}:generateContent?key=...` |
-| Groq     | `api.groq.com/openai/v1/chat/completions`                                         | `my-proxy.com/chat/completions`                |
-| Z.ai     | `api.z.ai/api/paas/v4/chat/completions`                                           | `my-proxy.com/chat/completions`                |
-
-> **Note:** Your API key is still included in the request (as a query param for Gemini, as an `Authorization` header for Groq and Z.ai). Make sure you trust your proxy server.
-
-</details>
-
-<details>
-<summary><strong>Configuration</strong></summary>
-
-1. Open the extension popup → **☰ menu** → **Proxy Settings**
-2. Enter your proxy server URL
-3. Click **Save** — a health check runs automatically
-4. ✅ Connected = proxy is working, ✗ Unhealthy = proxy is unreachable (not saved)
-
-To go back to direct connections, click **Clear**.
-
-</details>
-
-<details>
-<summary><strong>Example: Cloudflare Worker</strong></summary>
-
-A minimal reverse proxy that forwards requests to the original API:
-
-```js
-const PROVIDERS = {
-  '/v1beta/': 'https://generativelanguage.googleapis.com',
-  '/openai/': 'https://api.groq.com',
-  '/api/paas/': 'https://api.z.ai',
-};
-
-export default {
-  async fetch(request) {
-    const url = new URL(request.url);
-
-    let target;
-    for (const [prefix, origin] of Object.entries(PROVIDERS)) {
-      if (url.pathname.startsWith(prefix)) {
-        target = origin;
-        break;
-      }
-    }
-
-    if (!target) {
-      return new Response('Unknown provider path', { status: 400 });
-    }
-
-    return fetch(target + url.pathname + url.search, {
-      method: request.method,
-      headers: request.headers,
-      body: request.body,
-    });
-  },
-};
-```
-
-Set your proxy URL to:
-
-- **Gemini:** `https://your-worker.workers.dev/v1beta/models`
-- **Groq:** `https://your-worker.workers.dev/openai/v1`
-- **Z.ai:** `https://your-worker.workers.dev/api/paas/v4`
-
-</details>
-
----
-
 ## Roadmap
 
 - [x] Release to Chrome Web Store and Firefox Add-ons
-- [x] Add proxy support
-- [ ] Improve UI/UX
+- [ ] More AI providers
 
 ---
 
@@ -151,7 +97,7 @@ Set your proxy URL to:
 Rosseta does **not** collect, store, or transmit any personal data to our servers.
 
 - **API keys**, **preferences**, and **translation history** are stored locally in your browser using `browser.storage.local` and never leave your device.
-- **Translation requests** (screenshots of selected areas) are sent directly from your browser to the AI provider you configured (Google Gemini, Groq, or Z.ai) using your own API key. We have no access to this data.
+- **Translation requests** (screenshots of selected areas) are sent directly from your browser to the AI provider you configured, using your own API key. We have no access to this data.
 - **No analytics, tracking, or telemetry** of any kind.
 
 ---

@@ -12,12 +12,14 @@ function makeSegments(
     name: string;
     text: string;
     romanization?: string | null;
+    blockIndex?: number;
   }[],
 ): SegmentPayload[] {
   return items.map((i) => ({
     language: { code: i.code, name: i.name },
     text: i.text,
     romanization: i.romanization ?? null,
+    blockIndex: i.blockIndex ?? 0,
   }));
 }
 
@@ -97,6 +99,61 @@ describe('UI Controller: TranslationModalController', () => {
     });
 
     expect(ctrl.translatedText).toBe('Hello World');
+  });
+
+  // ── Block grouping ─────────────────────────────────────────
+
+  test('originalText joins segments in the same block with a space', () => {
+    const ctrl = createController({
+      original: makeSegments([
+        { code: 'en-US', name: 'English', text: 'OK', blockIndex: 0 },
+        { code: 'ja-JP', name: 'Japanese', text: 'ボタン', blockIndex: 0 },
+      ]),
+    });
+
+    expect(ctrl.originalText).toBe('OK ボタン');
+  });
+
+  test('originalText separates distinct blocks with a newline', () => {
+    const ctrl = createController({
+      original: makeSegments([
+        { code: 'ja-JP', name: 'Japanese', text: 'こんにちは', blockIndex: 0 },
+        { code: 'ja-JP', name: 'Japanese', text: '世界', blockIndex: 1 },
+      ]),
+    });
+
+    expect(ctrl.originalText).toBe('こんにちは\n世界');
+  });
+
+  test('originalBlocks groups consecutive segments sharing a blockIndex', () => {
+    const ctrl = createController({
+      original: makeSegments([
+        { code: 'en-US', name: 'English', text: 'OK', blockIndex: 0 },
+        { code: 'ja-JP', name: 'Japanese', text: 'ボタン', blockIndex: 0 },
+        { code: 'number', name: 'Number', text: '3.50', blockIndex: 1 },
+      ]),
+    });
+
+    expect(ctrl.originalBlocks).toHaveLength(2);
+    expect(ctrl.originalBlocks[0].map((s) => s.text)).toEqual([
+      'OK',
+      'ボタン',
+    ]);
+    expect(ctrl.originalBlocks[0].map((s) => s.index)).toEqual([0, 1]);
+    expect(ctrl.originalBlocks[1].map((s) => s.text)).toEqual(['3.50']);
+    expect(ctrl.originalBlocks[1][0].index).toBe(2);
+  });
+
+  test('translatedBlocks groups translated segments', () => {
+    const ctrl = createController({
+      translated: makeSegments([
+        { code: 'en-US', name: 'English', text: 'Hello', blockIndex: 0 },
+        { code: 'en-US', name: 'English', text: 'World', blockIndex: 2 },
+      ]),
+    });
+
+    expect(ctrl.translatedBlocks).toHaveLength(2);
+    expect(ctrl.translatedText).toBe('Hello\nWorld');
   });
 
   // ── Romanization detection ─────────────────────────────────
@@ -270,24 +327,6 @@ describe('UI Controller: TranslationModalController', () => {
     ctrl.close();
 
     expect(detachMock).toHaveBeenCalled();
-  });
-
-  test('handleKeydown Escape calls close()', () => {
-    const detachMock = vi.fn();
-    const ctrl = createController({ detachModal: detachMock });
-
-    ctrl.handleKeydown({ key: 'Escape' } as KeyboardEvent);
-
-    expect(detachMock).toHaveBeenCalled();
-  });
-
-  test('handleKeydown non-Escape does not close', () => {
-    const detachMock = vi.fn();
-    const ctrl = createController({ detachModal: detachMock });
-
-    ctrl.handleKeydown({ key: 'Enter' } as KeyboardEvent);
-
-    expect(detachMock).not.toHaveBeenCalled();
   });
 
   // ── langColorMap ───────────────────────────────────────────

@@ -35,11 +35,13 @@ vi.mock('../../../../content/handlers/TranslationModalHandler', () => ({
       language: { code: s.language.code, name: s.language.name },
       text: s.text,
       romanization: s.romanization,
+      blockIndex: s.blockIndex,
     })),
     translated: t.translated.map((s) => ({
       language: { code: s.language.code, name: s.language.name },
       text: s.text,
       romanization: s.romanization,
+      blockIndex: s.blockIndex,
     })),
     description: t.description,
     createdAt: t.createdAt,

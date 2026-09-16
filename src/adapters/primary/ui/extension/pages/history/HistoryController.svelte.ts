@@ -27,7 +27,6 @@ export function createHistoryController() {
   function getFiltered(): Translation[] {
     let items = state.translations;
 
-    // Time filter
     if (state.timeFilter !== 'all') {
       const now = Date.now();
       const cutoff =
@@ -37,12 +36,26 @@ export function createHistoryController() {
       items = items.filter((t) => t.createdAt.getTime() >= cutoff);
     }
 
-    // Search filter (match against original text segments)
     if (state.searchQuery.trim()) {
       const query = state.searchQuery.toLowerCase();
-      items = items.filter((t) =>
-        t.original.some((seg) => seg.text.toLowerCase().includes(query)),
-      );
+      items = items.filter((t) => {
+        const matchOriginal = t.original.some(
+          (seg) =>
+            seg.text.toLowerCase().includes(query) ||
+            seg.language.name.toLowerCase().includes(query) ||
+            seg.language.code.toLowerCase().includes(query) ||
+            (seg.romanization && seg.romanization.toLowerCase().includes(query)),
+        );
+        const matchTranslated = t.translated.some(
+          (seg) =>
+            seg.text.toLowerCase().includes(query) ||
+            seg.language.name.toLowerCase().includes(query) ||
+            seg.language.code.toLowerCase().includes(query) ||
+            (seg.romanization && seg.romanization.toLowerCase().includes(query)),
+        );
+        const matchDescription = t.description.toLowerCase().includes(query);
+        return matchOriginal || matchTranslated || matchDescription;
+      });
     }
 
     return items;
@@ -68,7 +81,6 @@ export function createHistoryController() {
     state.timeFilter = value;
   }
 
-  /** Commit any pending delete immediately (fire-and-forget). */
   function commitPendingDelete() {
     if (!state.pendingDelete) return;
     clearTimeout(state.pendingDelete.timer);
@@ -77,7 +89,6 @@ export function createHistoryController() {
   }
 
   function deleteItem(id: string) {
-    // Commit any previously pending delete first
     commitPendingDelete();
 
     const idx = state.translations.findIndex((t) => t.id === id);
@@ -113,6 +124,10 @@ export function createHistoryController() {
     });
   }
 
+  function destroy() {
+    commitPendingDelete();
+  }
+
   return {
     state,
     get filtered() {
@@ -124,5 +139,6 @@ export function createHistoryController() {
     deleteItem,
     undoDelete,
     openItem,
+    destroy,
   };
 }

@@ -18,6 +18,7 @@ const TextSegmentSchema = z.object({
   languageCode: z.string(),
   languageName: z.string(),
   romanization: z.string().nullable(),
+  blockIndex: z.number().int().nonnegative(),
 });
 
 const TranslationPropsSchema = z.object({
@@ -35,7 +36,6 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
       if (!allResult.success) return failure(allResult.error);
 
       const items = allResult.data;
-      // Replace if exists, otherwise prepend
       const existingIndex = items.findIndex((i) => i.id === translation.id);
       const props = translation.toProps();
 
@@ -82,7 +82,6 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
         if (result.success) {
           translations.push(result.data);
         }
-        // Skip corrupted entries silently
       }
 
       return success(translations);
@@ -163,6 +162,7 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
         seg.text,
         langResult.data,
         seg.romanization,
+        seg.blockIndex,
       );
       if (!segResult.success) {
         console.warn(
@@ -187,6 +187,7 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
         seg.text,
         langResult.data,
         seg.romanization,
+        seg.blockIndex,
       );
       if (!segResult.success) {
         console.warn(

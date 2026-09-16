@@ -17,7 +17,7 @@
 <Button
   variant="primary"
   size="lg"
-  class="w-full flex-col py-3"
+  class="w-full flex-col py-3 select-none"
   {onclick}
   {disabled}
   {isLoading}

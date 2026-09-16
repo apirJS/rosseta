@@ -1,15 +1,11 @@
 import { ValueObject } from '../shared/ValueObject';
 import { DomainError } from '../shared/DomainError';
 import { failure, success, type Result } from '../../../shared/types/Result';
+import { isAnyProvider, type AnyProvider } from './Provider';
 
-export const KEY_SELECTION_MODES = {
-  manual: 'Manual',
-  'auto-balance:gemini': 'Auto balance (round robin) GEMINI',
-  'auto-balance:groq': 'Auto balance (round robin) GROQ',
-  'auto-balance:zai': 'Auto balance (round robin) Z.AI',
-} as const;
+const AUTO_BALANCE_PREFIX = 'auto-balance:';
 
-export type KeySelectionModeValue = keyof typeof KEY_SELECTION_MODES;
+export type KeySelectionModeValue = 'manual' | `auto-balance:${AnyProvider}`;
 
 export class KeySelectionMode extends ValueObject {
   private constructor(private readonly _value: KeySelectionModeValue) {
@@ -25,31 +21,24 @@ export class KeySelectionMode extends ValueObject {
   }
 
   public get isAutoBalance(): boolean {
-    return this._value.startsWith('auto-balance:');
+    return this._value.startsWith(AUTO_BALANCE_PREFIX);
   }
 
-  /** Returns the provider being balanced, or null if manual. */
-  public get autoBalanceProvider(): 'gemini' | 'groq' | 'zai' | null {
-    if (this._value === 'auto-balance:gemini') return 'gemini';
-    if (this._value === 'auto-balance:groq') return 'groq';
-    if (this._value === 'auto-balance:zai') return 'zai';
-    return null;
+  public get autoBalanceProvider(): AnyProvider | null {
+    if (!this.isAutoBalance) return null;
+    return this._value.slice(AUTO_BALANCE_PREFIX.length) as AnyProvider;
   }
 
   public get label(): string {
-    return KEY_SELECTION_MODES[this._value];
+    if (this.isManual) return 'Manual';
+    const provider = this.autoBalanceProvider;
+    return `Auto balance (round robin) ${provider?.toUpperCase() ?? ''}`;
   }
 
-  /**
-   * Create from a known value (compile-time autocomplete).
-   */
   public static create(value: KeySelectionModeValue): KeySelectionMode {
     return new KeySelectionMode(value);
   }
 
-  /**
-   * Create from raw string input (runtime validation).
-   */
   public static fromRaw(raw: string): Result<KeySelectionMode, DomainError> {
     if (!raw || typeof raw !== 'string') {
       return failure(
@@ -57,13 +46,22 @@ export class KeySelectionMode extends ValueObject {
       );
     }
 
-    if (raw in KEY_SELECTION_MODES) {
-      return success(new KeySelectionMode(raw as KeySelectionModeValue));
+    if (raw === 'manual') {
+      return success(new KeySelectionMode('manual'));
+    }
+
+    if (raw.startsWith(AUTO_BALANCE_PREFIX)) {
+      const provider = raw.slice(AUTO_BALANCE_PREFIX.length);
+      if (isAnyProvider(provider)) {
+        return success(
+          new KeySelectionMode(`${AUTO_BALANCE_PREFIX}${provider}`),
+        );
+      }
     }
 
     return failure(
       new DomainError(
-        `Invalid key selection mode: ${raw}. Must be one of: ${Object.keys(KEY_SELECTION_MODES).join(', ')}`,
+        `Invalid key selection mode: ${raw}. Must be "manual" or "auto-balance:<provider>"`,
       ),
     );
   }
@@ -72,15 +70,7 @@ export class KeySelectionMode extends ValueObject {
     return new KeySelectionMode('manual');
   }
 
-  public static autoBalanceGemini(): KeySelectionMode {
-    return new KeySelectionMode('auto-balance:gemini');
-  }
-
-  public static autoBalanceGroq(): KeySelectionMode {
-    return new KeySelectionMode('auto-balance:groq');
-  }
-
-  public static autoBalanceZai(): KeySelectionMode {
-    return new KeySelectionMode('auto-balance:zai');
+  public static autoBalance(provider: AnyProvider): KeySelectionMode {
+    return new KeySelectionMode(`${AUTO_BALANCE_PREFIX}${provider}`);
   }
 }

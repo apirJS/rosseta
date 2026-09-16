@@ -38,6 +38,7 @@ function validTranslationProps(id: string = 'trans-1') {
         languageCode: 'ja-JP',
         languageName: 'Japanese',
         romanization: 'konnichiwa',
+        blockIndex: 0,
       },
     ],
     translated: [
@@ -46,6 +47,7 @@ function validTranslationProps(id: string = 'trans-1') {
         languageCode: 'en-US',
         languageName: 'English',
         romanization: null,
+        blockIndex: 0,
       },
     ],
     description: 'greeting',

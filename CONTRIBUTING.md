@@ -54,10 +54,10 @@ This project follows **Domain-Driven Design (DDD)** with a **Hexagonal (Ports & 
 │                      Adapters                          │
 │  ┌──────────────┐  ┌──────────┐  ┌──────────────────┐  │
 │  │   Primary     │  │ Secondary│  │   Primary (UI)   │  │
-│  │  background   │  │  gemini  │  │  Svelte 5 + TW4  │  │
-│  │  content      │  │  groq    │  │  extension popup │  │
-│  │              │  │  zai     │  │  injected overlay│  │
-│  │              │  │  storage  │  │                  │  │
+│  │  background   │  │  @ai-sdk │  │  Svelte 5 + TW4  │  │
+│  │  content      │  │  clients │  │  extension popup │  │
+│  │              │  │  storage  │  │  injected overlay│  │
+│  │              │  │  fetching │  │                  │  │
 │  └──────┬───────┘  └────┬─────┘  └────────┬─────────┘  │
 │         │               │                 │             │
 │ ────────┼───────────────┼─────────────────┼──────────── │
@@ -91,32 +91,39 @@ This project follows **Domain-Driven Design (DDD)** with a **Hexagonal (Ports & 
 src/
 ├── core/                          # Framework-free business logic
 │   ├── domain/
-│   │   ├── credential/            # ApiKey, Credential, Credentials
+│   │   ├── credential/            # ApiKey, Credential, Credentials, Provider, KeySelectionMode
+│   │   ├── image/                 # EncodedImage
 │   │   ├── preferences/           # UserPreferences, AiModel, Theme
-│   │   ├── provider/              # ProviderRegistry (models, languages)
+│   │   ├── provider/              # ProviderRegistry, CustomProviderConfig
 │   │   └── translation/           # Translation, Language, TextSegment
 │   ├── application/               # Use cases (one class per action)
-│   │   ├── auth/                  # Add/Remove API keys, set active key
+│   │   ├── auth/                  # Add/Remove API keys, active key, key-selection mode
+│   │   ├── command/               # Keyboard shortcut lookup
+│   │   ├── models/                # Fetch/Load/Add/Remove/Clear models
 │   │   ├── preferences/           # Get/Update user preferences
-│   │   └── translation/           # Save, Get, Delete, ClearAll translations
+│   │   ├── provider/              # Custom provider config CRUD
+│   │   └── translation/           # Translate, Save, Get, Delete, ClearAll
 │   └── ports/
 │       ├── inbound/               # Use case interfaces (driven side)
 │       └── outbound/              # Storage & service interfaces (driving side)
 │
 ├── adapters/
 │   ├── primary/                   # Entry points (driving adapters)
-│   │   ├── background/            # Service worker handlers
+│   │   ├── background/            # Service worker handlers (translation, model fetch)
 │   │   ├── content/               # Content script (overlay, toast, modal)
 │   │   └── ui/
 │   │       ├── extension/         # Popup UI (pages, components)
-│   │       ├── injected/          # In-page translation modal
+│   │       ├── injected/          # In-page overlay, toast, translation modal
 │   │       └── shared/            # Hooks, context, constants, components
 │   └── secondary/                 # Infrastructure (driven adapters)
-│       ├── gemini/                # Gemini API client
-│       ├── groq/                  # Groq API client
-│       ├── zai/                   # Z.ai API client
-│       ├── storage/               # Browser storage adapters
-│       └── validation/            # API key validation
+│       ├── google/ groq/ xai/     # @ai-sdk/* translation adapters (thin)
+│       ├── openai/ anthropic/ ... # one directory per provider
+│       ├── huggingface/ opencode/ # incl. Hugging Face + OpenCode
+│       ├── openai-compatible/     # custom providers (base URL + headers)
+│       ├── model-fetchers/        # ModelFetchService (provider /models APIs)
+│       ├── shared/                # executeTranslation, prompt, schema,
+│       │                          # parse-translation-json, response mapper
+│       └── storage/               # Browser storage adapters (Zod-validated)
 │
 ├── shared/                        # Cross-cutting concerns
 │   ├── di/                        # Dependency injection container
@@ -125,7 +132,7 @@ src/
 │   └── types/                     # Result<T, E>, shared type utilities
 │
 └── tests/
-    └── fakes/                     # In-memory test doubles
+    └── fakes/                     # In-memory test doubles (one per outbound port)
 ```
 
 ## Development Workflow
@@ -134,13 +141,26 @@ src/
 
 | Command                     | Description                                     |
 | --------------------------- | ----------------------------------------------- |
+| `bun run dev:chrome`        | Vite dev server (true HMR for the popup)        |
+| `bun run dev:firefox`       | Vite dev server for Firefox (no popup HMR)      |
 | `bun run build:dev:chrome`  | Development build with watch mode (Chrome)      |
 | `bun run build:dev:firefox` | Development build with watch mode (Firefox)     |
 | `bun run build:prod`        | Production build for both browsers              |
-| `bun run test:logic`        | Run domain, application, and adapter unit tests |
-| `bun run test:ui`           | Run Svelte component tests (Vitest + jsdom)     |
+| `bun run test:logic`        | Domain, application, background, content, adapter tests |
+| `bun run test:ui`           | Svelte component + `*.svelte.ts` controller tests (Vitest + jsdom) |
 | `bun run test`              | Run all tests                                   |
 | `bun run check`             | Type-check Svelte files and Node config         |
+
+> [!IMPORTANT]
+> Tests run on two runners, split by **path**, not by config. A file in the wrong
+> place silently never runs:
+>
+> - `bun run test:logic` (bun) covers `src/shared`, `src/core`,
+>   `src/adapters/primary/{background,content}`, `src/adapters/secondary`.
+> - `bun run test:ui` (vitest) covers `src/adapters/primary/ui` only — that is
+>   where the Svelte compiler is needed for `$state`/`$derived` in `*.svelte.ts`.
+>
+> Import from `bun:test` in the first scope and from `vitest` in the second.
 
 ### Recommended Dev Loop
 
@@ -148,8 +168,8 @@ src/
 # Terminal 1: Watch build
 bun run build:dev:chrome
 
-# Terminal 2: Run tests on change
-bun test --watch src/core src/adapters
+# Terminal 2: Run logic tests on change
+bun run test:logic
 
 # Before committing
 bun run check && bun run test
@@ -222,6 +242,7 @@ Use descriptive prefixes to indicate the layer:
 - `Application:` for use cases
 - `Adapter:` for storage, API, and UI adapters
 - `Service:` for application services
+- `UI Controller:` for `*Controller.svelte.ts` factories (vitest scope)
 
 ### Running Tests
 
@@ -306,134 +327,108 @@ test(translation): add ClearAllTranslationsUseCase tests
 One of the most common contributions is adding support for a new AI provider. The checklist below covers **every file** that needs changes — follow it in order.
 
 > [!IMPORTANT]
-> New providers **must** support:
+> New providers **must** support **multilingual image understanding** (vision) —
+> Rosseta sends screenshots of selected regions for translation.
 >
-> 1. **Multilingual image understanding** (vision) — Rosseta sends screenshots of selected regions for translation
-> 2. **Structured outputs** (JSON mode / response schema) — Rosseta expects a typed JSON response from the model
+> Structured outputs (`json_schema` / response schema) are strongly preferred but
+> **not required**: `executeTranslation()` detects a model that rejects the
+> `json_schema` response format, caches it in `structuredOutputExemptModels`
+> (keyed `provider:modelId`), and falls back to prompt-only JSON mode with a
+> manual parse + repair retry on every later call.
 
 ### Domain layer
 
-#### 1. Add to the `Provider` type and detection
+#### 1. Add to the `Provider` type
 
 **File:** `src/core/domain/credential/Provider.ts`
 
 - Add your provider ID to the `Provider` union type
 - Add it to the `PROVIDERS` array
-- Add a detection rule in `detectProvider()` — this determines which provider an API key belongs to based on its format (e.g. prefix, length, pattern)
 
 ```typescript
-export type Provider = 'gemini' | 'groq' | 'zai' | 'openai';
-export const PROVIDERS: Provider[] = ['gemini', 'groq', 'zai', 'openai'];
-
-export function detectProvider(rawKey: string): Provider | null {
-  // ... existing checks ...
-  if (rawKey.startsWith('sk-')) return 'openai';
-  return null;
-}
-```
-
-#### 2. Register models and languages in `ProviderRegistry`
-
-**File:** `src/core/domain/provider/ProviderRegistry.ts` — append a new `ProviderRegistry.register()` call at the bottom
-
-```typescript
-ProviderRegistry.register({
-  id: 'openai',
-  name: 'OpenAI',
-  defaultModelId: 'gpt-4o-mini',
-  models: [
-    { id: 'gpt-4o', name: 'GPT-4o' },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-  ],
-  supportedLanguages: ['en-US', 'ja-JP', 'ko-KR', 'zh-CN', ...],
-});
+export type Provider = 'google' | 'groq' | 'xai' | /* ... */ | 'your-provider';
+export const PROVIDERS: Provider[] = ['google', 'groq', 'xai', /* ... */, 'your-provider'];
 ```
 
 > [!NOTE]
-> Use **BCP 47** language-region codes (e.g. `en-US`, `ja-JP`, not `en`, `ja`). If your provider supports a language not yet in `src/core/domain/translation/LANGUAGE_MAP.ts`, add it there first.
+> API keys are **not validated** and providers are picked explicitly in the UI — do not add key-format detection rules.
 
-#### 3. Add auto-balance support
+#### 2. Register the provider in `ProviderRegistry`
 
-**File:** `src/core/domain/credential/KeySelectionMode.ts`
+**File:** `src/core/domain/provider/ProviderRegistry.ts` — append a new `ProviderRegistry.register()` call at the bottom. Model lists start empty; they are populated at runtime from the provider API (or manual user input).
 
-- Add `'auto-balance:<provider>'` to `KEY_SELECTION_MODES`
-- Add a factory method (e.g. `autoBalanceOpenai()`)
-- Update the `autoBalanceProvider` getter's return type
+```typescript
+ProviderRegistry.register({
+  id: 'your-provider',
+  name: 'Your Provider',
+  defaultModelId: 'your-default-model',
+  models: [],
+});
+```
 
 ### Adapter layer
 
-#### 4. Create the translation adapter
+#### 3. Create the translation adapter
 
-Create a new directory under `src/adapters/secondary/<provider>/` with these files:
-
-```
-src/adapters/secondary/openai/
-├── OpenAiTranslationAdapter.ts      # Implements ITranslationService
-├── OpenAiTranslationAdapter.test.ts # Unit tests
-├── prompt.ts                        # Provider-specific prompt builder
-└── schema.ts                        # Zod response schema
-```
-
-Use an existing adapter (e.g. `src/adapters/secondary/groq/` or `src/adapters/secondary/zai/`) as a reference for the structure.
-
-#### 5. Wire into the adapter factory
-
-**File:** `src/adapters/secondary/TranslationAdapterFactory.ts` — add a `case` for your provider in the switch statement
+Create `src/adapters/secondary/<provider>/YourProviderTranslationAdapter.ts`. Each adapter is a thin class that creates the `@ai-sdk/*` client, resolves the model id for **its own** provider, and delegates to the shared `executeTranslation()`. Copy an existing adapter (e.g. [GroqTranslationAdapter.ts](src/adapters/secondary/groq/GroqTranslationAdapter.ts)) verbatim and swap the client — every adapter has this exact shape:
 
 ```typescript
-case 'openai':
-  return new OpenAiTranslationAdapter(credential, preferences);
+import { createYourProvider } from '@ai-sdk/your-provider';
+
+export class YourProviderTranslationAdapter implements ITranslationService {
+  constructor(
+    private readonly credential: Credential,
+    private readonly userPreferences: UserPreferences,
+    private readonly structuredOutputExemptions: IStructuredOutputExemptionStorage,
+  ) {}
+
+  public async translateImage(
+    image: EncodedImage,
+    targetLanguage: Language,
+  ): Promise<Result<Translation, AppError>> {
+    const client = createYourProvider({ apiKey: this.credential.apiKey.value });
+    const model = client(
+      this.userPreferences.getModelIdFor(this.credential.provider),
+    );
+    return executeTranslation(
+      model,
+      image,
+      targetLanguage,
+      'YOUR_PROVIDER', // uppercase log tag
+      this.userPreferences.includeDescription,
+      this.structuredOutputExemptions,
+    );
+  }
+}
 ```
 
-#### 6. Add API key validation
+The prompt, response schema, parse/repair fallback, and domain mapping live in `src/adapters/secondary/shared/` — do not duplicate them per provider.
 
-**File:** `src/adapters/secondary/validation/HttpApiKeyValidator.ts`
+#### 4. Wire into the adapter factory
 
-- Add a condition in `validate()` to route to your validation method
-- Implement a `private async validateOpenaiKey()` method that calls your provider's models/list endpoint
+**File:** `src/adapters/secondary/TranslationAdapterFactory.ts` — add a `case` for your provider in the switch statement (the `default` branch is an exhaustive `never` check, so TypeScript will remind you).
 
-#### 7. Add to the storage schema
+#### 5. Add model fetching
 
-**File:** `src/adapters/secondary/storage/BrowserCredentialStorageAdapter.ts`
-
-Add your provider ID to the Zod enum on the `CredentialItemPropsSchema`:
-
-```typescript
-provider: z.enum(['gemini', 'groq', 'zai', 'openai']),
-```
-
-> [!CAUTION]
-> **Missing this step will cause ALL stored credentials to be silently deleted** when the extension loads a credential with an unrecognized provider.
+**File:** `src/adapters/secondary/model-fetchers/ModelFetchService.ts` — add your provider to the `MODEL_FETCHERS` record. If the provider exposes an OpenAI-compatible `/v1/models` endpoint, reuse `fetchOpenAICompatibleModels`. If it has no list endpoint, omit it — users add models manually.
 
 ### UI layer
 
-#### 8. Register in the provider cycle
+#### 6. Add UI metadata
 
-**File:** `src/adapters/primary/ui/shared/hooks/useProviderCycle.svelte.ts`
+**File:** `src/adapters/primary/ui/shared/constants/providers.ts` — add a `PROVIDER_BADGE_COLORS` entry and the API key URL to `API_KEY_URLS`.
 
-Add a new entry to the `PROVIDERS` array with the provider name and API key URL:
-
-```typescript
-{ id: 'openai', name: 'OpenAI', apiKeyUrl: 'https://platform.openai.com/api-keys' },
-```
-
-This makes the login and manage-keys pages cycle through your provider automatically.
-
-#### 9. Add auto-balance UI support
-
-These files control the auto-balance dropdown and active key indicator — add your provider alongside the existing entries:
-
-- `src/adapters/primary/ui/extension/pages/home/components/ActiveKeyIndicator.svelte` — add `showOpenaiAutoBalance` prop and handler
-- `src/adapters/primary/ui/extension/pages/home/components/KeySelectorDropdown.svelte` — add your provider to the auto-balance `{#each}` loop and badge color map
-- `src/adapters/primary/ui/extension/pages/home/HomePage.svelte` — wire up the auto-balance props
+The Manage Keys page reads the provider list straight from `PROVIDERS`, so no other UI edit is needed.
 
 ### Tests & fixtures
 
-#### 10. Update test fixtures
+#### 7. Update tests
 
-**File:** `tests/test-fixtures.ts` — add a credential factory (e.g. `createOpenaiCredential()`)
+**File:** `src/adapters/secondary/TranslationAdapterFactory.test.ts` — add your provider class to the `expectedAdapters` map (the test loops over it and asserts the factory returns the right class for each provider).
 
-**File:** `src/adapters/secondary/TranslationAdapterFactory.test.ts` — add a test case for the new adapter
+**File:** `src/adapters/secondary/model-fetchers/ModelFetchService.test.ts` — cover your fetcher, including error status mapping.
+
+**File:** `tests/test-fixtures.ts` — add a credential factory only if the e2e tests need one.
 
 ---
 
@@ -441,4 +436,4 @@ These files control the auto-balance dropdown and active key indicator — add y
 
 If something is unclear or you'd like to discuss a larger change before starting, open an issue and we'll figure it out together.
 
-Happy contributing! 🚀
+Happy contributing!

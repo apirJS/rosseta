@@ -3,7 +3,8 @@ import {
   KeySelectionMode,
   type KeySelectionModeValue,
 } from '../../../core/domain/credential/KeySelectionMode';
-import type { Provider } from '../../../core/domain/credential/Provider';
+import type { AnyProvider } from '../../../core/domain/credential/Provider';
+
 import { success, failure, type Result } from '../../../shared/types/Result';
 import { StorageError, type AppError } from '../../../shared/errors';
 import * as browser from 'webextension-polyfill';
@@ -23,7 +24,6 @@ export class BrowserKeySelectionStorageAdapter implements IKeySelectionStorage {
 
       const parsed = KeySelectionMode.fromRaw(raw);
       if (!parsed.success) {
-        // Invalid stored value → reset to manual
         await browser.storage.local.remove(MODE_KEY);
         return success(KeySelectionMode.manual());
       }
@@ -51,20 +51,22 @@ export class BrowserKeySelectionStorageAdapter implements IKeySelectionStorage {
   }
 
   async getLastUsedId(
-    provider: Provider,
+    provider: AnyProvider,
   ): Promise<Result<string | null, AppError>> {
     try {
       const key = `${LAST_USED_PREFIX}${provider}`;
       const result = await browser.storage.local.get(key);
       const id = result[key] as string | undefined;
-      return success(id ?? null);
+      if (id) return success(id);
+
+      return success(null);
     } catch {
       return failure(StorageError.readFailed(`${LAST_USED_PREFIX}${provider}`));
     }
   }
 
   async setLastUsedId(
-    provider: Provider,
+    provider: AnyProvider,
     credentialId: string,
   ): Promise<Result<void, AppError>> {
     try {

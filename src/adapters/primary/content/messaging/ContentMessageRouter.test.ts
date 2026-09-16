@@ -92,6 +92,7 @@ describe('Adapter: ContentMessageRouter', () => {
           language: { code: 'ja-JP', name: 'Japanese' },
           text: 'こんにちは',
           romanization: 'konnichiwa',
+          blockIndex: 0,
         },
       ],
       translated: [
@@ -99,6 +100,7 @@ describe('Adapter: ContentMessageRouter', () => {
           language: { code: 'en-US', name: 'English' },
           text: 'Hello',
           romanization: null,
+          blockIndex: 0,
         },
       ],
       description: 'A greeting',

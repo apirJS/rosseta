@@ -1,47 +1,36 @@
 <script lang="ts">
   import { Select } from '../../../../shared/components';
-  import { ProviderRegistry } from '../../../../../../../core/domain/provider/ProviderRegistry';
-  import type { Provider } from '../../../../../../../core/domain/credential/Provider';
+  import { getModelsStateContext } from '../../../../shared/context';
 
   interface Props {
     value: string;
-    provider?: Provider;
+    provider?: string;
     onchange?: (value: string) => void;
+    disabled?: boolean;
   }
 
-  const { value, provider, onchange }: Props = $props();
+  const { value, provider, onchange, disabled = false }: Props = $props();
 
-  const options = $derived.by(() => {
-    const activeProvider = provider ?? 'gemini';
-    return ProviderRegistry.getModelsForProvider(activeProvider).map((m) => ({
-      value: m.id,
-      label: m.name,
-    }));
-  });
+  const models = getModelsStateContext();
 
-  const effectiveValue = $derived.by(() => {
-    const activeProvider = provider ?? 'gemini';
-    const match = options.find((o) => o.value === value);
-    if (match) return value;
-    return ProviderRegistry.getDefaultModelId(activeProvider);
-  });
+  const providerModels = $derived(models.modelsFor(provider ?? 'google'));
+  const isDisabled = $derived(disabled || providerModels.length === 0);
 
-  // Auto-select default model when current value doesn't match provider
-  $effect(() => {
-    if (effectiveValue !== value && options.length > 0) {
-      onchange?.(effectiveValue);
-    }
-  });
-
-  function handleChange(newValue: string) {
-    onchange?.(newValue);
-  }
+  const options = $derived(
+    isDisabled
+      ? [{ value: '', label: '—', disabled: true, hidden: true }]
+      : providerModels.map((m) => ({
+          value: m.id,
+          label: m.name !== m.id ? `${m.name} (${m.id})` : m.id,
+        })),
+  );
 </script>
 
 <Select
   id="model-select"
   label="Model"
-  value={effectiveValue}
+  value={isDisabled ? '' : value}
   {options}
-  onchange={handleChange}
+  disabled={isDisabled}
+  onchange={onchange}
 />

@@ -1,4 +1,3 @@
-/* === CSS RESET FOR SHADOW DOM === */
 :host {
   all: initial;
   display: block;
@@ -24,16 +23,13 @@
   padding: 0;
 }
 
-/* === THEME VARIABLES === */
 :host {
-  /* Light theme (default) */
   --toast-bg: #ffffff;
   --toast-fg: #1e2328;
   --toast-border: #d8dadd;
   --toast-muted: #6b7280;
   --toast-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.06);
 
-  /* Semantic colors */
   --toast-success: #34a853;
   --toast-error: #ea4335;
   --toast-loading: #ff9940;
@@ -53,7 +49,6 @@
   --toast-info: #8b8f96;
 }
 
-/* === TOAST CONTAINER === */
 .toast-container {
   position: fixed;
   top: 16px;
@@ -66,7 +61,6 @@
   max-width: 380px;
 }
 
-/* === INDIVIDUAL TOAST === */
 .toast {
   position: relative;
   display: flex;
@@ -90,7 +84,6 @@
   animation: toast-fade-out 0.25s ease forwards;
 }
 
-/* Stacking depth effect */
 .toast:nth-child(n + 2) {
   opacity: 0.85;
   transform: scale(0.97);
@@ -106,7 +99,6 @@
   transform: scale(0.91);
 }
 
-/* === TOAST ICON === */
 .toast-icon {
   flex-shrink: 0;
   width: 18px;
@@ -138,7 +130,6 @@
   color: var(--toast-info);
 }
 
-/* === TOAST CONTENT === */
 .toast-content {
   flex: 1;
   min-width: 0;
@@ -158,7 +149,6 @@
   margin-top: 2px;
 }
 
-/* === ACTION BUTTON === */
 .toast-action {
   flex-shrink: 0;
   font-size: 12px;
@@ -179,7 +169,6 @@
   background: var(--toast-border);
 }
 
-/* === CLOSE BUTTON === */
 .toast-close {
   flex-shrink: 0;
   width: 20px;
@@ -209,7 +198,6 @@
   height: 12px;
 }
 
-/* === ANIMATIONS === */
 @keyframes toast-slide-in {
   from {
     opacity: 0;

@@ -11,15 +11,7 @@ const FRAME_COLOR = 'oklch(54.6% 0.245 262.881)';
 const FRAME_WIDTH = '1.5px';
 const FRAME_LENGTH = 20;
 
-/**
- * Handles the visual selection box overlay with camera-frame style corners.
- * Manages DOM creation, styling, and updates during drag selection.
- *
- * The element is mounted inside the provided container (typically a Shadow DOM host)
- * to isolate it from host page styles and event interference.
- */
-export class SelectionBox {
-  private readonly element: HTMLDivElement;
+export class SelectionBox {  private readonly element: HTMLDivElement;
   private readonly winWidth: number;
   private readonly winHeight: number;
   private readonly frameGradient: string;
@@ -48,10 +40,6 @@ export class SelectionBox {
     box.style.left = '0px';
     box.style.width = '0px';
     box.style.height = '0px';
-    // CRITICAL: The border-based positioning technique requires content-box.
-    // Borders must be additive to the content dimensions, not eat into them.
-    // Without this, Tailwind's reset (border-box) or host page CSS collapses
-    // the content area to 0, breaking the selection hole and coordinates.
     box.style.boxSizing = 'content-box';
     box.style.borderStyle = 'solid';
     box.style.borderColor = 'rgba(0, 0, 0, 0.4)';
@@ -64,9 +52,6 @@ export class SelectionBox {
     return box;
   }
 
-  /**
-   * Updates the selection box dimensions and border mask.
-   */
   public update(rect: SelectionRect): void {
     const { left, top, width, height } = rect;
 
@@ -80,9 +65,6 @@ export class SelectionBox {
     this.updateCameraFrame(width, height);
   }
 
-  /**
-   * Updates the camera-frame corner backgrounds based on current dimensions.
-   */
   private updateCameraFrame(width: number, height: number): void {
     const hLen = Math.min(this.frameLength, width / 3);
     const vLen = Math.min(this.frameLength, height / 3);

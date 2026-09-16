@@ -3,8 +3,13 @@ import { sendMessageToRuntime } from '../../../../../../shared/messaging';
 export type TranslationView =
   | 'main'
   | 'manage-api-keys'
-  | 'history'
-  | 'proxy-settings';
+  | 'manage-models'
+  | 'custom-providers'
+  | 'history';
+
+export type MenuDestination = Exclude<TranslationView, 'main'>;
+
+export type PopupNavigation = ReturnType<typeof createHomeController>;
 
 class TranslationControllerState {
   currentView = $state<TranslationView>('main');
@@ -26,6 +31,18 @@ export function createHomeController() {
     state.isMenuOpen = false;
   }
 
+  function showManageModels() {
+    state.slideDirection = 'forward';
+    state.currentView = 'manage-models';
+    state.isMenuOpen = false;
+  }
+
+  function showCustomProviders() {
+    state.slideDirection = 'forward';
+    state.currentView = 'custom-providers';
+    state.isMenuOpen = false;
+  }
+
   function toggleMenu() {
     state.isMenuOpen = !state.isMenuOpen;
   }
@@ -36,7 +53,7 @@ export function createHomeController() {
 
   async function startTranslation() {
     await sendMessageToRuntime({ action: 'START_OVERLAY' });
-    window.close(); // Close popup after triggering
+    window.close();
   }
 
   function showHistory() {
@@ -45,9 +62,13 @@ export function createHomeController() {
     state.isMenuOpen = false;
   }
 
-  function showProxySettings() {
+  function navigateTo(view: TranslationView) {
+    if (view === 'main') {
+      showMain();
+      return;
+    }
     state.slideDirection = 'forward';
-    state.currentView = 'proxy-settings';
+    state.currentView = view;
     state.isMenuOpen = false;
   }
 
@@ -55,8 +76,10 @@ export function createHomeController() {
     state,
     showMain,
     showManageApiKeys,
+    showManageModels,
+    showCustomProviders,
     showHistory,
-    showProxySettings,
+    navigateTo,
     toggleMenu,
     closeMenu,
     startTranslation,

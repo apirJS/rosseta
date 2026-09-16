@@ -1,188 +1,133 @@
 <script lang="ts">
   import {
     getAuthStateContext,
+    getCustomProvidersStateContext,
+    getModelsStateContext,
     getPreferencesStateContext,
+    getPopupToastContext,
   } from '../../../shared/context';
-  import { Icon, ThemeToggle } from '../../../shared/components';
+  import {
+    AddItemBar,
+    EmptyState,
+    PageShell,
+    ProviderSelector,
+    UndoBar,
+  } from '../../../shared/components';
+  import {
+    PROVIDERS,
+    type AnyProvider,
+  } from '../../../../../../core/domain/credential/Provider';
+  import {
+    createManageKeysController,
+    type ManageKeysDeps,
+  } from './ManageKeysController.svelte';
   import ApiKeyListItem from './components/ApiKeyListItem.svelte';
   import ApiKeyViewerModal from './components/ApiKeyViewerModal.svelte';
-  import { useProviderCycle } from '../../../shared/hooks/useProviderCycle.svelte';
 
   interface Props {
     onback: () => void;
   }
 
   const { onback }: Props = $props();
+
   const auth = getAuthStateContext();
   const preferences = getPreferencesStateContext();
-  const provider = useProviderCycle();
+  const models = getModelsStateContext();
+  const customProviders = getCustomProvidersStateContext();
+  const toast = getPopupToastContext();
 
-  let apiKeyInput = $state('');
-  let duplicateError = $state('');
-  let viewingKey = $state<string | null>(null);
-  let pendingDeleteId = $state<string | null>(null);
-  let pendingDeleteTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+  const allProviderIds = $derived([
+    ...PROVIDERS,
+    ...customProviders.state.providers.map((p) => p.id),
+  ]);
 
-  const allKeys = $derived(auth.state.credentials?.items ?? []);
+  const deps: ManageKeysDeps = {
+    credentials: () => auth.state.credentials,
+    addApiKey: auth.addApiKey,
+    removeApiKey: auth.removeApiKey,
+    setActiveKey: auth.setActiveKey,
+    currentKeySelectionMode: () => auth.state.keySelectionMode,
+    setKeySelectionMode: auth.setKeySelectionMode,
+    modelsFor: models.modelsFor,
+    fetchModels: models.fetchModels,
+    clearAllModels: async () => {
+      await Promise.all(
+        allProviderIds.map((provider) => models.clearModels(provider)),
+      );
+    },
+    toast,
+  };
 
-  const visibleKeys = $derived(
-    pendingDeleteId ? allKeys.filter((c) => c.id !== pendingDeleteId) : allKeys,
-  );
+  const controller = createManageKeysController(deps);
 
-  // Dynamic search: filter keys as user types
-  const filteredKeys = $derived.by(() => {
-    const query = apiKeyInput.trim().toLowerCase();
-    if (!query) return visibleKeys;
-    return visibleKeys.filter(
-      (c) =>
-        c.apiKey.value.toLowerCase().includes(query) ||
-        c.provider.toLowerCase().includes(query),
-    );
+  $effect(() => {
+    return () => controller.destroy();
   });
-
-  // Check for duplicate
-  function isDuplicate(rawKey: string): boolean {
-    return allKeys.some((c) => c.apiKey.value === rawKey.trim());
-  }
-
-  async function handleAdd() {
-    const trimmed = apiKeyInput.trim();
-    if (!trimmed) return;
-
-    if (isDuplicate(trimmed)) {
-      duplicateError = 'This API key has already been added.';
-      setTimeout(() => (duplicateError = ''), 3000);
-      return;
-    }
-
-    duplicateError = '';
-    await auth.addApiKey(trimmed);
-    if (!auth.state.error) {
-      apiKeyInput = '';
-    }
-  }
-
-  function commitPendingDelete() {
-    if (!pendingDeleteId) return;
-    if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
-    auth.removeApiKey(pendingDeleteId);
-    pendingDeleteId = null;
-    pendingDeleteTimer = null;
-  }
-
-  function handleDelete(credentialId: string) {
-    commitPendingDelete();
-    pendingDeleteId = credentialId;
-    pendingDeleteTimer = setTimeout(() => {
-      auth.removeApiKey(credentialId);
-      pendingDeleteId = null;
-      pendingDeleteTimer = null;
-    }, 5000);
-  }
-
-  function undoDelete() {
-    if (!pendingDeleteId) return;
-    if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
-    pendingDeleteId = null;
-    pendingDeleteTimer = null;
-  }
 </script>
 
-<div class="flex flex-col h-full w-full bg-background">
-  <!-- Header -->
-  <div class="flex items-center p-4 pb-0">
-    <button
-      type="button"
-      class="flex items-center text-sm text-muted hover:text-foreground cursor-pointer"
-      onclick={() => {
-        commitPendingDelete();
-        onback();
-      }}
-    >
-      <Icon name="arrow-left" class="w-4 h-4 mr-1" />
-    </button>
-    <h2 class="flex-1 text-center text-base font-semibold text-foreground">
-      Manage API Keys
-    </h2>
-    <ThemeToggle
-      isDark={preferences.state.resolvedTheme === 'dark'}
-      onToggle={preferences.toggleTheme}
-    />
-  </div>
-
-  <!-- Content -->
-  <div class="flex-1 flex flex-col px-4 py-4 min-h-0 overflow-hidden">
-    <!-- Add new key -->
-    <div class="flex gap-2 mb-4">
-      <input
-        type="text"
-        class="flex-1 px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary"
-        placeholder={`${provider.current.name} API Key`}
-        bind:value={apiKeyInput}
-        onkeydown={(e) => e.key === 'Enter' && handleAdd()}
+<PageShell
+  onback={() => {
+    controller.commitPendingDelete();
+    onback();
+  }}
+  isDark={preferences.state.resolvedTheme === 'dark'}
+  onToggleTheme={preferences.toggleTheme}
+>
+  {#snippet start()}
+    <div class="w-28 shrink-0">
+      <ProviderSelector
+        value={controller.state.selectedProvider}
+        compact
+        onchange={(value) => controller.setProvider(value as AnyProvider)}
       />
-      <button
-        type="button"
-        class="px-3 py-2 rounded-lg bg-primary text-primary-fg text-sm font-medium hover:opacity-90 cursor-pointer whitespace-nowrap"
-        onclick={handleAdd}
-        disabled={auth.state.loading}
-      >
-        Add +
-      </button>
     </div>
+  {/snippet}
 
-    {#if duplicateError}
-      <p class="text-sm text-destructive mb-3">{duplicateError}</p>
-    {/if}
+  <AddItemBar
+    class="mb-3"
+    type="password"
+    bind:value={controller.state.keyInput}
+    placeholder="Search or add key…"
+    addLabel="Add API key"
+    canAdd={controller.canAddKey}
+    disabled={auth.state.loading}
+    onadd={() => controller.addApiKey()}
+  />
 
-    {#if auth.state.error}
-      <p class="text-sm text-destructive mb-3">{auth.state.error}</p>
-    {/if}
-
-    <!-- Key list -->
-    <div class="flex flex-col gap-2 overflow-y-auto">
-      {#if auth.state.credentials}
-        {#each filteredKeys as credential (credential.id)}
-          <ApiKeyListItem
-            {credential}
-            isActive={auth.state.credentials.activeCredentialId ===
-              credential.id}
-            onSetActive={() => auth.setActiveKey(credential.id)}
-            onDelete={() => handleDelete(credential.id)}
-            onView={() => (viewingKey = credential.apiKey.value)}
-          />
-        {/each}
+  <div class="flex flex-col gap-1.5 overflow-y-auto flex-1">
+    {#each controller.visibleKeys as credential (credential.id)}
+      <ApiKeyListItem
+        {credential}
+        isActive={auth.state.keySelectionMode.isManual &&
+          auth.state.credentials?.activeCredentialId === credential.id}
+        onSetActive={() => controller.setActiveKey(credential)}
+        onDelete={() => controller.requestDelete(credential.id)}
+        onView={() => controller.viewKey(credential.id)}
+      />
+    {:else}
+      {#if !controller.canAddKey}
+        <EmptyState
+          message={controller.providerKeys.length === 0
+            ? 'No API keys for this provider yet. Add one above.'
+            : 'No keys match your search.'}
+        />
       {/if}
-
-      {#if !auth.state.credentials?.hasKeys()}
-        <p class="text-sm text-muted text-center py-4">
-          No API keys added yet.
-        </p>
-      {:else if filteredKeys.length === 0 && !pendingDeleteId}
-        <p class="text-sm text-muted text-center py-4">
-          No keys match your search.
-        </p>
-      {/if}
-    </div>
+    {/each}
   </div>
 
-  <!-- Undo banner -->
-  {#if pendingDeleteId}
-    <div
-      class="flex items-center justify-between px-3 py-2 bg-surface border-t border-border text-sm"
-    >
-      <span class="text-muted">API key deleted</span>
-      <button
-        type="button"
-        class="text-primary font-medium hover:underline cursor-pointer"
-        onclick={undoDelete}
-      >
-        Undo
-      </button>
-    </div>
-  {/if}
-</div>
+  {#snippet footer()}
+    {#if controller.state.pendingDeleteId}
+      <UndoBar
+        message="API key deleted"
+        onundo={() => controller.cancelPendingDelete()}
+      />
+    {/if}
+  {/snippet}
+</PageShell>
 
-{#if viewingKey}
-  <ApiKeyViewerModal apiKey={viewingKey} onclose={() => (viewingKey = null)} />
+{#if controller.viewingKey}
+  <ApiKeyViewerModal
+    apiKey={controller.viewingKey}
+    onclose={() => controller.closeViewer()}
+  />
 {/if}

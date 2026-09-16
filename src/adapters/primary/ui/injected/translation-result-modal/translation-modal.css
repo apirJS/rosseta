@@ -1,4 +1,3 @@
-/* === CSS RESET FOR SHADOW DOM === */
 :host {
   all: initial;
   display: block;
@@ -24,9 +23,7 @@
   padding: 0;
 }
 
-/* === THEME VARIABLES === */
 :host {
-  /* Light theme (default) */
   --modal-bg: #ffffff;
   --modal-fg: #1e2328;
   --modal-surface: #f0f1f3;
@@ -39,7 +36,6 @@
   --modal-shadow:
     0 4px 16px rgba(0, 0, 0, 0.1), 0 12px 40px rgba(0, 0, 0, 0.12);
 
-  /* Per-language gray shades (light theme) */
   --lang-gray-0: #2c3038;
   --lang-gray-1: #454a52;
   --lang-gray-2: #1a1e24;
@@ -62,7 +58,6 @@
   --modal-scrollbar-track: transparent;
   --modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
 
-  /* Per-language gray shades (dark theme) */
   --lang-gray-0: #bfbdb6;
   --lang-gray-1: #9a9892;
   --lang-gray-2: #d6d4ce;
@@ -73,7 +68,6 @@
   --lang-gray-7: #7a7872;
 }
 
-/* === MODAL CONTAINER === */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -105,7 +99,6 @@
   outline: none;
 }
 
-/* === FOOTER DRAG HANDLE === */
 .modal-footer-drag {
   display: flex;
   align-items: center;
@@ -122,7 +115,6 @@
   cursor: grabbing;
 }
 
-/* === HEADER (DRAG HANDLE) === */
 .modal-header {
   display: flex;
   align-items: center;
@@ -165,7 +157,6 @@
   color: var(--modal-fg);
 }
 
-/* === SCROLLABLE BODY === */
 .modal-body {
   flex: 1;
   overflow-y: auto;
@@ -190,7 +181,6 @@
   background: var(--modal-scrollbar-track);
 }
 
-/* === SECTION === */
 .section {
   display: flex;
   flex-direction: column;
@@ -221,7 +211,6 @@
   opacity: 0.7;
 }
 
-/* === TEXT BOX (scrollable) === */
 .text-box {
   background: var(--modal-surface);
   border: 1px solid var(--modal-border);
@@ -244,13 +233,16 @@
   border-radius: 2px;
 }
 
-/* === TEXT CONTENT === */
 .text-content {
   font-size: 15px;
   font-weight: 400;
   color: var(--modal-fg);
   line-height: 1.5;
-  display: inline;
+  display: block;
+}
+
+.text-block {
+  display: block;
 }
 
 .text-segment {
@@ -262,12 +254,10 @@
     filter 0.15s ease;
 }
 
-/* Text segment highlight (when hovering its romanization) */
 .text-segment.seg-highlight {
   color: var(--modal-primary) !important;
 }
 
-/* Unique gray shade per detected language */
 .lang-gray-0 {
   color: var(--lang-gray-0);
 }
@@ -300,19 +290,16 @@
   margin-top: 4px;
 }
 
-/* Individual romanization spans */
 .rom-segment {
   cursor: default;
   transition: font-size 0.15s ease;
 }
 
-/* Romanization highlight (when hovering its text segment) */
 .rom-segment.rom-highlight {
   font-size: 14px;
   color: var(--modal-fg);
 }
 
-/* === DESCRIPTION BOX === */
 .description-box {
   background: var(--modal-surface);
   border: 1px solid var(--modal-border);
@@ -338,7 +325,6 @@
   line-height: 1.5;
 }
 
-/* === RESIZE HANDLE === */
 .resize-handle {
   display: flex;
   align-items: center;
@@ -372,7 +358,6 @@
   opacity: 0.7;
 }
 
-/* === ACTION BAR === */
 .action-bar {
   display: flex;
   align-items: center;
@@ -381,7 +366,6 @@
   padding-top: 4px;
 }
 
-/* === ICON BUTTON === */
 .icon-btn {
   display: flex;
   align-items: center;
@@ -417,7 +401,6 @@
   height: 18px;
 }
 
-/* Small icon button (for section headers) */
 .icon-btn-sm {
   width: 22px;
   height: 22px;
@@ -432,7 +415,6 @@
   color: var(--modal-primary);
 }
 
-/* === COPY FEEDBACK === */
 .copy-feedback {
   color: #81c784;
 }

@@ -1,10 +1,3 @@
-/**
- * Shared mapper that converts a parsed API translation response
- * into a domain Translation entity.
- *
- * Used by both GeminiTranslationAdapter and GroqTranslationAdapter
- * to avoid duplicated mapToDomain logic.
- */
 import { v4 as uuidv4 } from 'uuid';
 import { Language } from '../../../core/domain/translation/Language';
 import { TextSegment } from '../../../core/domain/translation/TextSegment';
@@ -12,7 +5,6 @@ import { Translation } from '../../../core/domain/translation/Translation';
 import { success, failure, type Result } from '../../../shared/types/Result';
 import { TranslationError, type AppError } from '../../../shared/errors';
 
-/** Shape shared by both Gemini and Groq response schemas. */
 export interface TranslationData {
   originalText: {
     contents: {
@@ -20,6 +12,7 @@ export interface TranslationData {
       languageBcp47Code: string;
       language: string;
       romanization: string | null;
+      blockIndex: number;
     }[];
   };
   translatedText: {
@@ -28,18 +21,12 @@ export interface TranslationData {
       languageBcp47Code: string;
       language: string;
       romanization: string | null;
+      blockIndex: number;
     }[];
   };
-  description: string;
+  description?: string | null;
 }
 
-/**
- * Maps a raw API translation response to a domain Translation.
- *
- * @param data - The parsed and validated translation data from the API
- * @param targetLanguage - The target language domain object
- * @param tag - A short provider tag for log messages (e.g. "GEMINI", "GROQ")
- */
 export function mapResponseToDomain(
   data: TranslationData,
   targetLanguage: Language,
@@ -47,6 +34,13 @@ export function mapResponseToDomain(
 ): Result<Translation, AppError> {
   const originalSegments: TextSegment[] = [];
   const translatedSegments: TextSegment[] = [];
+
+  if (data.originalText.contents.length !== data.translatedText.contents.length) {
+    console.error(
+      `[${tag}] Segment count mismatch — original: ${data.originalText.contents.length}, translated: ${data.translatedText.contents.length}`,
+    );
+    return failure(TranslationError.malformedResponse());
+  }
 
   for (const item of data.originalText.contents) {
     const bcp47Code = item.languageBcp47Code;
@@ -71,6 +65,7 @@ export function mapResponseToDomain(
       item.text,
       lang,
       item.romanization,
+      item.blockIndex,
     );
     if (!segmentResult.success) {
       console.error(`[${tag}] TextSegment.create failed:`, segmentResult.error);
@@ -85,6 +80,7 @@ export function mapResponseToDomain(
       item.text,
       targetLanguage,
       item.romanization,
+      item.blockIndex,
     );
     if (!segmentResult.success) {
       console.error(
@@ -101,7 +97,7 @@ export function mapResponseToDomain(
     uuidv4(),
     originalSegments,
     translatedSegments,
-    data.description,
+    data.description ?? '',
     new Date(),
   );
 

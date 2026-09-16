@@ -28,9 +28,12 @@ describe('Application: GetCredentialsUseCase', () => {
     const { storage, useCase } = createUseCase();
 
     const creds = Credentials.createEmpty('creds-1');
-    const apiKey = ApiKey.create('AIzaSyTestKeyForGetCreds0000000000000000');
+    const apiKey = ApiKey.createWithProvider(
+      'AIzaSyTestKeyForGetCreds0000000000000000',
+      'google',
+    );
     if (!apiKey.success) throw new Error('Test helper: invalid API key');
-    const cred = Credential.create('cred-1', apiKey.data, 'gemini');
+    const cred = Credential.create('cred-1', apiKey.data, 'google');
     if (!cred.success) throw new Error('Test helper: invalid credential');
     storage.seedWith(creds.add(cred.data));
 

@@ -25,13 +25,13 @@ describe('Application: GetKeySelectionModeUseCase', () => {
 
   test('returns previously set mode', async () => {
     const { storage, useCase } = createUseCase();
-    storage.seedMode(KeySelectionMode.autoBalanceGemini());
+    storage.seedMode(KeySelectionMode.autoBalance('google'));
 
     const result = await useCase.execute();
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.value).toBe('auto-balance:gemini');
+      expect(result.data.value).toBe('auto-balance:google');
     }
   });
 

@@ -1,6 +1,3 @@
-/**
- * Options for creating a Shadow DOM host element.
- */
 export interface ShadowDomHostOptions {
   hostId: string;
   styles: string;
@@ -8,21 +5,12 @@ export interface ShadowDomHostOptions {
   containerStyles?: Partial<CSSStyleDeclaration>;
 }
 
-/**
- * Result of creating a Shadow DOM host.
- */
 export interface ShadowDomHostResult {
   host: HTMLElement;
   shadowRoot: ShadowRoot;
   appContainer: HTMLElement;
 }
 
-/**
- * Factory for creating isolated Shadow DOM host elements.
- *
- * Consolidates the duplicated pattern used across overlay, modal,
- * and toast mounting into a single reusable function.
- */
 export function createShadowDomHost(
   options: ShadowDomHostOptions,
 ): ShadowDomHostResult {

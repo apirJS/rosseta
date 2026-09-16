@@ -4,9 +4,9 @@
     type SegmentPayload,
   } from './TranslationModalController.svelte';
   import ModalHeader from './components/ModalHeader.svelte';
+  import ModalSection from './components/ModalSection.svelte';
   import TextSection from './components/TextSection.svelte';
   import DescriptionSection from './components/DescriptionSection.svelte';
-  import CopyButton from './components/CopyButton.svelte';
 
   interface Props {
     id: string;
@@ -19,6 +19,7 @@
 
   const { original, translated, description, detachModal }: Props = $props();
 
+  // svelte-ignore state_referenced_locally
   const ctrl = new TranslationModalController({
     original,
     translated,
@@ -26,32 +27,6 @@
     detachModal,
   });
 
-  // --- Hovered language label (overrides "Mixed" when hovering a segment) ---
-  let hoveredLangLabel = $state<string | null>(null);
-
-  // --- Cross-highlight: track which segment index is hovered in either section ---
-  let hoveredSegmentIndex = $state<number | null>(null);
-  // Which side is being hovered ('original' | 'translated' | null)
-  let hoveredSide = $state<'original' | 'translated' | null>(null);
-
-  const displayedLangLabel = $derived(
-    hoveredLangLabel ?? ctrl.detectedLanguageLabel,
-  );
-
-  function handleSegmentHover(label: string | null) {
-    hoveredLangLabel = label;
-  }
-
-  function handleOriginalIndexHover(index: number | null) {
-    hoveredSegmentIndex = index;
-    hoveredSide = index != null ? 'original' : null;
-  }
-
-  function handleTranslatedIndexHover(index: number | null) {
-    hoveredSegmentIndex = index;
-    hoveredSide = index != null ? 'translated' : null;
-  }
-  // Auto-focus this modal's backdrop so it receives keyboard events
   let backdropEl: HTMLDivElement;
   $effect(() => {
     backdropEl?.focus();
@@ -63,7 +38,6 @@
   role="presentation"
   bind:this={backdropEl}
   tabindex="-1"
-  onkeydown={ctrl.handleKeydown}
   onpointerdown={() => backdropEl?.focus()}
 >
   <div
@@ -79,73 +53,48 @@
     />
 
     <div class="modal-body">
-      <!-- Original -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-label"
-            >Original <span class="section-label-tag"
-              >— {displayedLangLabel}</span
-            ></span
-          >
-          <CopyButton
-            small
-            state={ctrl.originalCopy}
-            onclick={ctrl.copyOriginal}
-          />
-        </div>
+      <ModalSection
+        label="Original"
+        labelTag={ctrl.displayedLangLabel}
+        copyState={ctrl.originalCopy}
+        oncopy={ctrl.copyOriginal}
+      >
         <TextSection
-          segments={ctrl.original}
+          blocks={ctrl.originalBlocks}
           langColorMap={ctrl.langColorMap}
           isMultiLang={ctrl.isMultiLang}
           hasRomanization={ctrl.originalHasRomanization}
-          onSegmentHover={handleSegmentHover}
-          crossHighlightIndex={hoveredSide === 'translated'
-            ? hoveredSegmentIndex
-            : null}
-          onSegmentIndexHover={handleOriginalIndexHover}
+          onSegmentHover={ctrl.setHoveredLanguageLabel}
+          crossHighlightIndex={ctrl.originalCrossHighlight}
+          onSegmentIndexHover={ctrl.hoverOriginalSegment}
         />
-      </div>
+      </ModalSection>
 
-      <!-- Translated -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-label"
-            >Translated <span class="section-label-tag"
-              >— {ctrl.targetLanguageLabel}</span
-            ></span
-          >
-          <CopyButton
-            small
-            state={ctrl.translatedCopy}
-            onclick={ctrl.copyTranslated}
-          />
-        </div>
+      <ModalSection
+        label="Translated"
+        labelTag={ctrl.targetLanguageLabel}
+        copyState={ctrl.translatedCopy}
+        oncopy={ctrl.copyTranslated}
+      >
         <TextSection
-          segments={ctrl.translated}
+          blocks={ctrl.translatedBlocks}
           langColorMap={ctrl.langColorMap}
           isMultiLang={false}
           hasRomanization={ctrl.translatedHasRomanization}
-          crossHighlightIndex={hoveredSide === 'original'
-            ? hoveredSegmentIndex
-            : null}
-          onSegmentIndexHover={handleTranslatedIndexHover}
+          crossHighlightIndex={ctrl.translatedCrossHighlight}
+          onSegmentIndexHover={ctrl.hoverTranslatedSegment}
         />
-      </div>
+      </ModalSection>
 
-      <!-- Description -->
       {#if ctrl.description}
-        <div class="section">
-          <div class="section-header">
-            <span class="section-label">Description</span>
-            <CopyButton
-              small
-              state={ctrl.descriptionCopy}
-              onclick={ctrl.copyDescription}
-              label="Copy description"
-            />
-          </div>
+        <ModalSection
+          label="Description"
+          copyState={ctrl.descriptionCopy}
+          oncopy={ctrl.copyDescription}
+          copyLabel="Copy description"
+        >
           <DescriptionSection text={ctrl.description} />
-        </div>
+        </ModalSection>
       {/if}
     </div>
 

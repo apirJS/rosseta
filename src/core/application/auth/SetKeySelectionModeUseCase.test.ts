@@ -6,15 +6,19 @@ import { KeySelectionMode } from '../../domain/credential/KeySelectionMode';
 import { Credentials } from '../../domain/credential/Credentials';
 import { Credential } from '../../domain/credential/Credential';
 import { ApiKey } from '../../domain/credential/ApiKey';
-import { AuthError, ErrorCode } from '../../../shared/errors';
+import { ValidationError, ErrorCode } from '../../../shared/errors';
 
-const GEMINI_KEY_1 = 'AIzaSyA1234567890abcdefghijklmnopqrstuv';
-const GEMINI_KEY_2 = 'AIzaSyB1234567890abcdefghijklmnopqrstuv';
+const GOOGLE_KEY_1 = 'AIzaSyA1234567890abcdefghijklmnopqrstuv';
+const GOOGLE_KEY_2 = 'AIzaSyB1234567890abcdefghijklmnopqrstuv';
 const GROQ_KEY_1 = 'gsk_' + 'a'.repeat(52);
 const GROQ_KEY_2 = 'gsk_' + 'b'.repeat(52);
 
-function makeCredential(id: string, raw: string): Credential {
-  const apiKey = ApiKey.create(raw);
+function makeCredential(
+  id: string,
+  raw: string,
+  provider: 'google' | 'groq',
+): Credential {
+  const apiKey = ApiKey.createWithProvider(raw, provider);
   if (!apiKey.success) throw new Error('Test helper: invalid API key');
   const cred = Credential.create(id, apiKey.data, apiKey.data.provider);
   if (!cred.success) throw new Error('Test helper: invalid credential');
@@ -40,14 +44,14 @@ describe('Application: SetKeySelectionModeUseCase', () => {
     expect(result.success).toBe(true);
   });
 
-  test('sets auto-balance:gemini when ≥ 2 gemini keys exist', async () => {
+  test('sets auto-balance:google when ≥ 2 google keys exist', async () => {
     const { credentialStorage, useCase } = createUseCase();
     const creds = Credentials.createEmpty('creds-1')
-      .add(makeCredential('g1', GEMINI_KEY_1))
-      .add(makeCredential('g2', GEMINI_KEY_2));
+      .add(makeCredential('g1', GOOGLE_KEY_1, 'google'))
+      .add(makeCredential('g2', GOOGLE_KEY_2, 'google'));
     credentialStorage.seedWith(creds);
 
-    const result = await useCase.execute(KeySelectionMode.autoBalanceGemini());
+    const result = await useCase.execute(KeySelectionMode.autoBalance('google'));
 
     expect(result.success).toBe(true);
   });
@@ -55,39 +59,39 @@ describe('Application: SetKeySelectionModeUseCase', () => {
   test('sets auto-balance:groq when ≥ 2 groq keys exist', async () => {
     const { credentialStorage, useCase } = createUseCase();
     const creds = Credentials.createEmpty('creds-1')
-      .add(makeCredential('q1', GROQ_KEY_1))
-      .add(makeCredential('q2', GROQ_KEY_2));
+      .add(makeCredential('q1', GROQ_KEY_1, 'groq'))
+      .add(makeCredential('q2', GROQ_KEY_2, 'groq'));
     credentialStorage.seedWith(creds);
 
-    const result = await useCase.execute(KeySelectionMode.autoBalanceGroq());
+    const result = await useCase.execute(KeySelectionMode.autoBalance('groq'));
 
     expect(result.success).toBe(true);
   });
 
-  test('fails auto-balance:gemini with only 1 gemini key', async () => {
+  test('fails auto-balance:google with only 1 google key', async () => {
     const { credentialStorage, useCase } = createUseCase();
     const creds = Credentials.createEmpty('creds-1').add(
-      makeCredential('g1', GEMINI_KEY_1),
+      makeCredential('g1', GOOGLE_KEY_1, 'google'),
     );
     credentialStorage.seedWith(creds);
 
-    const result = await useCase.execute(KeySelectionMode.autoBalanceGemini());
+    const result = await useCase.execute(KeySelectionMode.autoBalance('google'));
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBeInstanceOf(AuthError);
-      expect(result.error.code).toBe(ErrorCode.AUTH_INVALID_API_KEY);
+      expect(result.error).toBeInstanceOf(ValidationError);
+      expect(result.error.code).toBe(ErrorCode.VALIDATION_INVALID_INPUT);
     }
   });
 
   test('fails auto-balance when no credentials stored', async () => {
     const { useCase } = createUseCase();
 
-    const result = await useCase.execute(KeySelectionMode.autoBalanceGroq());
+    const result = await useCase.execute(KeySelectionMode.autoBalance('groq'));
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBeInstanceOf(AuthError);
+      expect(result.error).toBeInstanceOf(ValidationError);
     }
   });
 });

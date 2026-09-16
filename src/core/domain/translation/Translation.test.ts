@@ -70,12 +70,14 @@ describe('Domain: Translation', () => {
           languageCode: 'ja-JP',
           languageName: Language.create('ja-JP').name,
           romanization: 'konnichiwa',
+          blockIndex: 0,
         },
         {
           text: '世界',
           languageCode: 'ja-JP',
           languageName: Language.create('ja-JP').name,
           romanization: 'sekai',
+          blockIndex: 0,
         },
       ]);
 
@@ -85,12 +87,14 @@ describe('Domain: Translation', () => {
           languageCode: 'en-US',
           languageName: Language.create('en-US').name,
           romanization: null,
+          blockIndex: 0,
         },
         {
           text: 'World',
           languageCode: 'en-US',
           languageName: Language.create('en-US').name,
           romanization: null,
+          blockIndex: 0,
         },
       ]);
     });

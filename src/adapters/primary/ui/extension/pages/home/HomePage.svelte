@@ -1,187 +1,85 @@
 <script lang="ts">
   import {
     getAuthStateContext,
+    getCustomProvidersStateContext,
+    getModelsStateContext,
+    getPopupToastContext,
     getPreferencesStateContext,
-    getTranslationContext,
   } from '../../../shared/context';
-  import { ThemeToggle } from '../../../shared/components';
-  import { createHomeController } from './HomeController.svelte';
+  import { Checkbox } from '../../../shared/components';
+  import type { LanguageCode } from '../../../shared/constants/languages';
+  import { createMainPageController } from './MainPageController.svelte';
+  import type { PopupNavigation } from './HomeController.svelte';
+  import MainHeader from './components/MainHeader.svelte';
   import ActiveKeyIndicator from './components/ActiveKeyIndicator.svelte';
-  import AppMenu from './components/AppMenu.svelte';
   import ModelSelector from './components/ModelSelector.svelte';
   import LanguageSelector from './components/LanguageSelector.svelte';
   import TranslateButton from './components/TranslateButton.svelte';
-  import LogoutConfirmModal from './components/LogoutConfirmModal.svelte';
-  import HistoryPage from '../history/HistoryPage.svelte';
-  import ManageKeysPage from '../manage-keys/ManageKeysPage.svelte';
-  import ProxySettingsPage from '../proxy-settings/ProxySettingsPage.svelte';
-  import type { LanguageCode } from '../../../shared/constants/languages';
+
+  interface Props {
+    navigation: PopupNavigation;
+  }
+
+  const { navigation }: Props = $props();
 
   const auth = getAuthStateContext();
   const preferences = getPreferencesStateContext();
-  const translation = getTranslationContext();
-  const controller = createHomeController();
+  const models = getModelsStateContext();
+  const customProviders = getCustomProvidersStateContext();
+  const toast = getPopupToastContext();
 
-  const activeCredential = $derived(
-    auth.state.credentials?.getActive() ?? null,
-  );
-  const activeProvider = $derived.by(() => {
-    const mode = auth.state.keySelectionMode;
-    if (mode.isAutoBalance) {
-      return mode.autoBalanceProvider!;
-    }
-    return activeCredential?.provider ?? 'gemini';
-  });
-
-  let showLogoutModal = $state(false);
-
-  function handleLogoutClick() {
-    controller.closeMenu();
-    showLogoutModal = true;
-  }
-
-  async function handleLogoutConfirm(deleteHistory: boolean) {
-    showLogoutModal = false;
-    if (deleteHistory) {
-      await translation.clearAllTranslations.execute();
-    }
-    auth.logout();
-  }
-
-  function handleLogoutCancel() {
-    showLogoutModal = false;
-  }
-
-  function handleManageKeys() {
-    controller.closeMenu();
-    controller.showManageApiKeys();
-  }
-
-  function handleProxySettings() {
-    controller.closeMenu();
-    controller.showProxySettings();
-  }
-
-  let menuAreaEl = $state<HTMLDivElement>();
-
-  $effect(() => {
-    if (!controller.state.isMenuOpen) return;
-
-    function handleClickOutside(e: PointerEvent) {
-      if (menuAreaEl && !menuAreaEl.contains(e.target as Node)) {
-        controller.closeMenu();
-      }
-    }
-
-    document.addEventListener('pointerdown', handleClickOutside);
-    return () =>
-      document.removeEventListener('pointerdown', handleClickOutside);
+  const controller = createMainPageController({
+    auth,
+    preferences,
+    models,
+    customProviders,
+    toast,
   });
 </script>
 
-<div
-  class="view-container"
-  class:slide-forward={controller.state.slideDirection === 'forward'}
-  class:slide-back={controller.state.slideDirection === 'back'}
->
-  {#key controller.state.currentView}
-    {#if controller.state.currentView === 'manage-api-keys'}
-      <ManageKeysPage onback={controller.showMain} />
-    {:else if controller.state.currentView === 'history'}
-      <HistoryPage onback={controller.showMain} />
-    {:else if controller.state.currentView === 'proxy-settings'}
-      <ProxySettingsPage onback={controller.showMain} />
-    {:else if controller.state.currentView === 'main' && activeCredential}
-      <div class="flex flex-col h-full w-full bg-background">
-        <div class="flex justify-between items-center p-4 pb-0">
-          <div class="relative" bind:this={menuAreaEl}>
-            <ActiveKeyIndicator
-              credential={activeCredential}
-              onMenuToggle={controller.toggleMenu}
-              isMenuOpen={controller.state.isMenuOpen}
-            />
-            {#if controller.state.isMenuOpen}
-              <AppMenu
-                onLogout={handleLogoutClick}
-                onManageKeys={handleManageKeys}
-                onProxySettings={handleProxySettings}
-                onHistory={controller.showHistory}
-                proxyActive={!!preferences.state.proxyUrl}
-              />
-            {/if}
-          </div>
-          <ThemeToggle
-            isDark={preferences.state.resolvedTheme === 'dark'}
-            onToggle={preferences.toggleTheme}
-          />
-        </div>
+<div class="flex flex-col h-full w-full bg-background">
+  <MainHeader
+    isMenuOpen={navigation.state.isMenuOpen}
+    onToggleMenu={navigation.toggleMenu}
+    onCloseMenu={navigation.closeMenu}
+    selectedProvider={controller.effectiveProvider}
+    onProviderChange={controller.changeProvider}
+    isDark={preferences.state.resolvedTheme === 'dark'}
+    onToggleTheme={preferences.toggleTheme}
+    onNavigate={navigation.navigateTo}
+  />
 
-        {#if preferences.state.loaded}
-          <div class="flex-1 flex flex-col justify-center px-4 pb-4 space-y-4">
-            <ModelSelector
-              value={preferences.state.selectedModel.id}
-              provider={activeProvider}
-              onchange={preferences.setSelectedModel}
-            />
+  {#if preferences.state.loaded}
+    <div class="flex-1 flex flex-col justify-center px-4 pb-4 space-y-4">
+      <ActiveKeyIndicator
+        provider={controller.effectiveProvider}
+        credential={controller.activeCredential}
+      />
 
-            <LanguageSelector
-              value={preferences.state.targetLanguage.code as LanguageCode}
-              provider={activeProvider}
-              onchange={preferences.setTargetLanguage}
-            />
+      <ModelSelector
+        value={controller.effectiveModelId}
+        provider={controller.effectiveProvider}
+        onchange={controller.setSelectedModel}
+      />
 
-            <div class="pt-2">
-              <TranslateButton onclick={controller.startTranslation} />
-            </div>
-          </div>
-        {/if}
-      </div>
+      <LanguageSelector
+        value={preferences.state.targetLanguage.code as LanguageCode}
+        onchange={preferences.setTargetLanguage}
+      />
 
-      {#if showLogoutModal}
-        <LogoutConfirmModal
-          onconfirm={handleLogoutConfirm}
-          oncancel={handleLogoutCancel}
+      <Checkbox
+        label="Enable Description"
+        checked={preferences.state.includeDescription}
+        onChange={(e) =>
+          preferences.setIncludeDescription(e.currentTarget.checked)}
+      />
+
+      <div class="pt-2">
+        <TranslateButton
+          onclick={navigation.startTranslation}
+          disabled={!controller.canTranslate}
         />
-      {/if}
-    {/if}
-  {/key}
+      </div>
+    </div>
+  {/if}
 </div>
-
-<style>
-  .view-container {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .view-container.slide-forward > :global(:first-child) {
-    animation: slide-in-left 0.2s ease-out;
-  }
-
-  .view-container.slide-back > :global(:first-child) {
-    animation: slide-in-right 0.2s ease-out;
-  }
-
-  @keyframes slide-in-left {
-    from {
-      transform: translateX(30%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-
-  @keyframes slide-in-right {
-    from {
-      transform: translateX(-30%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-</style>

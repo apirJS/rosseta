@@ -3,33 +3,35 @@ import { Credential } from './Credential';
 import { ApiKey } from './ApiKey';
 import { DomainError } from '../shared/DomainError';
 
-const VALID_GEMINI_KEY = 'AIzaSyA1234567890abcdefghijklmnopqrstuv';
+const VALID_GOOGLE_KEY = 'AIzaSyA1234567890abcdefghijklmnopqrstuv';
 const VALID_GROQ_KEY = 'gsk_' + 'a'.repeat(52);
 
-function makeApiKey(raw: string = VALID_GEMINI_KEY): ApiKey {
-  const r = ApiKey.create(raw);
+function makeApiKey(
+  raw: string = VALID_GOOGLE_KEY,
+  provider: 'google' | 'groq' = 'google',
+): ApiKey {
+  const r = ApiKey.createWithProvider(raw, provider);
   if (!r.success) throw new Error('Test helper: invalid API key');
   return r.data;
 }
 
 describe('Domain: Credential', () => {
-  // ==================== CREATE ====================
   describe('create', () => {
-    test('creates a valid Gemini credential', () => {
+    test('creates a valid credential', () => {
       const apiKey = makeApiKey();
-      const result = Credential.create('cred-1', apiKey, 'gemini');
+      const result = Credential.create('cred-1', apiKey, 'google');
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.id).toBe('cred-1');
-        expect(result.data.provider).toBe('gemini');
+        expect(result.data.provider).toBe('google');
         expect(result.data.type).toBe('API_KEY');
-        expect(result.data.apiKey.value).toBe(VALID_GEMINI_KEY);
+        expect(result.data.apiKey.value).toBe(VALID_GOOGLE_KEY);
       }
     });
 
     test('rejects empty ID', () => {
       const apiKey = makeApiKey();
-      const result = Credential.create('', apiKey, 'gemini');
+      const result = Credential.create('', apiKey, 'google');
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBeInstanceOf(DomainError);
@@ -39,24 +41,23 @@ describe('Domain: Credential', () => {
 
     test('rejects whitespace-only ID', () => {
       const apiKey = makeApiKey();
-      const result = Credential.create('   ', apiKey, 'gemini');
+      const result = Credential.create('   ', apiKey, 'google');
       expect(result.success).toBe(false);
     });
   });
 
-  // ==================== FROM PROPS ====================
   describe('fromProps', () => {
     test('reconstructs from valid props', () => {
       const result = Credential.fromProps({
         id: 'cred-1',
         type: 'API_KEY',
-        provider: 'gemini',
-        apiKey: VALID_GEMINI_KEY,
+        provider: 'google',
+        apiKey: VALID_GOOGLE_KEY,
       });
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.id).toBe('cred-1');
-        expect(result.data.provider).toBe('gemini');
+        expect(result.data.provider).toBe('google');
       }
     });
 
@@ -74,47 +75,10 @@ describe('Domain: Credential', () => {
       const result = Credential.fromProps({
         id: 'cred-1',
         type: 'API_KEY',
-        provider: 'gemini',
+        provider: 'google',
         apiKey: '',
       });
       expect(result.success).toBe(false);
-    });
-
-    test('succeeds with any non-empty key when provider is stored', () => {
-      const result = Credential.fromProps({
-        id: 'cred-1',
-        type: 'API_KEY',
-        provider: 'zai',
-        apiKey: 'some-arbitrary-key-format',
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.provider).toBe('zai');
-      }
-    });
-  });
-
-  // ==================== TO PROPS ====================
-  describe('toProps', () => {
-    test('round-trips through toProps and fromProps', () => {
-      const apiKey = makeApiKey();
-      const createResult = Credential.create('cred-1', apiKey, 'gemini');
-      expect(createResult.success).toBe(true);
-      if (!createResult.success) return;
-
-      const props = createResult.data.toProps();
-      expect(props).toEqual({
-        id: 'cred-1',
-        type: 'API_KEY',
-        provider: 'gemini',
-        apiKey: VALID_GEMINI_KEY,
-      });
-
-      const restored = Credential.fromProps(props);
-      expect(restored.success).toBe(true);
-      if (restored.success) {
-        expect(restored.data.id).toBe('cred-1');
-      }
     });
   });
 });

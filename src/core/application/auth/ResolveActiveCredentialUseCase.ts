@@ -13,7 +13,6 @@ export class ResolveActiveCredentialUseCase implements IResolveActiveCredentialU
   ): Promise<Result<Credential, AppError>> {
     const modeResult = await this.keySelectionStorage.getMode();
     if (!modeResult.success) {
-      // Fallback to manual if storage fails
       return this.resolveManual(credentials);
     }
 
@@ -23,7 +22,6 @@ export class ResolveActiveCredentialUseCase implements IResolveActiveCredentialU
       return this.resolveManual(credentials);
     }
 
-    // Auto-balance mode
     const provider = mode.autoBalanceProvider;
     if (!provider) {
       return this.resolveManual(credentials);
@@ -31,7 +29,6 @@ export class ResolveActiveCredentialUseCase implements IResolveActiveCredentialU
 
     const providerKeys = credentials.getByProvider(provider);
     if (providerKeys.length < 2) {
-      // Not enough keys — fall back to manual
       return this.resolveManual(credentials);
     }
 
@@ -44,8 +41,18 @@ export class ResolveActiveCredentialUseCase implements IResolveActiveCredentialU
       return this.resolveManual(credentials);
     }
 
-    // Persist the last used ID for next rotation
-    await this.keySelectionStorage.setLastUsedId(provider, next.id);
+    const rotationResult = await this.keySelectionStorage.setLastUsedId(
+      provider,
+      next.id,
+    );
+    if (!rotationResult.success) {
+      // Non-fatal: the request still goes out on `next`, but without a
+      // persisted cursor the rotation will hand back the same key next time.
+      console.warn(
+        '[ResolveActiveCredential] Could not persist round-robin cursor — rotation may repeat a key:',
+        rotationResult.error,
+      );
+    }
 
     return success(next);
   }

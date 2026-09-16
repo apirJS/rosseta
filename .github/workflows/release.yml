@@ -6,14 +6,19 @@ on:
       - main
       - beta
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
-  contents: write
-  issues: write
+  contents: read
 
 jobs:
   verify:
     name: Verify & Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
       - name: Setup Bun
@@ -26,11 +31,16 @@ jobs:
         run: bun run check
       - name: Run Test
         run: bun run test
+      - name: Build (production)
+        run: bun run build:prod
 
   release:
     name: Semantic Release
     needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
     steps:
       - uses: actions/checkout@v6
         with:

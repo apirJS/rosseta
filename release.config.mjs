@@ -62,10 +62,13 @@ export default {
       },
     ],
 
-    // Create the GitHub Release and upload the generated Zip file
+    // Create the GitHub Release as a draft and upload the generated Zip file.
+    // A human clicks "Publish release" to promote it, which is what fires the
+    // `release: published` workflows that upload to the stores.
     [
       '@semantic-release/github',
       {
+        draftRelease: true,
         assets: [
           { path: 'chrome-v*.zip', label: 'Chrome Extension (Zip)' },
           { path: 'firefox-v*.zip', label: 'Firefox Extension (Zip)' },

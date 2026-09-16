@@ -1,9 +1,3 @@
-/**
- * Shared test fixtures used across adapter tests.
- *
- * Centralizes domain object factories, API response envelopes,
- * and mock storage seeding to avoid duplication.
- */
 import { v4 as uuidv4 } from 'uuid';
 import { ApiKey } from '../src/core/domain/credential/ApiKey';
 import { Credential } from '../src/core/domain/credential/Credential';
@@ -11,16 +5,12 @@ import { Credentials } from '../src/core/domain/credential/Credentials';
 import { UserPreferences } from '../src/core/domain/preferences/UserPreferences';
 import { EncodedImage } from '../src/core/domain/image/EncodedImage';
 import { Language } from '../src/core/domain/translation/Language';
-import type { TranslationResponse } from '../src/adapters/secondary/gemini/schema';
-import type { GroqTranslationResponse } from '../src/adapters/secondary/groq/schema';
-import type { ZaiTranslationResponse } from '../src/adapters/secondary/zai/schema';
+import type { TranslationSchemaOutput } from '../src/adapters/secondary/shared/translation-schema';
 import { seedStore } from './browser-mock';
+import type { Provider } from '../src/core/domain/credential/Provider';
 
-// ── Constants ────────────────────────────────────────────────────────
-
-/** A minimal valid 1×1 PNG as a data URL. */
 export const VALID_IMAGE_BASE64 =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualrQAAAABJRU5ErkJggg==';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVRQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVRQI12P4z8BQDwAEgAF/QualrQAAAABJRU5ErkJggg==';
 
 export const VALID_IMAGE = (() => {
   const result = EncodedImage.create(VALID_IMAGE_BASE64);
@@ -30,14 +20,9 @@ export const VALID_IMAGE = (() => {
 
 export const TARGET_LANGUAGE = Language.create('en-US');
 
-/**
- * A valid translation API response body.
- * Both Gemini and Groq use the same inner shape.
- */
-export const VALID_TRANSLATION_RESPONSE: TranslationResponse &
-  GroqTranslationResponse &
-  ZaiTranslationResponse = {
+export const VALID_TRANSLATION_RESPONSE: TranslationSchemaOutput = {
   success: true,
+  error: null,
   data: {
     description: 'A greeting in Japanese',
     originalText: {
@@ -47,6 +32,7 @@ export const VALID_TRANSLATION_RESPONSE: TranslationResponse &
           language: 'Japanese',
           romanization: 'konnichiwa',
           text: 'こんにちは',
+          blockIndex: 0,
         },
       ],
     },
@@ -57,98 +43,51 @@ export const VALID_TRANSLATION_RESPONSE: TranslationResponse &
           language: 'English',
           romanization: null,
           text: 'Hello',
+          blockIndex: 0,
         },
       ],
     },
   },
 };
 
-// ── API Envelope Wrappers ────────────────────────────────────────────
-
-/** Wrap a TranslationResponse in the Gemini API envelope. */
-export function geminiEnvelope(response: TranslationResponse): object {
-  return {
-    candidates: [
-      {
-        content: {
-          parts: [{ text: JSON.stringify(response) }],
-        },
-      },
-    ],
-  };
-}
-
-/** Wrap a GroqTranslationResponse in the OpenAI-compatible envelope. */
-export function groqEnvelope(response: GroqTranslationResponse): object {
-  return {
-    choices: [
-      {
-        message: {
-          content: JSON.stringify(response),
-        },
-      },
-    ],
-  };
-}
-
-/** Wrap a ZaiTranslationResponse in the OpenAI-compatible envelope. */
-export function zaiEnvelope(response: ZaiTranslationResponse): object {
-  return {
-    choices: [
-      {
-        message: {
-          content: JSON.stringify(response),
-        },
-      },
-    ],
-  };
-}
-
-// ── Credential & Preferences Factories ──────────────────────────────
-
-const GEMINI_KEY = 'AIza' + 'X'.repeat(35);
+const GOOGLE_KEY = 'AIza' + 'X'.repeat(35);
 const GROQ_KEY = 'gsk_' + 'X'.repeat(52);
-const ZAI_KEY = 'a'.repeat(32) + '.abcdefghijklmn';
+const XAI_KEY = 'a'.repeat(32) + '.abcdefghijklmn';
 
-export function createGeminiCredential(): Credential {
-  const apiKey = ApiKey.create(GEMINI_KEY);
+function createCredentialFor(
+  rawKey: string,
+  provider: Provider,
+): Credential {
+  const apiKey = ApiKey.createWithProvider(rawKey, provider);
   if (!apiKey.success) throw apiKey.error;
-  const credential = Credential.create(uuidv4(), apiKey.data, 'gemini');
+  const credential = Credential.create(uuidv4(), apiKey.data, provider);
   if (!credential.success) throw credential.error;
   return credential.data;
+}
+
+export function createGoogleCredential(): Credential {
+  return createCredentialFor(GOOGLE_KEY, 'google');
 }
 
 export function createGroqCredential(): Credential {
-  const apiKey = ApiKey.create(GROQ_KEY);
-  if (!apiKey.success) throw apiKey.error;
-  const credential = Credential.create(uuidv4(), apiKey.data, 'groq');
-  if (!credential.success) throw credential.error;
-  return credential.data;
+  return createCredentialFor(GROQ_KEY, 'groq');
 }
 
-export function createZaiCredential(): Credential {
-  const apiKey = ApiKey.create(ZAI_KEY);
-  if (!apiKey.success) throw apiKey.error;
-  const credential = Credential.create(uuidv4(), apiKey.data, 'zai');
-  if (!credential.success) throw credential.error;
-  return credential.data;
+export function createXaiCredential(): Credential {
+  return createCredentialFor(XAI_KEY, 'xai');
 }
 
 export function createDefaultPreferences(): UserPreferences {
   return UserPreferences.createDefault(uuidv4());
 }
 
-/**
- * Seeds the browser mock store with serialized credentials and preferences.
- * The credential is set as the active key.
- */
 export function seedCredentialsAndPreferences(
-  provider: 'gemini' | 'groq' | 'zai' = 'groq',
+  provider: 'google' | 'groq' | 'xai' = 'groq',
 ) {
   const credentialFactories = {
-    gemini: createGeminiCredential,
+    google: createGoogleCredential,
     groq: createGroqCredential,
-    zai: createZaiCredential,
+    xai: createXaiCredential,
   };
   const credential = credentialFactories[provider]();
 

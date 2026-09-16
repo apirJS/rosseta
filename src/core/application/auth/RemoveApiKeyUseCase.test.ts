@@ -14,9 +14,12 @@ function createUseCase() {
 
 function seedWithCredentials(storage: FakeCredentialStorage): string {
   const creds = Credentials.createEmpty('creds-1');
-  const apiKey = ApiKey.create('AIzaSyTestKeyForRemove00000000000000000000');
+  const apiKey = ApiKey.createWithProvider(
+    'AIzaSyTestKeyForRemove00000000000000000000',
+    'google',
+  );
   if (!apiKey.success) throw new Error('Test helper: invalid API key');
-  const cred = Credential.create('cred-1', apiKey.data, 'gemini');
+  const cred = Credential.create('cred-1', apiKey.data, 'google');
   if (!cred.success) throw new Error('Test helper: invalid credential');
   storage.seedWith(creds.add(cred.data));
   return 'cred-1';
@@ -48,27 +51,45 @@ describe('Application: RemoveApiKeyUseCase', () => {
     }
   });
 
-  test('works when storage is empty (creates empty credentials)', async () => {
-    const { useCase } = createUseCase();
+  test('promotes next credential when the active key is removed', async () => {
+    const { storage, useCase } = createUseCase();
+    seedWithTwoCredentials(storage);
 
-    const result = await useCase.execute('any-id');
+    const result = await useCase.execute('cred-2');
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.items).toHaveLength(0);
+      expect(result.data.items).toHaveLength(1);
+      expect(result.data.activeCredentialId).toBe('cred-1');
     }
   });
 
-  test('fails when storage.get() fails', async () => {
+  test('fails when storage write fails', async () => {
     const { storage, useCase } = createUseCase();
-    storage.failNextCallWith(StorageError.readFailed('credentials'));
+    seedWithCredentials(storage);
+    storage.failNextCallWith(StorageError.writeFailed('credentials'));
 
-    const result = await useCase.execute('any-id');
+    const result = await useCase.execute('cred-1');
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBeInstanceOf(StorageError);
-      expect(result.error.code).toBe(ErrorCode.STORAGE_READ_FAILED);
+      expect(result.error.code).toBe(ErrorCode.STORAGE_WRITE_FAILED);
     }
   });
 });
+
+function seedWithTwoCredentials(storage: FakeCredentialStorage) {
+  const creds = Credentials.createEmpty('creds-1');
+  const apiKey1 = ApiKey.createWithProvider(
+    'AIzaSyTestKeyForRemove00000000000000000000',
+    'google',
+  );
+  if (!apiKey1.success) throw new Error('bad key');
+  const cred1 = Credential.create('cred-1', apiKey1.data, 'google');
+  if (!cred1.success) throw new Error('bad cred');
+  const apiKey2 = ApiKey.createWithProvider('gsk_' + 'b'.repeat(52), 'groq');
+  if (!apiKey2.success) throw new Error('bad key');
+  const cred2 = Credential.create('cred-2', apiKey2.data, 'groq');
+  if (!cred2.success) throw new Error('bad cred');
+  storage.seedWith(creds.add(cred1.data).add(cred2.data));
+}

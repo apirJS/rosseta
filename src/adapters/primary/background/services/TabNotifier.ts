@@ -1,9 +1,5 @@
 import { sendMessageToTab } from '../../../../shared/messaging';
 
-/**
- * Provides a clean API for sending toast notifications to a specific tab.
- * Wraps the repetitive message-sending pattern used throughout the service worker.
- */
 export class TabNotifier {
   constructor(private readonly tabId: number) {}
 

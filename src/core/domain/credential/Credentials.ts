@@ -2,7 +2,6 @@ import { AggregateRoot } from '../shared/AggregateRoot';
 import { DomainError } from '../shared/DomainError';
 import { failure, success, type Result } from '../../../shared/types/Result';
 import { Credential, type CredentialProps } from './Credential';
-import type { Provider } from './Provider';
 
 export interface CredentialsProps {
   id: string;
@@ -88,18 +87,12 @@ export class Credentials extends AggregateRoot<string> {
     return success(new Credentials(this.id, [...this._items], credentialId));
   }
 
-  /** Filter credentials by provider. */
-  getByProvider(provider: Provider): Credential[] {
+  getByProvider(provider: string): Credential[] {
     return this._items.filter((c) => c.provider === provider);
   }
 
-  /**
-   * Round-robin: return the next credential for a provider after `lastUsedId`.
-   * Wraps around to the first key when reaching the end.
-   * Returns null if no credentials exist for the provider.
-   */
   getNextRoundRobin(
-    provider: Provider,
+    provider: string,
     lastUsedId: string | null,
   ): Credential | null {
     const providerKeys = this.getByProvider(provider);
@@ -108,7 +101,6 @@ export class Credentials extends AggregateRoot<string> {
     if (!lastUsedId) return providerKeys[0];
 
     const lastIndex = providerKeys.findIndex((c) => c.id === lastUsedId);
-    // If not found or at end, wrap to first
     const nextIndex = lastIndex < 0 ? 0 : (lastIndex + 1) % providerKeys.length;
     return providerKeys[nextIndex];
   }

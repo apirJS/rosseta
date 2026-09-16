@@ -1,10 +1,17 @@
-// Barrel export for shared components
+export { default as AddItemBar } from './AddItemBar.svelte';
+export { default as BackButton } from './BackButton.svelte';
 export { default as Button } from './Button.svelte';
+export { default as Checkbox } from './Checkbox.svelte';
 export { default as Divider } from './Divider.svelte';
+export { default as EmptyState } from './EmptyState.svelte';
 export { default as FormError } from './FormError.svelte';
 export { default as Icon } from './Icon.svelte';
 export { default as Input } from './Input.svelte';
 export { default as Link } from './Link.svelte';
 export { default as PageShell } from './PageShell.svelte';
+export { default as PopupToast } from './PopupToast.svelte';
+export { default as PopupToastContainer } from './PopupToastContainer.svelte';
+export { default as ProviderSelector } from './ProviderSelector.svelte';
 export { default as Select } from './Select.svelte';
 export { default as ThemeToggle } from './ThemeToggle.svelte';
+export { default as UndoBar } from './UndoBar.svelte';

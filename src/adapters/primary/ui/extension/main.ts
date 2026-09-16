@@ -17,7 +17,6 @@ const preferencesUseCases = {
   getPreferences: uiContainer.getPreferencesUseCase,
   updatePreferences: uiContainer.updatePreferencesUseCase,
   getShortcut: uiContainer.getShortcutUseCase,
-  checkProxyHealth: uiContainer.checkProxyHealthUseCase,
   onThemeApplied: (theme: 'dark' | 'light') => {
     ExtensionThemeBroadcaster.broadcast(theme);
   },
@@ -29,9 +28,28 @@ const translationUseCases = {
   clearAllTranslations: uiContainer.clearAllTranslationsUseCase,
 };
 
+const modelUseCases = {
+  addCustomModel: uiContainer.addCustomModelUseCase,
+  removeCustomModel: uiContainer.removeCustomModelUseCase,
+  clearModels: uiContainer.clearModelsUseCase,
+  loadModels: uiContainer.loadModelsUseCase,
+};
+
+const customProviderUseCases = {
+  getCustomProviders: uiContainer.getCustomProvidersUseCase,
+  saveCustomProvider: uiContainer.saveCustomProviderUseCase,
+  removeCustomProvider: uiContainer.removeCustomProviderUseCase,
+};
+
 const app = mount(App, {
   target: document.getElementById('app')!,
-  props: { authUseCases, preferencesUseCases, translationUseCases },
+  props: {
+    authUseCases,
+    preferencesUseCases,
+    translationUseCases,
+    modelUseCases,
+    customProviderUseCases,
+  },
 });
 
 export default app;

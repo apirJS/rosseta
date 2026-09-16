@@ -10,10 +10,8 @@
 </script>
 
 <div class="toast {toast.dismissing ? 'dismissing' : ''}">
-  <!-- Icon -->
   <div class="toast-icon {toast.type}">
     {#if toast.type === 'loading'}
-      <!-- Spinner -->
       <svg
         viewBox="0 0 24 24"
         fill="none"
@@ -32,7 +30,6 @@
         <line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
       </svg>
     {:else if toast.type === 'success'}
-      <!-- Checkmark circle -->
       <svg
         viewBox="0 0 24 24"
         fill="none"
@@ -45,7 +42,6 @@
         <path d="m9 12 2 2 4-4" />
       </svg>
     {:else if toast.type === 'error'}
-      <!-- X circle -->
       <svg
         viewBox="0 0 24 24"
         fill="none"
@@ -59,7 +55,6 @@
         <line x1="9" y1="9" x2="15" y2="15" />
       </svg>
     {:else}
-      <!-- Info circle -->
       <svg
         viewBox="0 0 24 24"
         fill="none"
@@ -75,7 +70,6 @@
     {/if}
   </div>
 
-  <!-- Content -->
   <div class="toast-content">
     <div class="toast-message">{toast.message}</div>
     {#if toast.description}
@@ -83,7 +77,6 @@
     {/if}
   </div>
 
-  <!-- Action button (e.g. Retry) -->
   {#if toast.onAction}
     <button
       class="toast-action"
@@ -96,7 +89,6 @@
     </button>
   {/if}
 
-  <!-- Close button -->
   <button class="toast-close" onclick={onclose} aria-label="Close toast">
     <svg
       viewBox="0 0 24 24"

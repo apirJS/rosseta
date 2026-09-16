@@ -5,15 +5,12 @@ vi.mock('../../../../../../shared/messaging', () => ({
   sendMessageToRuntime: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Import after mock so we get the mocked version
 import { sendMessageToRuntime } from '../../../../../../shared/messaging';
 
 describe('UI Controller: HomeController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
-  // ── Initial State ──────────────────────────────────────────────
 
   test('initial state is "main" view with menu closed', () => {
     const controller = createHomeController();
@@ -22,11 +19,9 @@ describe('UI Controller: HomeController', () => {
     expect(controller.state.isMenuOpen).toBe(false);
   });
 
-  // ── View Transitions ──────────────────────────────────────────
-
   test('showManageApiKeys switches to "manage-api-keys" and closes menu', () => {
     const controller = createHomeController();
-    controller.toggleMenu(); // open menu first
+    controller.toggleMenu();
     expect(controller.state.isMenuOpen).toBe(true);
 
     controller.showManageApiKeys();
@@ -45,23 +40,13 @@ describe('UI Controller: HomeController', () => {
     expect(controller.state.isMenuOpen).toBe(false);
   });
 
-  test('showProxySettings switches to "proxy-settings" and closes menu', () => {
+  test('showManageModels switches to "manage-models" and closes menu', () => {
     const controller = createHomeController();
     controller.toggleMenu();
 
-    controller.showProxySettings();
+    controller.showManageModels();
 
-    expect(controller.state.currentView).toBe('proxy-settings');
-    expect(controller.state.isMenuOpen).toBe(false);
-  });
-
-  test('showMain resets to "main" from "proxy-settings"', () => {
-    const controller = createHomeController();
-    controller.showProxySettings();
-
-    controller.showMain();
-
-    expect(controller.state.currentView).toBe('main');
+    expect(controller.state.currentView).toBe('manage-models');
     expect(controller.state.isMenuOpen).toBe(false);
   });
 
@@ -74,8 +59,6 @@ describe('UI Controller: HomeController', () => {
     expect(controller.state.currentView).toBe('main');
     expect(controller.state.slideDirection).toBe('back');
   });
-
-  // ── Menu Logic ─────────────────────────────────────────────────
 
   test('toggleMenu flips isMenuOpen', () => {
     const controller = createHomeController();
@@ -104,8 +87,6 @@ describe('UI Controller: HomeController', () => {
     expect(controller.state.isMenuOpen).toBe(false);
   });
 
-  // ── Start Translation ──────────────────────────────────────────
-
   test('startTranslation sends START_OVERLAY message and closes window', async () => {
     const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {});
 
@@ -119,5 +100,26 @@ describe('UI Controller: HomeController', () => {
     expect(closeSpy).toHaveBeenCalled();
 
     closeSpy.mockRestore();
+  });
+
+  test('navigateTo switches to any view and closes the menu', () => {
+    const controller = createHomeController();
+    controller.toggleMenu();
+
+    controller.navigateTo('manage-models');
+
+    expect(controller.state.currentView).toBe('manage-models');
+    expect(controller.state.slideDirection).toBe('forward');
+    expect(controller.state.isMenuOpen).toBe(false);
+  });
+
+  test('navigateTo returns to main with back direction', () => {
+    const controller = createHomeController();
+    controller.navigateTo('history');
+
+    controller.navigateTo('main');
+
+    expect(controller.state.currentView).toBe('main');
+    expect(controller.state.slideDirection).toBe('back');
   });
 });

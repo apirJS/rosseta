@@ -5,13 +5,11 @@ import {
   Theme,
   type ThemeValue,
 } from '../../../../../core/domain/preferences/Theme';
-import { AiModel } from '../../../../../core/domain/preferences/AiModel';
 import {
   Language,
   type LanguageCode,
 } from '../../../../../core/domain/translation/Language';
 import { LANGUAGE_MAP } from '../../../../../core/domain/translation/LANGUAGE_MAP';
-import { ProviderRegistry } from '../../../../../core/domain/provider/ProviderRegistry';
 
 export function getBrowserLanguage(): Language {
   const browserLang = navigator.language;
@@ -33,29 +31,17 @@ export class PreferencesState {
   theme = $state<Theme>(Theme.system());
   resolvedTheme = $state<'dark' | 'light'>('light');
   targetLanguage = $state<Language>(getBrowserLanguage());
-  selectedModel = $state<AiModel>(
-    AiModel.create(ProviderRegistry.getDefaultModelId('gemini')),
-  );
+  selectedModels = $state<Record<string, string>>({});
+  includeDescription = $state(true);
   loading = $state(false);
   loaded = $state(false);
   shortcut = $state<string | null>(null);
-  proxyUrl = $state<string | null>(null);
 }
 
 export interface PreferencesUseCasesDeps {
   getPreferences: IGetPreferencesUseCase;
   updatePreferences: IUpdatePreferencesUseCase;
   getShortcut: IGetShortcutUseCase;
-  checkProxyHealth: {
-    execute(
-      proxyUrl: string,
-    ): Promise<
-      import('../../../../../shared/types/Result').Result<
-        boolean,
-        import('../../../../../shared/errors').AppError
-      >
-    >;
-  };
   onThemeApplied?: (theme: 'dark' | 'light') => void;
 }
 
@@ -78,7 +64,6 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    // Notify external handler (e.g. broadcast to content script)
     useCases.onThemeApplied?.(resolved);
   }
 
@@ -89,8 +74,8 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     if (result.success && result.data) {
       state.theme = result.data.theme;
       state.targetLanguage = result.data.targetLanguage;
-      state.selectedModel = result.data.selectedModel;
-      state.proxyUrl = result.data.proxyUrl;
+      state.selectedModels = { ...result.data.selectedModels };
+      state.includeDescription = result.data.includeDescription;
     }
 
     const shortcutResult =
@@ -126,11 +111,20 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
     });
   }
 
-  async function setSelectedModel(modelId: string) {
-    const model = AiModel.create(modelId);
-    state.selectedModel = model;
+  async function setSelectedModelFor(provider: string, modelId: string) {
+    const trimmed = modelId.trim();
+    if (!trimmed) return;
+
+    state.selectedModels = { ...state.selectedModels, [provider]: trimmed };
     await useCases.updatePreferences.execute({
-      preferences: { selectedModel: modelId },
+      preferences: { selectedModels: { ...state.selectedModels } },
+    });
+  }
+
+  async function setIncludeDescription(includeDescription: boolean) {
+    state.includeDescription = includeDescription;
+    await useCases.updatePreferences.execute({
+      preferences: { includeDescription },
     });
   }
 
@@ -143,24 +137,12 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
 
   load();
 
-  async function setProxyUrl(proxyUrl: string | null) {
-    state.proxyUrl = proxyUrl;
-    await useCases.updatePreferences.execute({
-      preferences: { proxyUrl },
-    });
-  }
-
-  async function checkProxyHealth(proxyUrl: string) {
-    return useCases.checkProxyHealth.execute(proxyUrl);
-  }
-
   return {
     state,
     setTheme,
     toggleTheme,
     setTargetLanguage,
-    setSelectedModel,
-    setProxyUrl,
-    checkProxyHealth,
+    setSelectedModelFor,
+    setIncludeDescription,
   };
 }

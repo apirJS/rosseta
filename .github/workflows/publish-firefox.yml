@@ -15,6 +15,7 @@ permissions:
 jobs:
   publish:
     name: Sign & Publish
+    if: "!contains(github.event.release.body, '[skip publish]') && !contains(github.event.release.name, '[skip publish]')"
     runs-on: ubuntu-latest
     steps:
       - name: Resolve version

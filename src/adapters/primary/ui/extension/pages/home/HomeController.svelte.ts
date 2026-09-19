@@ -1,4 +1,5 @@
 import { sendMessageToRuntime } from '../../../../../../shared/messaging';
+import type { AnyProvider } from '../../../../../../core/domain/credential/Provider';
 
 export type TranslationView =
   | 'main'
@@ -16,6 +17,7 @@ class TranslationControllerState {
   currentView = $state<TranslationView>('main');
   slideDirection = $state<'forward' | 'back'>('forward');
   isMenuOpen = $state(false);
+  selectedProvider = $state<AnyProvider | null>(null);
 }
 
 export function createHomeController() {
@@ -69,7 +71,8 @@ export function createHomeController() {
     state.isMenuOpen = false;
   }
 
-  function navigateTo(view: TranslationView) {
+  function navigateTo(view: TranslationView, provider?: AnyProvider) {
+    if (provider) state.selectedProvider = provider;
     if (view === 'main') {
       showMain();
       return;

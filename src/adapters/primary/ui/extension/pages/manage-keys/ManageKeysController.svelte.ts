@@ -34,8 +34,12 @@ export interface ManageKeysDeps {
   toast: PopupToastController;
 }
 
-export function createManageKeysController(deps: ManageKeysDeps) {
+export function createManageKeysController(
+  deps: ManageKeysDeps,
+  initialProvider: AnyProvider = 'google',
+) {
   const state = new ManageKeysState();
+  state.selectedProvider = initialProvider;
   let deleteTimer: ReturnType<typeof setTimeout> | null = null;
 
   const allKeys = $derived(deps.credentials()?.items ?? []);

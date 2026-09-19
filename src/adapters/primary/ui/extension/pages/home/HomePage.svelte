@@ -34,6 +34,7 @@
     models,
     customProviders,
     toast,
+    providerSelection: navigation.state,
   });
 </script>
 
@@ -46,7 +47,8 @@
     onProviderChange={controller.changeProvider}
     isDark={preferences.state.resolvedTheme === 'dark'}
     onToggleTheme={preferences.toggleTheme}
-    onNavigate={navigation.navigateTo}
+    onNavigate={(destination) =>
+      navigation.navigateTo(destination, controller.effectiveProvider)}
   />
 
   {#if preferences.state.loaded}

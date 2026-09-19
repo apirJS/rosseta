@@ -26,9 +26,10 @@
 
   interface Props {
     onback: () => void;
+    initialProvider?: AnyProvider | null;
   }
 
-  const { onback }: Props = $props();
+  const { onback, initialProvider = 'google' }: Props = $props();
 
   const auth = getAuthStateContext();
   const preferences = getPreferencesStateContext();
@@ -58,7 +59,10 @@
     toast,
   };
 
-  const controller = createManageKeysController(deps);
+  const controller = createManageKeysController(
+    deps,
+    initialProvider ?? 'google',
+  );
 
   $effect(() => {
     return () => controller.destroy();

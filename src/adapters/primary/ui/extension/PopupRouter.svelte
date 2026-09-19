@@ -19,9 +19,15 @@
 >
   {#key currentView}
     {#if currentView === 'manage-api-keys'}
-      <ManageKeysPage onback={controller.showMain} />
+      <ManageKeysPage
+        onback={controller.showMain}
+        initialProvider={controller.state.selectedProvider}
+      />
     {:else if currentView === 'manage-models'}
-      <ManageModelsPage onback={controller.showMain} />
+      <ManageModelsPage
+        onback={controller.showMain}
+        initialProvider={controller.state.selectedProvider}
+      />
     {:else if currentView === 'custom-providers'}
       <CustomProvidersPage onback={controller.showMain} />
     {:else if currentView === 'history'}

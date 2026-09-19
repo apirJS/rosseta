@@ -1,4 +1,5 @@
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
+import type { AnyProvider } from '../../../../../../core/domain/credential/Provider';
 import type { Result } from '../../../../../../shared/types/Result';
 import type { AppError } from '../../../../../../shared/errors';
 import { ERROR_TITLES } from '../../../../../../shared/errors';
@@ -30,8 +31,12 @@ export interface ManageModelsDeps {
   toast: PopupToastController;
 }
 
-export function createManageModelsController(deps: ManageModelsDeps) {
+export function createManageModelsController(
+  deps: ManageModelsDeps,
+  initialProvider: AnyProvider = 'google',
+) {
   const state = new ManageModelsState();
+  state.selectedProvider = initialProvider;
 
   const models = $derived(deps.modelsFor(state.selectedProvider));
   const selectedModelId = $derived(

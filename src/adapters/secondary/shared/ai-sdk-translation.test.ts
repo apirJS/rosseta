@@ -461,7 +461,7 @@ describe('Adapter: ai-sdk-translation', () => {
     }
   });
 
-  test('unrelated 400 stays a generic failure without retry or exemption', async () => {
+  test('unrelated 400 maps to request rejected without retry or exemption', async () => {
     const exemptions = new FakeStructuredOutputExemptionStorage();
     generateTextMock.mockRejectedValueOnce(apiError(400));
 
@@ -476,13 +476,13 @@ describe('Adapter: ai-sdk-translation', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.code).toBe(ErrorCode.TRANSLATION_FAILED);
+      expect(result.error.code).toBe(ErrorCode.TRANSLATION_REQUEST_REJECTED);
     }
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(exemptions.exemptCalls).toEqual([]);
   });
 
-  test('maps 401 to failed with credential hint', async () => {
+  test('maps 401 to invalid API key', async () => {
     generateTextMock.mockRejectedValueOnce(apiError(401));
 
     const result = await executeTranslation(
@@ -494,12 +494,11 @@ describe('Adapter: ai-sdk-translation', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.code).toBe(ErrorCode.TRANSLATION_FAILED);
-      expect(result.error.message).toContain('API key');
+      expect(result.error.code).toBe(ErrorCode.AUTH_INVALID_API_KEY);
     }
   });
 
-  test('maps 404 to failed with model hint', async () => {
+  test('maps 404 to model not found', async () => {
     generateTextMock.mockRejectedValueOnce(apiError(404));
 
     const result = await executeTranslation(
@@ -511,7 +510,7 @@ describe('Adapter: ai-sdk-translation', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.message).toContain('Model not found');
+      expect(result.error.code).toBe(ErrorCode.TRANSLATION_MODEL_NOT_FOUND);
     }
   });
 
@@ -528,7 +527,7 @@ describe('Adapter: ai-sdk-translation', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBeInstanceOf(NetworkError);
-      expect(result.error.code).toBe(ErrorCode.NETWORK_SERVER_ERROR);
+      expect(result.error.code).toBe(ErrorCode.NETWORK_PROVIDER_UNAVAILABLE);
     }
   });
 

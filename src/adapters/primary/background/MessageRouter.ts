@@ -62,6 +62,10 @@ export class MessageRouter {
       case 'MOUNT_HISTORY_MODAL':
         return this.mountHistoryModalHandler.handle(message.payload);
 
+      case 'CANCEL_TRANSLATION':
+        this.translateImageHandler.cancel(message.payload.id);
+        return;
+
       default:
         break;
     }

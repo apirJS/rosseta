@@ -49,6 +49,7 @@
     toast,
   };
 
+  // svelte-ignore state_referenced_locally
   const controller = createManageModelsController(
     deps,
     initialProvider ?? 'google',

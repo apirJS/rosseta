@@ -1,5 +1,6 @@
 import { createMistral } from '@ai-sdk/mistral';
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
+import type { ICancellationToken } from '../../../core/ports/outbound/ICancellationToken';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
 import type { Language } from '../../../core/domain/translation/Language';
@@ -20,6 +21,7 @@ export class MistralTranslationAdapter implements ITranslationService {
   public async translateImage(
     image: EncodedImage,
     targetLanguage: Language,
+    cancellationToken?: ICancellationToken,
   ): Promise<Result<Translation, AppError>> {
     const mistral = createMistral({
       apiKey: this.credential.apiKey.value,
@@ -29,6 +31,6 @@ export class MistralTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'MISTRAL', this.userPreferences.includeDescription, this.structuredOutputExemptions);
+    return executeTranslation(model, image, targetLanguage, 'MISTRAL', this.userPreferences.includeDescription, this.structuredOutputExemptions, cancellationToken);
   }
 }

@@ -30,6 +30,7 @@ export class TranslateImageUseCase implements ITranslateImageUseCase {
     return await this.translationService.translateImage(
       imageResult.data,
       targetLangResult.data,
+      command.cancellationToken,
     );
   }
 }

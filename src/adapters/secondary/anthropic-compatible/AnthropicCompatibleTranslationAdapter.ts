@@ -1,5 +1,6 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
+import type { ICancellationToken } from '../../../core/ports/outbound/ICancellationToken';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
 import type { Language } from '../../../core/domain/translation/Language';
@@ -25,6 +26,7 @@ export class AnthropicCompatibleTranslationAdapter
   public async translateImage(
     image: EncodedImage,
     targetLanguage: Language,
+    cancellationToken?: ICancellationToken,
   ): Promise<Result<Translation, AppError>> {
     const provider = createAnthropic({
       name: this.providerConfig.name,
@@ -45,6 +47,7 @@ export class AnthropicCompatibleTranslationAdapter
       'CUSTOM_ANTHROPIC',
       this.userPreferences.includeDescription,
       this.structuredOutputExemptions,
+      cancellationToken,
     );
   }
 }

@@ -28,6 +28,7 @@
   const customProviders = getCustomProvidersStateContext();
   const toast = getPopupToastContext();
 
+  // svelte-ignore state_referenced_locally
   const controller = createMainPageController({
     auth,
     preferences,

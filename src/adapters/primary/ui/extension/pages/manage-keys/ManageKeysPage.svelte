@@ -59,6 +59,7 @@
     toast,
   };
 
+  // svelte-ignore state_referenced_locally
   const controller = createManageKeysController(
     deps,
     initialProvider ?? 'google',

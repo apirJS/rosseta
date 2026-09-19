@@ -11,6 +11,7 @@ import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
 import type { Language } from '../../../core/domain/translation/Language';
 import type { IStructuredOutputExemptionStorage } from '../../../core/ports/outbound/IStructuredOutputExemptionStorage';
+import type { ICancellationToken } from '../../../core/ports/outbound/ICancellationToken';
 import { failure, type Result } from '../../../shared/types/Result';
 import {
   AppError,
@@ -27,6 +28,22 @@ import {
 import { parseTranslationResponse } from './parse-translation-json';
 
 const REQUEST_TIMEOUT_MS = 60_000;
+
+function createRequestAbortSignal(
+  cancellationToken?: ICancellationToken,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  if (!cancellationToken) return timeoutSignal;
+  if (cancellationToken.isCancellationRequested) return AbortSignal.abort();
+
+  const controller = new AbortController();
+  const unsubscribe = cancellationToken.onCancellationRequested(() => {
+    controller.abort();
+  });
+  const signal = AbortSignal.any([controller.signal, timeoutSignal]);
+  signal.addEventListener('abort', unsubscribe, { once: true });
+  return signal;
+}
 
 const VISION_REJECTION_PATTERNS: RegExp[] = [
   /content must be a string/i,
@@ -135,7 +152,12 @@ function interpretParsedTranslation(
 function mapGenerationError(
   error: unknown,
   tag: string,
+  cancellationToken?: ICancellationToken,
 ): Result<Translation, AppError> {
+  if (cancellationToken?.isCancellationRequested) {
+    return failure(TranslationError.failed(new Error('Translation cancelled')));
+  }
+
   if (error instanceof AppError) {
     return failure(error);
   }
@@ -238,6 +260,7 @@ export async function executeTranslation(
   tag: string,
   includeDescription = true,
   exemptions?: IStructuredOutputExemptionStorage,
+  cancellationToken?: ICancellationToken,
 ): Promise<Result<Translation, AppError>> {
   const prompt = buildBasePrompt({
     targetLanguageCode: targetLanguage.code,
@@ -291,7 +314,7 @@ export async function executeTranslation(
         instructions: plainPrompt,
         messages,
         temperature: 0,
-        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        abortSignal: createRequestAbortSignal(cancellationToken),
       });
       if (!text.trim()) {
         return failure(TranslationError.emptyResponse());
@@ -305,7 +328,7 @@ export async function executeTranslation(
       );
       return await translateViaRepair(text);
     } catch (error: unknown) {
-      return mapGenerationError(error, tag);
+      return mapGenerationError(error, tag, cancellationToken);
     }
   }
 
@@ -327,7 +350,7 @@ export async function executeTranslation(
           },
         ],
         temperature: 0,
-        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        abortSignal: createRequestAbortSignal(cancellationToken),
       });
       if (!text.trim()) {
         return failure(TranslationError.emptyResponse());
@@ -338,7 +361,7 @@ export async function executeTranslation(
         tag,
       );
     } catch (error: unknown) {
-      return mapGenerationError(error, tag);
+      return mapGenerationError(error, tag, cancellationToken);
     }
   }
 
@@ -367,7 +390,7 @@ export async function executeTranslation(
       }),
       messages,
       temperature: 0,
-      abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      abortSignal: createRequestAbortSignal(cancellationToken),
     });
 
     if (!output.success || !output.data) {
@@ -409,6 +432,6 @@ export async function executeTranslation(
       return translateViaRepair(normalized.text ?? '');
     }
 
-    return mapGenerationError(normalized, tag);
+    return mapGenerationError(normalized, tag, cancellationToken);
   }
 }

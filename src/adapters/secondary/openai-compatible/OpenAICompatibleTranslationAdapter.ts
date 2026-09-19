@@ -1,5 +1,6 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
+import type { ICancellationToken } from '../../../core/ports/outbound/ICancellationToken';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
 import type { Language } from '../../../core/domain/translation/Language';
@@ -22,6 +23,7 @@ export class OpenAICompatibleTranslationAdapter implements ITranslationService {
   public async translateImage(
     image: EncodedImage,
     targetLanguage: Language,
+    cancellationToken?: ICancellationToken,
   ): Promise<Result<Translation, AppError>> {
     const provider = createOpenAICompatible({
       name: this.providerConfig.name,
@@ -35,6 +37,6 @@ export class OpenAICompatibleTranslationAdapter implements ITranslationService {
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
 
-    return executeTranslation(model, image, targetLanguage, 'CUSTOM', this.userPreferences.includeDescription, this.structuredOutputExemptions);
+    return executeTranslation(model, image, targetLanguage, 'CUSTOM', this.userPreferences.includeDescription, this.structuredOutputExemptions, cancellationToken);
   }
 }

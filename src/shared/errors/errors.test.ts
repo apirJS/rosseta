@@ -282,7 +282,7 @@ describe('Shared: NetworkError', () => {
       });
     });
 
-    test('wraps generic fetch error as server error', () => {
+    test('wraps generic fetch error as connection failure', () => {
       Object.defineProperty(globalThis, 'navigator', {
         value: { onLine: true },
         configurable: true,
@@ -291,7 +291,7 @@ describe('Shared: NetworkError', () => {
       const cause = new Error('network error');
       const error = NetworkError.fromFetchError(cause, 'https://api.test.com');
 
-      expect(error.code).toBe(ErrorCode.NETWORK_SERVER_ERROR);
+      expect(error.code).toBe(ErrorCode.NETWORK_CONNECTION_FAILED);
       expect(error.cause).toBe(cause);
       expect(error.context).toEqual({ url: 'https://api.test.com' });
 

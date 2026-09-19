@@ -318,7 +318,7 @@ describe('Adapter: ModelFetchService', () => {
     }
   });
 
-  test('maps 500 to server NetworkError with status', async () => {
+  test('maps 500 to provider-unavailable NetworkError with status', async () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse({}, 500));
 
     const result = await service.fetchModels('openai', 'key');
@@ -326,7 +326,7 @@ describe('Adapter: ModelFetchService', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBeInstanceOf(NetworkError);
-      expect(result.error.code).toBe(ErrorCode.NETWORK_SERVER_ERROR);
+      expect(result.error.code).toBe(ErrorCode.NETWORK_PROVIDER_UNAVAILABLE);
       expect(result.error.context).toMatchObject({ status: 500 });
     }
   });

@@ -16,5 +16,8 @@ export interface IModelStorage {
     provider: string,
     models: StoredModel[],
   ): Promise<Result<void, AppError>>;
+  replaceAllModels(
+    models: Record<string, StoredModel[]>,
+  ): Promise<Result<void, AppError>>;
   clearModels(provider: string): Promise<Result<void, AppError>>;
 }

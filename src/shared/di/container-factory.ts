@@ -30,6 +30,8 @@ import { SaveCustomProviderUseCase } from '../../core/application/provider/SaveC
 import { GetCustomProvidersUseCase } from '../../core/application/provider/GetCustomProvidersUseCase';
 import { RemoveCustomProviderUseCase } from '../../core/application/provider/RemoveCustomProviderUseCase';
 import { GetShortcutUseCase } from '../../core/application/command/GetShortcutUseCase';
+import { ExportSettingsUseCase } from '../../core/application/settings/ExportSettingsUseCase';
+import { ImportSettingsUseCase } from '../../core/application/settings/ImportSettingsUseCase';
 import type { ICredentialStorage } from '../../core/ports/outbound/ICredentialStorage';
 import type { ITranslationStorage } from '../../core/ports/outbound/ITranslationStorage';
 import type { IUserPreferencesStorage } from '../../core/ports/outbound/IUserPreferencesStorage';
@@ -119,6 +121,22 @@ export function createContainer() {
     ),
 
     getShortcutUseCase: new GetShortcutUseCase(commandStorage),
+
+    exportSettingsUseCase: new ExportSettingsUseCase(
+      credentialStorage,
+      modelStorage,
+      customProviderStorage,
+      keySelectionStorage,
+      translationStorage,
+    ),
+    importSettingsUseCase: new ImportSettingsUseCase(
+      credentialStorage,
+      userPreferencesStorage,
+      modelStorage,
+      customProviderStorage,
+      keySelectionStorage,
+      translationStorage,
+    ),
   };
 }
 

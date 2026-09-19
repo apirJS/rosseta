@@ -64,6 +64,9 @@ export class FetchModelsHandler {
       provider,
       apiKey,
       config.baseURL,
+      config.headers,
+      config.queryParams,
+      config.type,
     );
     if (!result.success) {
       return this.toErrorResponse(result.error);
@@ -86,6 +89,8 @@ export class FetchModelsHandler {
       return this.toErrorResponse(
         new AuthError({
           message: 'No API key available for this provider. Add a key first.',
+          userMessage:
+            'No API key is configured for this provider. Add a key first.',
           context: { provider },
         }),
       );

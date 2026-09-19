@@ -16,6 +16,7 @@ import { OpenRouterTranslationAdapter } from './openrouter/OpenRouterTranslation
 import { OpenCodeTranslationAdapter } from './opencode/OpenCodeTranslationAdapter';
 import { HuggingFaceTranslationAdapter } from './huggingface/HuggingFaceTranslationAdapter';
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
+import { AnthropicCompatibleTranslationAdapter } from './anthropic-compatible/AnthropicCompatibleTranslationAdapter';
 
 export function createTranslationAdapter(
   credential: Credential,
@@ -29,7 +30,10 @@ export function createTranslationAdapter(
         'Custom provider config is required for custom providers',
       );
     }
-    return new OpenAICompatibleTranslationAdapter(
+    const Adapter = customProviderConfig.type === 'anthropic'
+      ? AnthropicCompatibleTranslationAdapter
+      : OpenAICompatibleTranslationAdapter;
+    return new Adapter(
       credential,
       preferences,
       customProviderConfig,

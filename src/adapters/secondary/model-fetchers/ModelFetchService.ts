@@ -14,21 +14,35 @@ import {
   ValidationError,
 } from '../../../shared/errors';
 import { isCustomProviderId } from '../../../core/domain/provider/CustomProviderConfig';
+import type { CustomProviderType } from '../../../core/domain/provider/CustomProviderConfig';
+import { buildCustomProviderURL } from '../shared/custom-provider-request';
 
 class HttpError extends Error {
   constructor(
     readonly status: number,
     readonly statusText: string,
     readonly url: string,
+    readonly responseBody?: string,
   ) {
-    super(`${status} ${statusText}`);
+    super(`${status} ${statusText}${responseBody ? `: ${responseBody}` : ''}`);
     this.name = 'HttpError';
   }
 }
 
 async function assertOk(response: Response, url: string): Promise<void> {
   if (!response.ok) {
-    throw new HttpError(response.status, response.statusText, url);
+    let responseBody: string | undefined;
+    try {
+      responseBody = (await response.text()).slice(0, 2000);
+    } catch {
+      responseBody = undefined;
+    }
+    throw new HttpError(
+      response.status,
+      response.statusText,
+      url,
+      responseBody,
+    );
   }
 }
 
@@ -52,17 +66,21 @@ interface OpenAIModelsResponse {
 async function fetchOpenAICompatibleModels(
   apiKey: string,
   baseURL: string,
+  customHeaders?: Record<string, string>,
+  queryParams?: Record<string, string>,
 ): Promise<ModelInfo[]> {
-  const base = baseURL.replace(/\/$/, '');
-  const url = `${base}/models`;
+  const requestURL = buildCustomProviderURL(baseURL, 'models', queryParams);
 
-  const headers: Record<string, string> = {};
-  if (apiKey) {
+  const headers: Record<string, string> = { ...customHeaders };
+  const hasAuthorization = Object.keys(headers).some(
+    (name) => name.toLowerCase() === 'authorization',
+  );
+  if (apiKey && !hasAuthorization) {
     headers.Authorization = `Bearer ${apiKey}`;
   }
 
-  const response = await fetch(url, { headers });
-  await assertOk(response, url);
+  const response = await fetch(requestURL, { headers });
+  await assertOk(response, requestURL);
 
   const json = (await parseJson(response)) as OpenAIModelsResponse;
   const data = Array.isArray(json?.data) ? json.data : [];
@@ -71,6 +89,55 @@ async function fetchOpenAICompatibleModels(
     .filter((m) => m.object === undefined || m.object === 'model')
     .map((m) => ({ id: m.id, name: m.id }))
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+async function fetchAnthropicCompatibleModels(
+  apiKey: string,
+  baseURL: string,
+  customHeaders?: Record<string, string>,
+  queryParams?: Record<string, string>,
+): Promise<ModelInfo[]> {
+  const models: ModelInfo[] = [];
+  let cursor: string | undefined;
+
+  for (let page = 0; page < ANTHROPIC_MAX_PAGES; page++) {
+    const pageQueryParams = {
+      limit: '100',
+      ...queryParams,
+      ...(cursor ? { after_id: cursor } : {}),
+    };
+    const requestURL = buildCustomProviderURL(
+      baseURL,
+      'models',
+      pageQueryParams,
+    );
+    const headers: Record<string, string> = {
+      'anthropic-version': '2023-06-01',
+      ...customHeaders,
+    };
+    if (
+      apiKey &&
+      !Object.keys(headers).some((name) => name.toLowerCase() === 'x-api-key')
+    ) {
+      headers['x-api-key'] = apiKey;
+    }
+
+    const response = await fetch(requestURL, { headers });
+    await assertOk(response, requestURL);
+    const json = (await parseJson(response)) as AnthropicModelsResponse;
+    const data = Array.isArray(json?.data) ? json.data : [];
+    models.push(
+      ...data.map((model) => ({
+        id: model.id,
+        name: model.display_name || model.id,
+      })),
+    );
+
+    if (!json.has_more || !json.last_id) break;
+    cursor = json.last_id;
+  }
+
+  return models.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 interface GeminiModelEntry {
@@ -185,6 +252,9 @@ export class ModelFetchService implements IModelFetchService {
     provider: string,
     apiKey: string,
     baseURL?: string,
+    headers?: Record<string, string>,
+    queryParams?: Record<string, string>,
+    customProviderType?: CustomProviderType,
   ): Promise<Result<ModelInfo[], AppError>> {
     if (isCustomProviderId(provider)) {
       if (!baseURL) {
@@ -196,7 +266,9 @@ export class ModelFetchService implements IModelFetchService {
         );
       }
       return this.run(
-        () => fetchOpenAICompatibleModels(apiKey, baseURL),
+        () => customProviderType === 'anthropic'
+          ? fetchAnthropicCompatibleModels(apiKey, baseURL, headers, queryParams)
+          : fetchOpenAICompatibleModels(apiKey, baseURL, headers, queryParams),
         provider,
       );
     }
@@ -229,15 +301,41 @@ export class ModelFetchService implements IModelFetchService {
   private toAppError(provider: string, error: unknown): AppError {
     if (error instanceof HttpError) {
       if (error.status === 401 || error.status === 403) {
-        return AuthError.invalidApiKey();
+        return error.status === 403
+          ? AuthError.accessDenied()
+          : AuthError.invalidApiKey();
       }
+      if (error.status === 402) return AuthError.paymentRequired();
       if (error.status === 429) {
-        return new NetworkError({
-          message: 'Rate limited. Wait a moment and try again.',
-          context: { provider, status: error.status, url: error.url },
-        });
+        return NetworkError.rateLimited(error.url);
+      }
+      if (error.status >= 500) {
+        return NetworkError.providerUnavailable(error.status, error.url);
+      }
+      if (error.status === 404) {
+        return ValidationError.invalidInput(
+          `No models were found at the ${provider} endpoint. Check the base URL and path.`,
+          { provider, status: error.status, url: error.url },
+        );
+      }
+      if (error.status === 400 || error.status === 422) {
+        return ValidationError.invalidInput(
+          `The ${provider} endpoint rejected the model list request. Check the base URL, headers, query parameters, and API key.`,
+          { provider, status: error.status, url: error.url },
+        );
       }
       return NetworkError.serverError(error.status, error.url);
+    }
+
+    if (
+      error instanceof TypeError ||
+      (error instanceof Error && /failed to fetch|network error/i.test(error.message))
+    ) {
+      return NetworkError.connectionFailed(undefined, error);
+    }
+
+    if (error instanceof Error && /invalid JSON/i.test(error.message)) {
+      return NetworkError.invalidResponse();
     }
 
     return AppError.fromUnknown(error);

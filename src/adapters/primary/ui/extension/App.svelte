@@ -10,11 +10,13 @@
     setCustomProvidersContext,
     setCustomProvidersStateContext,
     setPopupToastContext,
+    setSettingsContext,
     type AuthUseCases,
     type PreferencesUseCases,
     type TranslationUseCases,
     type ModelUseCases,
     type CustomProviderUseCases,
+    type SettingsUseCases,
   } from '../shared/context';
   import { useAuth } from '../shared/hooks/useAuth.svelte';
   import { usePreferences } from '../shared/hooks/usePreferences.svelte';
@@ -30,6 +32,7 @@
     translationUseCases: TranslationUseCases;
     modelUseCases: ModelUseCases;
     customProviderUseCases: CustomProviderUseCases;
+    settingsUseCases: SettingsUseCases;
   }
 
   const {
@@ -38,6 +41,7 @@
     translationUseCases,
     modelUseCases,
     customProviderUseCases,
+    settingsUseCases,
   }: Props = $props();
 
   // svelte-ignore state_referenced_locally
@@ -50,6 +54,8 @@
   setModelsContext(modelUseCases);
   // svelte-ignore state_referenced_locally
   setCustomProvidersContext(customProviderUseCases);
+  // svelte-ignore state_referenced_locally
+  setSettingsContext(settingsUseCases);
   // svelte-ignore state_referenced_locally
   setPopupToastContext(new PopupToastController());
 

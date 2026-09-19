@@ -82,4 +82,66 @@ export class BrowserKeySelectionStorageAdapter implements IKeySelectionStorage {
       );
     }
   }
+
+  async getAllLastUsedIds(): Promise<
+    Result<Record<string, string>, AppError>
+  > {
+    try {
+      const all = (await browser.storage.local.get(null)) as Record<
+        string,
+        unknown
+      >;
+      const ids: Record<string, string> = {};
+
+      for (const [key, value] of Object.entries(all)) {
+        if (!key.startsWith(LAST_USED_PREFIX) || typeof value !== 'string') {
+          continue;
+        }
+        ids[key.slice(LAST_USED_PREFIX.length)] = value;
+      }
+
+      return success(ids);
+    } catch {
+      return failure(StorageError.readFailed(`${LAST_USED_PREFIX}*`));
+    }
+  }
+
+  async replaceLastUsedIds(
+    ids: Record<string, string>,
+  ): Promise<Result<void, AppError>> {
+    try {
+      const all = (await browser.storage.local.get(null)) as Record<
+        string,
+        unknown
+      >;
+      const existingKeys = Object.keys(all).filter((key) =>
+        key.startsWith(LAST_USED_PREFIX),
+      );
+      const nextEntries = Object.fromEntries(
+        Object.entries(ids).map(([provider, credentialId]) => [
+          `${LAST_USED_PREFIX}${provider}`,
+          credentialId,
+        ]),
+      );
+
+      if (Object.keys(nextEntries).length > 0) {
+        await browser.storage.local.set(nextEntries);
+      }
+
+      const nextKeys = new Set(Object.keys(nextEntries));
+      const staleKeys = existingKeys.filter((key) => !nextKeys.has(key));
+      if (staleKeys.length > 0) {
+        await browser.storage.local.remove(staleKeys);
+      }
+
+      return success(undefined);
+    } catch (error) {
+      return failure(
+        StorageError.writeFailed(
+          `${LAST_USED_PREFIX}*`,
+          error instanceof Error ? error : undefined,
+        ),
+      );
+    }
+  }
 }

@@ -28,6 +28,9 @@ export interface MainPageDeps {
     getProvider: (id: string) => { id: string } | null;
   };
   toast: Pick<PopupToastController, 'show'>;
+  providerSelection?: {
+    selectedProvider: AnyProvider | null;
+  };
 }
 
 class MainPageState {
@@ -36,6 +39,7 @@ class MainPageState {
 
 export function createMainPageController(deps: MainPageDeps) {
   const state = new MainPageState();
+  const providerSelection = deps.providerSelection ?? state;
 
   const activeCredential = $derived(
     deps.auth.state.credentials?.getActive() ?? null,
@@ -67,7 +71,9 @@ export function createMainPageController(deps: MainPageDeps) {
       DEFAULT_PROVIDER,
   );
 
-  const effectiveProvider = $derived(state.selectedProvider ?? activeProvider);
+  const effectiveProvider = $derived(
+    providerSelection.selectedProvider ?? activeProvider,
+  );
 
   const providerKeys = $derived(
     deps.auth.state.credentials?.getByProvider(effectiveProvider) ?? [],
@@ -121,16 +127,17 @@ export function createMainPageController(deps: MainPageDeps) {
   });
   $effect(() => {
     if (
-      state.selectedProvider !== null &&
-      isCustomProviderId(state.selectedProvider) &&
-      !deps.customProviders.getProvider(state.selectedProvider)
+      providerSelection.selectedProvider !== null &&
+      isCustomProviderId(providerSelection.selectedProvider) &&
+      !deps.customProviders.getProvider(providerSelection.selectedProvider)
     ) {
-      state.selectedProvider = null;
+      providerSelection.selectedProvider = null;
     }
   });
 
   function revertProviderSelection(previous: AnyProvider, error: string) {
-    state.selectedProvider = previous === activeProvider ? null : previous;
+    providerSelection.selectedProvider =
+      previous === activeProvider ? null : previous;
     deps.toast.show({
       type: 'error',
       message: 'Could not switch provider',
@@ -142,7 +149,7 @@ export function createMainPageController(deps: MainPageDeps) {
     if (!isAnyProvider(newValue) || newValue === effectiveProvider) return;
 
     const previous = effectiveProvider;
-    state.selectedProvider = newValue;
+    providerSelection.selectedProvider = newValue;
 
     const candidates =
       deps.auth.state.credentials?.getByProvider(newValue) ?? [];

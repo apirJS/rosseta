@@ -55,6 +55,7 @@
   {:else}
     <CustomProviderForm
       bind:name={controller.state.name}
+      bind:type={controller.state.type}
       bind:baseURL={controller.state.baseURL}
       bind:headers={controller.state.headers}
       bind:queryParams={controller.state.queryParams}

@@ -1,7 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Container } from '../../../../shared/di/container-factory';
 import { failure, type Result } from '../../../../shared/types/Result';
-import { AuthError, ValidationError } from '../../../../shared/errors';
+import {
+  AuthError,
+  ERROR_TITLES,
+  ValidationError,
+} from '../../../../shared/errors';
 import { UserPreferences } from '../../../../core/domain/preferences/UserPreferences';
 import type { StoredModel } from '../../../../core/ports/outbound/IModelStorage';
 import { isCustomProviderId } from '../../../../core/domain/provider/CustomProviderConfig';
@@ -10,15 +14,44 @@ import { TranslateImageUseCase } from '../../../../core/application/translation/
 import { TabNotifier } from '../services/TabNotifier';
 import { serializeForModal } from '../../content/handlers/TranslationModalHandler';
 import { sendMessageToTab } from '../../../../shared/messaging';
+import { AbortCancellationToken } from '../services/AbortCancellationToken';
+import type { ICancellationToken } from '../../../../core/ports/outbound/ICancellationToken';
 
 export class TranslateImageHandler {
+  private readonly activeTranslations = new Map<string, AbortCancellationToken>();
+
   constructor(private readonly container: Container) {}
 
   async handle(
     payload: { imageBase64: string },
     senderTabId: number,
   ): Promise<Result<void, Error>> {
-    const toastId = `translate-${Date.now()}`;
+    const toastId = `translate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const cancellationToken = new AbortCancellationToken();
+    this.activeTranslations.set(toastId, cancellationToken);
+
+    try {
+      return await this.process(
+        payload,
+        senderTabId,
+        toastId,
+        cancellationToken,
+      );
+    } finally {
+      this.activeTranslations.delete(toastId);
+    }
+  }
+
+  cancel(toastId: string): void {
+    this.activeTranslations.get(toastId)?.cancel();
+  }
+
+  private async process(
+    payload: { imageBase64: string },
+    senderTabId: number,
+    toastId: string,
+    cancellationToken: ICancellationToken,
+  ): Promise<Result<void, Error>> {
     const notifier = new TabNotifier(senderTabId);
 
     await notifier.showLoading(toastId, 'Translating...');
@@ -26,6 +59,7 @@ export class TranslateImageHandler {
     const credentialsResult =
       await this.container.getCredentialsUseCase.execute();
     if (!credentialsResult.success) {
+      if (cancellationToken.isCancellationRequested) return failure(new Error('Translation cancelled'));
       console.error(
         '[TranslateImageHandler] Credential check failed:',
         credentialsResult.error,
@@ -33,13 +67,14 @@ export class TranslateImageHandler {
       await notifier.showError(
         toastId,
         'Authentication Failed',
-        credentialsResult.error.message,
+        credentialsResult.error.userMessage,
       );
       return failure(credentialsResult.error);
     }
 
     const credentials = credentialsResult.data;
     if (!credentials) {
+      if (cancellationToken.isCancellationRequested) return failure(new Error('Translation cancelled'));
       console.error('[TranslateImageHandler] No credentials stored');
       await notifier.showError(
         toastId,
@@ -52,6 +87,7 @@ export class TranslateImageHandler {
     const resolveResult =
       await this.container.resolveActiveCredentialUseCase.execute(credentials);
     if (!resolveResult.success) {
+      if (cancellationToken.isCancellationRequested) return failure(new Error('Translation cancelled'));
       console.error(
         '[TranslateImageHandler] Credential resolution failed:',
         resolveResult.error,
@@ -69,10 +105,11 @@ export class TranslateImageHandler {
     const userPreferencesResult =
       await this.container.getPreferencesUseCase.execute();
     if (!userPreferencesResult.success) {
+      if (cancellationToken.isCancellationRequested) return failure(new Error('Translation cancelled'));
       await notifier.showError(
         toastId,
         'Preferences Error',
-        userPreferencesResult.error.message,
+        userPreferencesResult.error.userMessage,
       );
       return failure(userPreferencesResult.error);
     }
@@ -97,6 +134,7 @@ export class TranslateImageHandler {
     }
 
     if (!preferences.hasSelectedModel(activeCredential.provider)) {
+      if (cancellationToken.isCancellationRequested) return failure(new Error('Translation cancelled'));
       const error = ValidationError.invalidInput(
         `No model selected for ${activeCredential.provider}. Pick one under Manage Models.`,
       );
@@ -109,10 +147,11 @@ export class TranslateImageHandler {
       const configResult =
         await this.container.getCustomProvidersUseCase.execute();
       if (!configResult.success) {
+        if (cancellationToken.isCancellationRequested) return failure(new Error('Translation cancelled'));
         await notifier.showError(
           toastId,
           'Configuration Error',
-          configResult.error.message,
+          configResult.error.userMessage,
         );
         return failure(configResult.error);
       }
@@ -121,10 +160,11 @@ export class TranslateImageHandler {
         (config) => config.id === activeCredential.provider,
       );
       if (!customProviderConfig) {
+        if (cancellationToken.isCancellationRequested) return failure(new Error('Translation cancelled'));
         const error = ValidationError.invalidInput(
           'Custom provider is not configured. Set it up under Custom Providers.',
         );
-        await notifier.showError(toastId, 'Configuration Error', error.message);
+        await notifier.showError(toastId, 'Configuration Error', error.userMessage);
         return failure(error);
       }
     }
@@ -140,7 +180,12 @@ export class TranslateImageHandler {
     const translationResult = await translateImageUseCase.execute({
       imageBase64: payload.imageBase64,
       targetLanguageCode: preferences.targetLanguage.code,
+      cancellationToken,
     });
+
+    if (cancellationToken.isCancellationRequested) {
+      return failure(new Error('Translation cancelled'));
+    }
 
     if (!translationResult.success) {
       console.error(
@@ -149,7 +194,7 @@ export class TranslateImageHandler {
       );
       await notifier.showError(
         toastId,
-        'Translation Failed!',
+        ERROR_TITLES[translationResult.error.code],
         translationResult.error.userMessage,
       );
       return failure(translationResult.error);
@@ -165,6 +210,10 @@ export class TranslateImageHandler {
         '[TranslateImageHandler] Failed to save translation:',
         saveResult.error,
       );
+    }
+
+    if (cancellationToken.isCancellationRequested) {
+      return failure(new Error('Translation cancelled'));
     }
 
     await notifier.showSuccess(toastId, 'Translation Success!');

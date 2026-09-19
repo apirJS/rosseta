@@ -1,4 +1,4 @@
-export { ErrorCode, ERROR_MESSAGES } from './ErrorCode';
+export { ErrorCode, ERROR_MESSAGES, ERROR_TITLES } from './ErrorCode';
 export { AppError, type AppErrorOptions } from './AppError';
 export { AuthError } from './AuthError';
 export { TranslationError } from './TranslationError';

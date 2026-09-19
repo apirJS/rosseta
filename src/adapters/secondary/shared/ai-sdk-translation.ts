@@ -11,14 +11,16 @@ import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
 import type { Language } from '../../../core/domain/translation/Language';
 import type { IStructuredOutputExemptionStorage } from '../../../core/ports/outbound/IStructuredOutputExemptionStorage';
+import type { ICancellationToken } from '../../../core/ports/outbound/ICancellationToken';
 import { failure, type Result } from '../../../shared/types/Result';
 import {
   AppError,
+  AuthError,
   NetworkError,
   TranslationError,
 } from '../../../shared/errors';
 import { mapResponseToDomain } from './translation-response-mapper';
-import { buildBasePrompt } from './prompt-base';
+import { buildBasePrompt, buildPlainPrompt } from './prompt-base';
 import {
   createTranslationDataSchema,
   type TranslationResponse,
@@ -26,6 +28,22 @@ import {
 import { parseTranslationResponse } from './parse-translation-json';
 
 const REQUEST_TIMEOUT_MS = 60_000;
+
+function createRequestAbortSignal(
+  cancellationToken?: ICancellationToken,
+): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  if (!cancellationToken) return timeoutSignal;
+  if (cancellationToken.isCancellationRequested) return AbortSignal.abort();
+
+  const controller = new AbortController();
+  const unsubscribe = cancellationToken.onCancellationRequested(() => {
+    controller.abort();
+  });
+  const signal = AbortSignal.any([controller.signal, timeoutSignal]);
+  signal.addEventListener('abort', unsubscribe, { once: true });
+  return signal;
+}
 
 const VISION_REJECTION_PATTERNS: RegExp[] = [
   /content must be a string/i,
@@ -44,6 +62,30 @@ const RESPONSE_FORMAT_UNSUPPORTED_PATTERNS: RegExp[] = [
   /json_schema/i,
 ];
 
+const CONTENT_BLOCKED_PATTERNS: RegExp[] = [
+  /content.{0,30}(?:blocked|filter|moderation|policy)/i,
+  /(?:safety|moderation) policy/i,
+  /(?:unsafe|prohibited) content/i,
+];
+const CONTEXT_LIMIT_PATTERNS: RegExp[] = [
+  /context (?:length|window)/i,
+  /maximum context/i,
+  /too many tokens/i,
+  /token limit/i,
+  /input is too long/i,
+];
+const IMAGE_TOO_LARGE_PATTERNS: RegExp[] = [
+  /image.{0,30}too large/i,
+  /image.{0,30}(?:size|dimensions).{0,30}(?:exceed|limit)/i,
+  /payload too large/i,
+  /request entity too large/i,
+];
+const QUOTA_PATTERNS: RegExp[] = [
+  /insufficient.{0,20}(?:quota|credit|balance)/i,
+  /(?:quota|credit|balance).{0,30}(?:exceed|exhaust|deplet|insufficient)/i,
+  /billing/i,
+];
+
 function isVisionRejection(message: string): boolean {
   return VISION_REJECTION_PATTERNS.some((pattern) => pattern.test(message));
 }
@@ -52,6 +94,24 @@ function isResponseFormatUnsupported(message: string): boolean {
   return RESPONSE_FORMAT_UNSUPPORTED_PATTERNS.some((pattern) =>
     pattern.test(message),
   );
+}
+
+function matchesAny(message: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(message));
+}
+
+function apiErrorDetail(error: APICallError): string {
+  let data = '';
+  if (typeof error.data === 'string') {
+    data = error.data;
+  } else if (error.data !== undefined) {
+    try {
+      data = JSON.stringify(error.data);
+    } catch {
+      data = '';
+    }
+  }
+  return [error.message, error.responseBody, data].filter(Boolean).join(' ');
 }
 
 function unwrapRetryError(error: unknown): unknown {
@@ -78,13 +138,12 @@ function interpretParsedTranslation(
   }
 
   if (!parsed.data.success || !parsed.data.data) {
+    const reason = parsed.data.error ?? 'Unknown error';
     console.error(
       `[${tag}] AI rejected translation:`,
-      parsed.data.error ?? 'Unknown error',
+      reason,
     );
-    return failure(
-      TranslationError.aiRejected(parsed.data.error ?? 'Unknown error'),
-    );
+    return failure(TranslationError.aiRejected(reason));
   }
 
   return mapResponseToDomain(parsed.data.data, targetLanguage, tag);
@@ -93,12 +152,21 @@ function interpretParsedTranslation(
 function mapGenerationError(
   error: unknown,
   tag: string,
+  cancellationToken?: ICancellationToken,
 ): Result<Translation, AppError> {
+  if (cancellationToken?.isCancellationRequested) {
+    return failure(TranslationError.failed(new Error('Translation cancelled')));
+  }
+
   if (error instanceof AppError) {
     return failure(error);
   }
 
   error = unwrapRetryError(error);
+
+  if (error instanceof AppError) {
+    return failure(error);
+  }
 
   if (NoOutputGeneratedError.isInstance(error)) {
     console.error(`[${tag}] Response failed schema validation:`, error.cause);
@@ -107,19 +175,37 @@ function mapGenerationError(
 
   if (APICallError.isInstance(error)) {
     const status = error.statusCode ?? 0;
+    const detail = apiErrorDetail(error);
+
+    if (matchesAny(detail, CONTENT_BLOCKED_PATTERNS)) {
+      return failure(TranslationError.contentBlocked());
+    }
+    if (matchesAny(detail, CONTEXT_LIMIT_PATTERNS)) {
+      return failure(TranslationError.contextLimit());
+    }
+    if (status === 413 || matchesAny(detail, IMAGE_TOO_LARGE_PATTERNS)) {
+      return failure(TranslationError.imageTooLarge());
+    }
 
     if (status === 429) {
       console.warn(`[${tag}] Rate limited`);
+      if (matchesAny(detail, QUOTA_PATTERNS)) {
+        return failure(TranslationError.quotaExceeded());
+      }
       return failure(TranslationError.rateLimited());
     }
 
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       console.warn(`[${tag}] Authentication failed (${status})`);
-      return failure(
-        TranslationError.failed(
-          new Error('Invalid API key — check your credentials'),
-        ),
-      );
+      return failure(AuthError.invalidApiKey());
+    }
+
+    if (status === 402) {
+      return failure(AuthError.paymentRequired());
+    }
+
+    if (status === 403) {
+      return failure(AuthError.accessDenied());
     }
 
     if (isVisionRejection(error.message)) {
@@ -131,17 +217,20 @@ function mapGenerationError(
     }
 
     if (status === 404) {
-      console.warn(`[${tag}] Model not found: ${error.url}`);
-      return failure(
-        TranslationError.failed(
-          new Error('Model not found — check your model selection'),
-        ),
-      );
+      return failure(TranslationError.modelNotFound());
+    }
+
+    if (status === 408 || status === 504) {
+      return failure(NetworkError.timeout(error.url));
+    }
+
+    if (status === 400 || status === 409 || status === 422) {
+      return failure(TranslationError.requestRejected(detail));
     }
 
     if (status >= 500) {
       console.error(`[${tag}] Provider server error (${status})`);
-      return failure(NetworkError.serverError(status, error.url));
+      return failure(NetworkError.providerUnavailable(status, error.url));
     }
 
     console.error(`[${tag}] API call failed:`, error);
@@ -151,6 +240,13 @@ function mapGenerationError(
   if (error instanceof Error && error.name === 'AbortError') {
     console.warn(`[${tag}] Request timed out after ${REQUEST_TIMEOUT_MS}ms`);
     return failure(NetworkError.timeout());
+  }
+
+  if (
+    error instanceof TypeError ||
+    (error instanceof Error && /failed to fetch|network error/i.test(error.message))
+  ) {
+    return failure(NetworkError.connectionFailed(undefined, error));
   }
 
   console.error(`[${tag}] Translation error:`, error);
@@ -164,8 +260,14 @@ export async function executeTranslation(
   tag: string,
   includeDescription = true,
   exemptions?: IStructuredOutputExemptionStorage,
+  cancellationToken?: ICancellationToken,
 ): Promise<Result<Translation, AppError>> {
   const prompt = buildBasePrompt({
+    targetLanguageCode: targetLanguage.code,
+    targetLanguageName: targetLanguage.name,
+    includeDescription,
+  });
+  const plainPrompt = buildPlainPrompt({
     targetLanguageCode: targetLanguage.code,
     targetLanguageName: targetLanguage.name,
     includeDescription,
@@ -209,11 +311,14 @@ export async function executeTranslation(
     try {
       const { text } = await generateText({
         model,
-        instructions: prompt,
+        instructions: plainPrompt,
         messages,
         temperature: 0,
-        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        abortSignal: createRequestAbortSignal(cancellationToken),
       });
+      if (!text.trim()) {
+        return failure(TranslationError.emptyResponse());
+      }
       const parsed = parseTranslationResponse(text);
       if (parsed.success) {
         return interpretParsedTranslation(parsed, targetLanguage, tag);
@@ -223,7 +328,7 @@ export async function executeTranslation(
       );
       return await translateViaRepair(text);
     } catch (error: unknown) {
-      return mapGenerationError(error, tag);
+      return mapGenerationError(error, tag, cancellationToken);
     }
   }
 
@@ -234,7 +339,7 @@ export async function executeTranslation(
     try {
       const { text } = await generateText({
         model,
-        instructions: prompt,
+        instructions: plainPrompt,
         messages: [
           {
             role: 'user' as const,
@@ -245,15 +350,18 @@ export async function executeTranslation(
           },
         ],
         temperature: 0,
-        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        abortSignal: createRequestAbortSignal(cancellationToken),
       });
+      if (!text.trim()) {
+        return failure(TranslationError.emptyResponse());
+      }
       return interpretParsedTranslation(
         parseTranslationResponse(text),
         targetLanguage,
         tag,
       );
     } catch (error: unknown) {
-      return mapGenerationError(error, tag);
+      return mapGenerationError(error, tag, cancellationToken);
     }
   }
 
@@ -282,7 +390,7 @@ export async function executeTranslation(
       }),
       messages,
       temperature: 0,
-      abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      abortSignal: createRequestAbortSignal(cancellationToken),
     });
 
     if (!output.success || !output.data) {
@@ -302,7 +410,7 @@ export async function executeTranslation(
 
     if (
       APICallError.isInstance(normalized) &&
-      isResponseFormatUnsupported(normalized.message)
+      isResponseFormatUnsupported(apiErrorDetail(normalized))
     ) {
       console.warn(
         `[${tag}] Model does not support the json_schema response format — retrying without it`,
@@ -324,6 +432,6 @@ export async function executeTranslation(
       return translateViaRepair(normalized.text ?? '');
     }
 
-    return mapGenerationError(normalized, tag);
+    return mapGenerationError(normalized, tag, cancellationToken);
   }
 }

@@ -139,6 +139,7 @@ export function usePreferences(useCases: PreferencesUseCasesDeps) {
 
   return {
     state,
+    hydrate: load,
     setTheme,
     toggleTheme,
     setTargetLanguage,

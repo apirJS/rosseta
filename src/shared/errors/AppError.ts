@@ -3,6 +3,7 @@ import { ErrorCode, ERROR_MESSAGES } from './ErrorCode';
 export interface AppErrorOptions {
   code: ErrorCode;
   message?: string;
+  userMessage?: string;
   cause?: Error;
   context?: Record<string, unknown>;
 }
@@ -20,7 +21,7 @@ export class AppError extends Error {
 
     this.name = 'AppError';
     this.code = options.code;
-    this.userMessage = ERROR_MESSAGES[options.code];
+    this.userMessage = options.userMessage ?? ERROR_MESSAGES[options.code];
     this.context = options.context;
     this.timestamp = new Date();
 

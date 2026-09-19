@@ -59,4 +59,21 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
     this._lastUsedIds.set(provider, credentialId);
     return success(undefined);
   }
+
+  async getAllLastUsedIds(): Promise<
+    Result<Record<string, string>, AppError>
+  > {
+    const error = this.consumeError();
+    if (error) return failure(error);
+    return success(Object.fromEntries(this._lastUsedIds));
+  }
+
+  async replaceLastUsedIds(
+    ids: Record<string, string>,
+  ): Promise<Result<void, AppError>> {
+    const error = this.consumeError();
+    if (error) return failure(error);
+    this._lastUsedIds = new Map(Object.entries(ids));
+    return success(undefined);
+  }
 }

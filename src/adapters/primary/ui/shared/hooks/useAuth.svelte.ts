@@ -95,6 +95,7 @@ export function useAuth() {
 
   return {
     state,
+    hydrate: checkAuth,
     addApiKey,
     removeApiKey,
     setActiveKey,

@@ -5,6 +5,7 @@
     getPreferencesStateContext,
     getPopupToastContext,
   } from '../../../shared/context';
+  import type { AnyProvider } from '../../../../../../core/domain/credential/Provider';
   import {
     AddItemBar,
     EmptyState,
@@ -20,9 +21,10 @@
 
   interface Props {
     onback: () => void;
+    initialProvider?: AnyProvider | null;
   }
 
-  const { onback }: Props = $props();
+  const { onback, initialProvider = 'google' }: Props = $props();
 
   const auth = getAuthStateContext();
   const preferences = getPreferencesStateContext();
@@ -47,7 +49,11 @@
     toast,
   };
 
-  const controller = createManageModelsController(deps);
+  // svelte-ignore state_referenced_locally
+  const controller = createManageModelsController(
+    deps,
+    initialProvider ?? 'google',
+  );
 </script>
 
 <PageShell

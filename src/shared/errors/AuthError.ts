@@ -22,4 +22,12 @@ export class AuthError extends AppError {
       code: ErrorCode.AUTH_NOT_AUTHENTICATED,
     });
   }
+
+  public static accessDenied(): AuthError {
+    return new AuthError({ code: ErrorCode.AUTH_ACCESS_DENIED });
+  }
+
+  public static paymentRequired(): AuthError {
+    return new AuthError({ code: ErrorCode.AUTH_PAYMENT_REQUIRED });
+  }
 }

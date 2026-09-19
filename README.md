@@ -44,9 +44,9 @@ Rosseta supports the following providers out of the box: Google, Groq, xAI, Open
 
 Model lists are fetched directly from the provider's API at runtime. You can also add models manually.
 
-### Custom OpenAI-compatible endpoints
+### Custom provider endpoints
 
-Point Rosseta at any OpenAI-compatible API by providing a base URL, optional custom headers, and optional query parameters. Useful for self-hosted models, corporate proxies, or providers not yet built in.
+Point Rosseta at any OpenAI-compatible or Anthropic-compatible API by selecting the protocol and providing a base URL, optional custom headers, and optional query parameters. These values are validated when saved and used for both translation and model discovery. Useful for self-hosted models, corporate proxies, or providers not yet built in.
 
 ### Multiple API keys per provider
 
@@ -55,6 +55,10 @@ You can store multiple API keys for each provider. The extension supports round-
 ### Translation history
 
 Every translation is automatically saved locally. History is searchable and can be cleared individually or all at once.
+
+### Settings backup
+
+Export your complete setup to a JSON file and restore it later from the Settings page. Backups include API keys, custom providers, model lists and selections, language and theme preferences, key rotation settings, and translation history.
 
 ### Keyboard shortcut
 
@@ -90,16 +94,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, architecture deta
 - [x] Release to Chrome Web Store and Firefox Add-ons
 - [ ] More AI providers
 
-
----
-
-## Known Issues
-I forgot about thiss... (will fix this on 2.0.1)
-
-- **Custom provider headers and query params are ignored when fetching models.** For a custom OpenAI-compatible endpoint, *Manage Models -> Fetch* sends only the base URL and API key, so endpoints that require extra headers (e.g. OpenRouter's `HTTP-Referer`) or query parameters (e.g. an `api-version`) may fail to list their models. Translation is unaffected.
-- **Custom header and query param values are not validated.** Invalid header names, or values containing control characters such as newlines, are accepted when saving and only surface later as a generic request error.
-
-Both are planned to be addressed in a follow-up release.
 
 ---
 

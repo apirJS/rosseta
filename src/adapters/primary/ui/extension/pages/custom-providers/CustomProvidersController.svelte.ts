@@ -1,8 +1,9 @@
 import type { Result } from '../../../../../../shared/types/Result';
-import type { AppError } from '../../../../../../shared/errors';
+import { ERROR_TITLES, type AppError } from '../../../../../../shared/errors';
 import type {
   CustomProviderConfig,
   CustomProviderConfigProps,
+  CustomProviderType,
 } from '../../../../../../core/domain/provider/CustomProviderConfig';
 import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
 
@@ -12,6 +13,7 @@ class CustomProvidersState {
   view = $state<CustomProvidersSubView>('list');
   editingId = $state<string | null>(null);
   name = $state('');
+  type = $state<CustomProviderType>('openai-compatible');
   baseURL = $state('');
   headers = $state('');
   queryParams = $state('');
@@ -65,6 +67,7 @@ export function createCustomProvidersController(
     state.view = 'form';
     state.editingId = null;
     state.name = '';
+    state.type = 'openai-compatible';
     state.baseURL = '';
     state.headers = '';
     state.queryParams = '';
@@ -75,6 +78,7 @@ export function createCustomProvidersController(
     state.view = 'form';
     state.editingId = provider.id;
     state.name = provider.name;
+    state.type = provider.type;
     state.baseURL = provider.baseURL;
     state.headers = provider.headers
       ? JSON.stringify(provider.headers, null, 2)
@@ -103,6 +107,7 @@ export function createCustomProvidersController(
     const props: CustomProviderConfigProps = {
       id: state.editingId ?? '',
       name: state.name,
+      type: state.type,
       baseURL: state.baseURL,
       headers,
       queryParams,
@@ -113,10 +118,11 @@ export function createCustomProvidersController(
     state.isSaving = false;
 
     if (!result.success) {
+      state.error = result.error.message;
       deps.toast.show({
         type: 'error',
-        message: 'Could not save provider',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
       return;
     }
@@ -135,8 +141,8 @@ export function createCustomProvidersController(
     if (!result.success) {
       deps.toast.show({
         type: 'error',
-        message: 'Could not remove provider',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
       return;
     }

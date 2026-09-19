@@ -8,6 +8,7 @@ import type { IUserPreferencesStorage } from '../../ports/outbound/IUserPreferen
 import { ProviderRegistry } from '../../domain/provider/ProviderRegistry';
 import { success, failure, type Result } from '../../../shared/types/Result';
 import type { AppError } from '../../../shared/errors';
+import type { CustomProviderType } from '../../domain/provider/CustomProviderConfig';
 
 export class FetchModelsUseCase implements IFetchModelsUseCase {
   constructor(
@@ -20,11 +21,17 @@ export class FetchModelsUseCase implements IFetchModelsUseCase {
     provider: string,
     apiKey: string,
     baseURL?: string,
+    headers?: Record<string, string>,
+    queryParams?: Record<string, string>,
+    customProviderType?: CustomProviderType,
   ): Promise<Result<StoredModel[], AppError>> {
     const fetchResult = await this.modelFetchService.fetchModels(
       provider,
       apiKey,
       baseURL,
+      headers,
+      queryParams,
+      customProviderType,
     );
     if (!fetchResult.success) return failure(fetchResult.error);
 

@@ -5,6 +5,7 @@
   import ManageModelsPage from './pages/manage-models/ManageModelsPage.svelte';
   import CustomProvidersPage from './pages/custom-providers/CustomProvidersPage.svelte';
   import HistoryPage from './pages/history/HistoryPage.svelte';
+  import SettingsPage from './pages/settings/SettingsPage.svelte';
 
   const controller = createHomeController();
 
@@ -18,13 +19,21 @@
 >
   {#key currentView}
     {#if currentView === 'manage-api-keys'}
-      <ManageKeysPage onback={controller.showMain} />
+      <ManageKeysPage
+        onback={controller.showMain}
+        initialProvider={controller.state.selectedProvider}
+      />
     {:else if currentView === 'manage-models'}
-      <ManageModelsPage onback={controller.showMain} />
+      <ManageModelsPage
+        onback={controller.showMain}
+        initialProvider={controller.state.selectedProvider}
+      />
     {:else if currentView === 'custom-providers'}
       <CustomProvidersPage onback={controller.showMain} />
     {:else if currentView === 'history'}
       <HistoryPage onback={controller.showMain} />
+    {:else if currentView === 'settings'}
+      <SettingsPage onback={controller.showMain} />
     {:else}
       <HomePage navigation={controller} />
     {/if}

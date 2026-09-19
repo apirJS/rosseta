@@ -14,6 +14,6 @@ export class ValidationError extends AppError {
     message: string,
     context?: Record<string, unknown>,
   ): ValidationError {
-    return new ValidationError({ message, context });
+    return new ValidationError({ message, userMessage: message, context });
   }
 }

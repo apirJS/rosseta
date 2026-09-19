@@ -49,6 +49,20 @@ export class FakeTranslationStorage implements ITranslationStorage {
     return success([...this._storage.values()]);
   }
 
+  async replaceAll(
+    translations: Translation[],
+  ): Promise<Result<void, AppError>> {
+    if (this._error) {
+      const error = this._error;
+      this._error = null;
+      return failure(error);
+    }
+    this._storage = new Map(
+      translations.map((translation) => [translation.id, translation]),
+    );
+    return success(undefined);
+  }
+
   async delete(id: string): Promise<Result<void, AppError>> {
     if (this._error) {
       const error = this._error;

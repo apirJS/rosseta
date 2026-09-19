@@ -4,7 +4,7 @@ import type { Credentials } from '../../../../../../core/domain/credential/Crede
 import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import type { Result } from '../../../../../../shared/types/Result';
-import type { AppError } from '../../../../../../shared/errors';
+import { ERROR_TITLES, type AppError } from '../../../../../../shared/errors';
 import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
 
 const UNDO_WINDOW_MS = 5000;
@@ -34,8 +34,12 @@ export interface ManageKeysDeps {
   toast: PopupToastController;
 }
 
-export function createManageKeysController(deps: ManageKeysDeps) {
+export function createManageKeysController(
+  deps: ManageKeysDeps,
+  initialProvider: AnyProvider = 'google',
+) {
   const state = new ManageKeysState();
+  state.selectedProvider = initialProvider;
   let deleteTimer: ReturnType<typeof setTimeout> | null = null;
 
   const allKeys = $derived(deps.credentials()?.items ?? []);
@@ -109,8 +113,8 @@ export function createManageKeysController(deps: ManageKeysDeps) {
     } else {
       deps.toast.show({
         type: 'error',
-        message: 'Could not fetch models',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
     }
   }

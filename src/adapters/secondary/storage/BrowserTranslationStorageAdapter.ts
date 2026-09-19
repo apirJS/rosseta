@@ -90,6 +90,26 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
     }
   }
 
+  async replaceAll(
+    translations: Translation[],
+  ): Promise<Result<void, AppError>> {
+    try {
+      await browser.storage.local.set({
+        [STORAGE_KEY]: translations.map((translation) =>
+          translation.toProps(),
+        ),
+      });
+      return success(undefined);
+    } catch (error) {
+      return failure(
+        StorageError.writeFailed(
+          STORAGE_KEY,
+          error instanceof Error ? error : undefined,
+        ),
+      );
+    }
+  }
+
   async delete(id: string): Promise<Result<void, AppError>> {
     try {
       const allResult = await this.getAllRaw();

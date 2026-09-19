@@ -15,6 +15,7 @@ const CustomProviderConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   baseURL: z.string(),
+  type: z.enum(['openai-compatible', 'anthropic']).optional(),
   headers: z.record(z.string(), z.string()).optional(),
   queryParams: z.record(z.string(), z.string()).optional(),
 });
@@ -67,6 +68,12 @@ export class BrowserCustomProviderStorageAdapter
     ];
 
     return this.persist(nextProviders);
+  }
+
+  async replaceAll(
+    configs: CustomProviderConfig[],
+  ): Promise<Result<void, AppError>> {
+    return this.persist(configs);
   }
 
   async remove(id: string): Promise<Result<void, AppError>> {

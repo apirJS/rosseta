@@ -30,6 +30,35 @@ export class NetworkError extends AppError {
     });
   }
 
+  public static connectionFailed(url?: string, cause?: Error): NetworkError {
+    return new NetworkError({
+      code: ErrorCode.NETWORK_CONNECTION_FAILED,
+      cause,
+      context: { url },
+    });
+  }
+
+  public static providerUnavailable(status?: number, url?: string): NetworkError {
+    return new NetworkError({
+      code: ErrorCode.NETWORK_PROVIDER_UNAVAILABLE,
+      context: { status, url },
+    });
+  }
+
+  public static rateLimited(url?: string): NetworkError {
+    return new NetworkError({
+      code: ErrorCode.NETWORK_RATE_LIMITED,
+      context: { url },
+    });
+  }
+
+  public static invalidResponse(url?: string): NetworkError {
+    return new NetworkError({
+      code: ErrorCode.NETWORK_INVALID_RESPONSE,
+      context: { url },
+    });
+  }
+
   public static fromFetchError(error: Error, url?: string): NetworkError {
     if (!navigator.onLine) {
       return NetworkError.offline();
@@ -39,10 +68,6 @@ export class NetworkError extends AppError {
       return NetworkError.timeout(url);
     }
 
-    return new NetworkError({
-      code: ErrorCode.NETWORK_SERVER_ERROR,
-      cause: error,
-      context: { url },
-    });
+    return NetworkError.connectionFailed(url, error);
   }
 }

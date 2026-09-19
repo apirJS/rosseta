@@ -1,5 +1,6 @@
 import { createZai } from '@ai-sdk/zai';
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
+import type { ICancellationToken } from '../../../core/ports/outbound/ICancellationToken';
 import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
 import type { Translation } from '../../../core/domain/translation/Translation';
 import type { Language } from '../../../core/domain/translation/Language';
@@ -20,6 +21,7 @@ export class ZaiTranslationAdapter implements ITranslationService {
   public async translateImage(
     image: EncodedImage,
     targetLanguage: Language,
+    cancellationToken?: ICancellationToken,
   ): Promise<Result<Translation, AppError>> {
     const zai = createZai({
       apiKey: this.credential.apiKey.value,
@@ -36,6 +38,7 @@ export class ZaiTranslationAdapter implements ITranslationService {
       'ZAI',
       this.userPreferences.includeDescription,
       this.structuredOutputExemptions,
+      cancellationToken,
     );
   }
 }

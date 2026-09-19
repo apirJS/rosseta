@@ -117,6 +117,12 @@ export const MessageSchema = z.discriminatedUnion('action', [
     }),
   }),
   z.object({
+    action: z.literal('CANCEL_TRANSLATION'),
+    payload: z.object({
+      id: z.string(),
+    }),
+  }),
+  z.object({
     action: z.literal('PING'),
   }),
   z.object({
@@ -142,6 +148,7 @@ export interface MessageReturnTypeMap {
   MOUNT_HISTORY_MODAL: void;
   SHOW_TOAST: void;
   DISMISS_TOAST: void;
+  CANCEL_TRANSLATION: void;
 }
 
 export enum COMMAND {

@@ -13,4 +13,10 @@ export interface IKeySelectionStorage {
     provider: AnyProvider,
     credentialId: string,
   ): Promise<Result<void, AppError>>;
+  getAllLastUsedIds(): Promise<
+    Result<Record<string, string>, AppError>
+  >;
+  replaceLastUsedIds(
+    ids: Record<string, string>,
+  ): Promise<Result<void, AppError>>;
 }

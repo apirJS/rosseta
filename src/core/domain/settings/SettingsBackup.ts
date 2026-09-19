@@ -9,6 +9,7 @@ import { TextSegment } from '../translation/TextSegment';
 import { UserPreferences } from '../preferences/UserPreferences';
 import {
   CustomProviderConfig,
+  type CustomProviderType,
   type CustomProviderConfigProps,
 } from '../provider/CustomProviderConfig';
 import { Credentials } from '../credential/Credentials';
@@ -182,6 +183,18 @@ export function parseSettingsBackup(
       );
     }
 
+    const customProviderType =
+      record.type === undefined ? undefined : record.type;
+    if (
+      customProviderType !== undefined &&
+      customProviderType !== 'openai-compatible' &&
+      customProviderType !== 'anthropic'
+    ) {
+      return failure(
+        new DomainError(`customProviders[${index}].type is invalid`),
+      );
+    }
+
     const headersResult = optionalStringRecord(
       record.headers,
       `customProviders[${index}].headers`,
@@ -197,6 +210,7 @@ export function parseSettingsBackup(
       id: record.id,
       name: record.name,
       baseURL: record.baseURL,
+      type: customProviderType as CustomProviderType | undefined,
       headers: headersResult.data,
       queryParams: queryParamsResult.data,
     });

@@ -1,6 +1,9 @@
 <script lang="ts">
+  import type { CustomProviderType } from '../../../../../../../core/domain/provider/CustomProviderConfig';
+
   interface Props {
     name: string;
+    type: CustomProviderType;
     baseURL: string;
     headers: string;
     queryParams: string;
@@ -12,6 +15,7 @@
 
   let {
     name = $bindable(),
+    type = $bindable(),
     baseURL = $bindable(),
     headers = $bindable(),
     queryParams = $bindable(),
@@ -27,15 +31,24 @@
 
 <div class="flex-1 flex flex-col gap-3 overflow-y-auto">
   <p class="text-xs text-muted">
-    OpenAI-compatible endpoint. API keys are managed under Manage API Keys.
+    Configure an OpenAI-compatible or Anthropic-compatible endpoint. API keys
+    are managed under Manage API Keys.
   </p>
+
+  <label class="flex flex-col gap-1">
+    <span class="text-xs font-medium text-foreground">API compatibility *</span>
+    <select class={inputClass} bind:value={type}>
+      <option value="openai-compatible">OpenAI-compatible</option>
+      <option value="anthropic">Anthropic-compatible</option>
+    </select>
+  </label>
 
   <label class="flex flex-col gap-1">
     <span class="text-xs font-medium text-foreground">Name *</span>
     <input
       type="text"
       class={inputClass}
-      placeholder="OpenRouter"
+      placeholder={type === 'anthropic' ? 'My Anthropic proxy' : 'OpenRouter'}
       bind:value={name}
     />
   </label>
@@ -45,7 +58,9 @@
     <input
       type="url"
       class={inputClass}
-      placeholder="https://openrouter.ai/api/v1"
+      placeholder={type === 'anthropic'
+        ? 'https://api.anthropic.com/v1'
+        : 'https://openrouter.ai/api/v1'}
       bind:value={baseURL}
     />
   </label>
@@ -72,6 +87,12 @@
       rows="2"
       bind:value={queryParams}
     ></textarea>
+    {#if type === 'anthropic'}
+      <span class="text-[10px] text-muted">
+        Anthropic requests use <code>/messages</code>; model discovery uses
+        <code>/models</code>.
+      </span>
+    {/if}
   </label>
 
   {#if error}

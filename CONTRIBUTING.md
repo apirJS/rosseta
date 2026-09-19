@@ -119,7 +119,8 @@ src/
 │       ├── google/ groq/ xai/     # @ai-sdk/* translation adapters (thin)
 │       ├── openai/ anthropic/ ... # one directory per provider
 │       ├── huggingface/ opencode/ # incl. Hugging Face + OpenCode
-│       ├── openai-compatible/     # custom providers (base URL + headers)
+│       ├── openai-compatible/     # custom OpenAI-compatible providers
+│       ├── anthropic-compatible/  # custom Anthropic-compatible providers
 │       ├── model-fetchers/        # ModelFetchService (provider /models APIs)
 │       ├── shared/                # executeTranslation, prompt, schema,
 │       │                          # parse-translation-json, response mapper

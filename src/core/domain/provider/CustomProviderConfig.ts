@@ -6,9 +6,15 @@ export interface CustomProviderConfigProps {
   id: string;
   name: string;
   baseURL: string;
+  type?: CustomProviderType;
   headers?: Record<string, string>;
   queryParams?: Record<string, string>;
 }
+
+export type CustomProviderType = 'openai-compatible' | 'anthropic';
+
+export const DEFAULT_CUSTOM_PROVIDER_TYPE: CustomProviderType =
+  'openai-compatible';
 
 export const CUSTOM_PROVIDER_ID_PREFIX = 'custom-';
 
@@ -80,6 +86,10 @@ export class CustomProviderConfig extends ValueObject {
     return this.props.baseURL;
   }
 
+  get type(): CustomProviderType {
+    return this.props.type ?? DEFAULT_CUSTOM_PROVIDER_TYPE;
+  }
+
   get headers(): Record<string, string> | undefined {
     return this.props.headers;
   }
@@ -91,6 +101,7 @@ export class CustomProviderConfig extends ValueObject {
   toProps(): CustomProviderConfigProps {
     return {
       ...this.props,
+      type: this.type,
       headers: this.props.headers ? { ...this.props.headers } : undefined,
       queryParams: this.props.queryParams
         ? { ...this.props.queryParams }
@@ -121,6 +132,14 @@ export class CustomProviderConfig extends ValueObject {
       );
     }
 
+    if (
+      props.type !== undefined &&
+      props.type !== 'openai-compatible' &&
+      props.type !== 'anthropic'
+    ) {
+      return failure(new DomainError('Unsupported custom provider type'));
+    }
+
     const headersResult = validateHeaders(props.headers);
     if (!headersResult.success) return failure(headersResult.error);
 
@@ -132,6 +151,7 @@ export class CustomProviderConfig extends ValueObject {
         ...props,
         name,
         baseURL,
+        type: props.type ?? DEFAULT_CUSTOM_PROVIDER_TYPE,
         headers:
           props.headers && Object.keys(props.headers).length > 0
             ? { ...props.headers }

@@ -44,9 +44,9 @@ Rosseta supports the following providers out of the box: Google, Groq, xAI, Open
 
 Model lists are fetched directly from the provider's API at runtime. You can also add models manually.
 
-### Custom OpenAI-compatible endpoints
+### Custom provider endpoints
 
-Point Rosseta at any OpenAI-compatible API by providing a base URL, optional custom headers, and optional query parameters. These values are validated when saved and used for both translation and model discovery. Useful for self-hosted models, corporate proxies, or providers not yet built in.
+Point Rosseta at any OpenAI-compatible or Anthropic-compatible API by selecting the protocol and providing a base URL, optional custom headers, and optional query parameters. These values are validated when saved and used for both translation and model discovery. Useful for self-hosted models, corporate proxies, or providers not yet built in.
 
 ### Multiple API keys per provider
 

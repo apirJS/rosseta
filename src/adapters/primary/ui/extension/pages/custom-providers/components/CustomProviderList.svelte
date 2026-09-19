@@ -18,7 +18,7 @@
       <CustomProviderListItem {provider} {onedit} {onremove} />
     {:else}
       <EmptyState
-        message="No custom providers yet. Add an OpenAI-compatible endpoint."
+        message="No custom providers yet. Add an OpenAI-compatible or Anthropic-compatible endpoint."
       />
     {/each}
   </div>

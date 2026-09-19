@@ -14,6 +14,8 @@ import {
   ValidationError,
 } from '../../../shared/errors';
 import { isCustomProviderId } from '../../../core/domain/provider/CustomProviderConfig';
+import type { CustomProviderType } from '../../../core/domain/provider/CustomProviderConfig';
+import { buildCustomProviderURL } from '../shared/custom-provider-request';
 
 class HttpError extends Error {
   constructor(
@@ -67,11 +69,7 @@ async function fetchOpenAICompatibleModels(
   customHeaders?: Record<string, string>,
   queryParams?: Record<string, string>,
 ): Promise<ModelInfo[]> {
-  const url = new URL(baseURL);
-  url.pathname = `${url.pathname.replace(/\/$/, '')}/models`;
-  for (const [name, value] of Object.entries(queryParams ?? {})) {
-    url.searchParams.set(name, value);
-  }
+  const requestURL = buildCustomProviderURL(baseURL, 'models', queryParams);
 
   const headers: Record<string, string> = { ...customHeaders };
   const hasAuthorization = Object.keys(headers).some(
@@ -81,7 +79,6 @@ async function fetchOpenAICompatibleModels(
     headers.Authorization = `Bearer ${apiKey}`;
   }
 
-  const requestURL = url.toString();
   const response = await fetch(requestURL, { headers });
   await assertOk(response, requestURL);
 
@@ -92,6 +89,55 @@ async function fetchOpenAICompatibleModels(
     .filter((m) => m.object === undefined || m.object === 'model')
     .map((m) => ({ id: m.id, name: m.id }))
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+async function fetchAnthropicCompatibleModels(
+  apiKey: string,
+  baseURL: string,
+  customHeaders?: Record<string, string>,
+  queryParams?: Record<string, string>,
+): Promise<ModelInfo[]> {
+  const models: ModelInfo[] = [];
+  let cursor: string | undefined;
+
+  for (let page = 0; page < ANTHROPIC_MAX_PAGES; page++) {
+    const pageQueryParams = {
+      limit: '100',
+      ...queryParams,
+      ...(cursor ? { after_id: cursor } : {}),
+    };
+    const requestURL = buildCustomProviderURL(
+      baseURL,
+      'models',
+      pageQueryParams,
+    );
+    const headers: Record<string, string> = {
+      'anthropic-version': '2023-06-01',
+      ...customHeaders,
+    };
+    if (
+      apiKey &&
+      !Object.keys(headers).some((name) => name.toLowerCase() === 'x-api-key')
+    ) {
+      headers['x-api-key'] = apiKey;
+    }
+
+    const response = await fetch(requestURL, { headers });
+    await assertOk(response, requestURL);
+    const json = (await parseJson(response)) as AnthropicModelsResponse;
+    const data = Array.isArray(json?.data) ? json.data : [];
+    models.push(
+      ...data.map((model) => ({
+        id: model.id,
+        name: model.display_name || model.id,
+      })),
+    );
+
+    if (!json.has_more || !json.last_id) break;
+    cursor = json.last_id;
+  }
+
+  return models.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 interface GeminiModelEntry {
@@ -208,6 +254,7 @@ export class ModelFetchService implements IModelFetchService {
     baseURL?: string,
     headers?: Record<string, string>,
     queryParams?: Record<string, string>,
+    customProviderType?: CustomProviderType,
   ): Promise<Result<ModelInfo[], AppError>> {
     if (isCustomProviderId(provider)) {
       if (!baseURL) {
@@ -219,13 +266,9 @@ export class ModelFetchService implements IModelFetchService {
         );
       }
       return this.run(
-        () =>
-          fetchOpenAICompatibleModels(
-            apiKey,
-            baseURL,
-            headers,
-            queryParams,
-          ),
+        () => customProviderType === 'anthropic'
+          ? fetchAnthropicCompatibleModels(apiKey, baseURL, headers, queryParams)
+          : fetchOpenAICompatibleModels(apiKey, baseURL, headers, queryParams),
         provider,
       );
     }

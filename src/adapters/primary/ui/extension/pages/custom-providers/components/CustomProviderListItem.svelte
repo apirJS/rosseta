@@ -21,7 +21,10 @@
     title="Edit provider"
   >
     <span class="text-sm text-foreground truncate">{provider.name}</span>
-    <span class="text-xs text-muted truncate">{provider.baseURL}</span>
+    <span class="text-xs text-muted truncate">
+      {provider.type === 'anthropic' ? 'Anthropic-compatible' : 'OpenAI-compatible'}
+      · {provider.baseURL}
+    </span>
   </button>
   <button
     type="button"

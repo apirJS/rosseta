@@ -25,6 +25,7 @@ function responseToResult(
           ? (response.error.code as ErrorCode)
           : ErrorCode.UNKNOWN_ERROR,
       message: response.error?.message ?? 'Failed to fetch models',
+      userMessage: response.error?.userMessage,
     }),
   );
 }

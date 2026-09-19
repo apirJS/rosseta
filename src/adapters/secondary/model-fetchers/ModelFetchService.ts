@@ -20,15 +20,27 @@ class HttpError extends Error {
     readonly status: number,
     readonly statusText: string,
     readonly url: string,
+    readonly responseBody?: string,
   ) {
-    super(`${status} ${statusText}`);
+    super(`${status} ${statusText}${responseBody ? `: ${responseBody}` : ''}`);
     this.name = 'HttpError';
   }
 }
 
 async function assertOk(response: Response, url: string): Promise<void> {
   if (!response.ok) {
-    throw new HttpError(response.status, response.statusText, url);
+    let responseBody: string | undefined;
+    try {
+      responseBody = (await response.text()).slice(0, 2000);
+    } catch {
+      responseBody = undefined;
+    }
+    throw new HttpError(
+      response.status,
+      response.statusText,
+      url,
+      responseBody,
+    );
   }
 }
 
@@ -246,15 +258,41 @@ export class ModelFetchService implements IModelFetchService {
   private toAppError(provider: string, error: unknown): AppError {
     if (error instanceof HttpError) {
       if (error.status === 401 || error.status === 403) {
-        return AuthError.invalidApiKey();
+        return error.status === 403
+          ? AuthError.accessDenied()
+          : AuthError.invalidApiKey();
       }
+      if (error.status === 402) return AuthError.paymentRequired();
       if (error.status === 429) {
-        return new NetworkError({
-          message: 'Rate limited. Wait a moment and try again.',
-          context: { provider, status: error.status, url: error.url },
-        });
+        return NetworkError.rateLimited(error.url);
+      }
+      if (error.status >= 500) {
+        return NetworkError.providerUnavailable(error.status, error.url);
+      }
+      if (error.status === 404) {
+        return ValidationError.invalidInput(
+          `No models were found at the ${provider} endpoint. Check the base URL and path.`,
+          { provider, status: error.status, url: error.url },
+        );
+      }
+      if (error.status === 400 || error.status === 422) {
+        return ValidationError.invalidInput(
+          `The ${provider} endpoint rejected the model list request. Check the base URL, headers, query parameters, and API key.`,
+          { provider, status: error.status, url: error.url },
+        );
       }
       return NetworkError.serverError(error.status, error.url);
+    }
+
+    if (
+      error instanceof TypeError ||
+      (error instanceof Error && /failed to fetch|network error/i.test(error.message))
+    ) {
+      return NetworkError.connectionFailed(undefined, error);
+    }
+
+    if (error instanceof Error && /invalid JSON/i.test(error.message)) {
+      return NetworkError.invalidResponse();
     }
 
     return AppError.fromUnknown(error);

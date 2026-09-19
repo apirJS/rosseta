@@ -1,7 +1,31 @@
+import * as z from 'zod';
+import { createTranslationDataSchema } from './translation-schema';
+
 export interface PromptParams {
   targetLanguageCode: string;
   targetLanguageName: string;
   includeDescription?: boolean;
+}
+
+/**
+ * Prompt used when the provider cannot enforce structured output itself.
+ * Keep the schema generated from the same Zod contract passed to Output.object
+ * so the prompt-only and provider-enforced paths cannot drift apart.
+ */
+export function buildPlainPrompt(params: PromptParams): string {
+  const schema = z.toJSONSchema(
+    createTranslationDataSchema(params.includeDescription ?? true),
+    { target: 'draft-07', io: 'input' },
+  );
+
+  return `${buildBasePrompt(params)}
+
+The provider cannot enforce structured output for this model. You must enforce it yourself.
+Your entire response must be one JSON object that validates against this complete JSON Schema:
+
+${JSON.stringify(schema, null, 2)}
+
+Do not include markdown fences, commentary, or properties that are absent from the schema.`;
 }
 
 export function buildBasePrompt({

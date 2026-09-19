@@ -1,6 +1,7 @@
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import type { Result } from '../../../../../../shared/types/Result';
 import type { AppError } from '../../../../../../shared/errors';
+import { ERROR_TITLES } from '../../../../../../shared/errors';
 import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
 
 class ManageModelsState {
@@ -67,8 +68,8 @@ export function createManageModelsController(deps: ManageModelsDeps) {
     } else {
       deps.toast.show({
         type: 'error',
-        message: 'Could not add model',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
     }
   }
@@ -78,8 +79,8 @@ export function createManageModelsController(deps: ManageModelsDeps) {
     if (!result.success) {
       deps.toast.show({
         type: 'error',
-        message: 'Could not remove model',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
     }
   }
@@ -106,8 +107,8 @@ export function createManageModelsController(deps: ManageModelsDeps) {
     } else {
       deps.toast.show({
         type: 'error',
-        message: 'Could not fetch models',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
     }
   }
@@ -117,8 +118,8 @@ export function createManageModelsController(deps: ManageModelsDeps) {
     if (!result.success) {
       deps.toast.show({
         type: 'error',
-        message: 'Could not reset models',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
     }
   }

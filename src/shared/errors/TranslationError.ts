@@ -45,8 +45,17 @@ export class TranslationError extends AppError {
   }
 
   public static aiRejected(reason: string): TranslationError {
+    const noText = /NO_TEXT_FOUND/i.test(reason);
+    const blocked = /(?:content|safety|moderation).{0,30}(?:blocked|policy|filter)/i.test(
+      reason,
+    );
     return new TranslationError({
       code: ErrorCode.TRANSLATION_AI_REJECTED,
+      userMessage: noText
+        ? 'No readable text was found in the selected area.'
+        : blocked
+          ? 'The provider blocked this image because of its content or safety policy.'
+          : undefined,
       context: { reason },
     });
   }
@@ -55,6 +64,45 @@ export class TranslationError extends AppError {
     return new TranslationError({
       code: ErrorCode.TRANSLATION_MODEL_NO_VISION,
       context: detail ? { detail } : undefined,
+    });
+  }
+
+  public static noTextFound(): TranslationError {
+    return new TranslationError({ code: ErrorCode.TRANSLATION_NO_TEXT_FOUND });
+  }
+
+  public static modelNotFound(): TranslationError {
+    return new TranslationError({ code: ErrorCode.TRANSLATION_MODEL_NOT_FOUND });
+  }
+
+  public static contentBlocked(): TranslationError {
+    return new TranslationError({ code: ErrorCode.TRANSLATION_CONTENT_BLOCKED });
+  }
+
+  public static contextLimit(): TranslationError {
+    return new TranslationError({ code: ErrorCode.TRANSLATION_CONTEXT_LIMIT });
+  }
+
+  public static imageTooLarge(): TranslationError {
+    return new TranslationError({
+      code: ErrorCode.TRANSLATION_IMAGE_TOO_LARGE,
+    });
+  }
+
+  public static requestRejected(detail?: string): TranslationError {
+    return new TranslationError({
+      code: ErrorCode.TRANSLATION_REQUEST_REJECTED,
+      context: detail ? { detail } : undefined,
+    });
+  }
+
+  public static emptyResponse(): TranslationError {
+    return new TranslationError({ code: ErrorCode.TRANSLATION_EMPTY_RESPONSE });
+  }
+
+  public static quotaExceeded(): TranslationError {
+    return new TranslationError({
+      code: ErrorCode.TRANSLATION_PROVIDER_QUOTA_EXCEEDED,
     });
   }
 }

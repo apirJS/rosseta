@@ -1,5 +1,5 @@
 import type { Result } from '../../../../../../shared/types/Result';
-import type { AppError } from '../../../../../../shared/errors';
+import { ERROR_TITLES, type AppError } from '../../../../../../shared/errors';
 import type {
   CustomProviderConfig,
   CustomProviderConfigProps,
@@ -116,8 +116,8 @@ export function createCustomProvidersController(
       state.error = result.error.message;
       deps.toast.show({
         type: 'error',
-        message: 'Could not save provider',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
       return;
     }
@@ -136,8 +136,8 @@ export function createCustomProvidersController(
     if (!result.success) {
       deps.toast.show({
         type: 'error',
-        message: 'Could not remove provider',
-        description: result.error.message,
+        message: ERROR_TITLES[result.error.code],
+        description: result.error.userMessage,
       });
       return;
     }

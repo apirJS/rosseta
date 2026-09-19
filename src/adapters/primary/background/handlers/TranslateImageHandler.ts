@@ -1,7 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Container } from '../../../../shared/di/container-factory';
 import { failure, type Result } from '../../../../shared/types/Result';
-import { AuthError, ValidationError } from '../../../../shared/errors';
+import {
+  AuthError,
+  ERROR_TITLES,
+  ValidationError,
+} from '../../../../shared/errors';
 import { UserPreferences } from '../../../../core/domain/preferences/UserPreferences';
 import type { StoredModel } from '../../../../core/ports/outbound/IModelStorage';
 import { isCustomProviderId } from '../../../../core/domain/provider/CustomProviderConfig';
@@ -33,7 +37,7 @@ export class TranslateImageHandler {
       await notifier.showError(
         toastId,
         'Authentication Failed',
-        credentialsResult.error.message,
+        credentialsResult.error.userMessage,
       );
       return failure(credentialsResult.error);
     }
@@ -72,7 +76,7 @@ export class TranslateImageHandler {
       await notifier.showError(
         toastId,
         'Preferences Error',
-        userPreferencesResult.error.message,
+        userPreferencesResult.error.userMessage,
       );
       return failure(userPreferencesResult.error);
     }
@@ -112,7 +116,7 @@ export class TranslateImageHandler {
         await notifier.showError(
           toastId,
           'Configuration Error',
-          configResult.error.message,
+          configResult.error.userMessage,
         );
         return failure(configResult.error);
       }
@@ -124,7 +128,7 @@ export class TranslateImageHandler {
         const error = ValidationError.invalidInput(
           'Custom provider is not configured. Set it up under Custom Providers.',
         );
-        await notifier.showError(toastId, 'Configuration Error', error.message);
+        await notifier.showError(toastId, 'Configuration Error', error.userMessage);
         return failure(error);
       }
     }
@@ -149,7 +153,7 @@ export class TranslateImageHandler {
       );
       await notifier.showError(
         toastId,
-        'Translation Failed!',
+        ERROR_TITLES[translationResult.error.code],
         translationResult.error.userMessage,
       );
       return failure(translationResult.error);

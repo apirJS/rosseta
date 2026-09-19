@@ -152,7 +152,7 @@ describe('UI Controller: ManageModelsController', () => {
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'error',
-        message: 'Could not add model',
+        message: 'Invalid Configuration',
         description: 'Storage broken',
       }),
     );
@@ -170,7 +170,11 @@ describe('UI Controller: ManageModelsController', () => {
     await controller.removeModel('m1');
 
     expect(show).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'error', message: 'Could not remove model' }),
+      expect.objectContaining({
+        type: 'error',
+        message: 'Invalid Configuration',
+        description: 'nope',
+      }),
     );
   });
 
@@ -212,7 +216,7 @@ describe('UI Controller: ManageModelsController', () => {
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'error',
-        message: 'Could not fetch models',
+        message: 'Invalid Configuration',
         description: '401 Unauthorized',
       }),
     );
@@ -238,7 +242,11 @@ describe('UI Controller: ManageModelsController', () => {
     await controller.resetModels();
 
     expect(show).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'error', message: 'Could not reset models' }),
+      expect.objectContaining({
+        type: 'error',
+        message: 'Invalid Configuration',
+        description: 'denied',
+      }),
     );
   });
 

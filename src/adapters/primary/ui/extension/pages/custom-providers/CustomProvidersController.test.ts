@@ -170,7 +170,11 @@ describe('UI Controller: CustomProvidersController', () => {
     await controller.save();
 
     expect(show).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'error', message: 'Could not save provider' }),
+      expect.objectContaining({
+        type: 'error',
+        message: 'Could Not Save Data',
+        description: 'Could not save data.',
+      }),
     );
     expect(controller.state.view).toBe('form');
   });

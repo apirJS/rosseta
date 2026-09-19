@@ -1,3 +1,14 @@
+## [2.1.0](https://github.com/apirJS/rosseta/compare/v2.0.0...v2.1.0) (2026-09-19)
+
+### Features
+
+* export import settings ([#5](https://github.com/apirJS/rosseta/issues/5)) ([10900cc](https://github.com/apirJS/rosseta/commit/10900cc77e555a07579fab9b847d7a0cbf3ebe44))
+
+### Bug Fixes
+
+* broken tests because of new feats ([e853d11](https://github.com/apirJS/rosseta/commit/e853d11605da55bf4f2df35de911d8b817d086b2))
+* failing UI tests ([#7](https://github.com/apirJS/rosseta/issues/7)) ([533dbb7](https://github.com/apirJS/rosseta/commit/533dbb73394bb83518647f2bb4ddb4babc6328e6))
+
 ## [2.0.0](https://github.com/apirJS/rosseta/compare/v1.3.1...v2.0.0) (2026-09-16)
 
 ### ⚠ BREAKING CHANGES

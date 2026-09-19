@@ -50,6 +50,15 @@ export class FakeCustomProviderStorage implements ICustomProviderStorage {
     return success(undefined);
   }
 
+  async replaceAll(
+    configs: CustomProviderConfig[],
+  ): Promise<Result<void, AppError>> {
+    const err = this.checkFailure();
+    if (err) return failure(err);
+    this.providers = [...configs];
+    return success(undefined);
+  }
+
   async remove(id: string): Promise<Result<void, AppError>> {
     const err = this.checkFailure();
     if (err) return failure(err);

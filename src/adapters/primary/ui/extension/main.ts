@@ -41,6 +41,11 @@ const customProviderUseCases = {
   removeCustomProvider: uiContainer.removeCustomProviderUseCase,
 };
 
+const settingsUseCases = {
+  exportSettings: uiContainer.exportSettingsUseCase,
+  importSettings: uiContainer.importSettingsUseCase,
+};
+
 const app = mount(App, {
   target: document.getElementById('app')!,
   props: {
@@ -49,6 +54,7 @@ const app = mount(App, {
     translationUseCases,
     modelUseCases,
     customProviderUseCases,
+    settingsUseCases,
   },
 });
 

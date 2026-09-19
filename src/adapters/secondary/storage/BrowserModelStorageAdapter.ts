@@ -83,6 +83,45 @@ export class BrowserModelStorageAdapter implements IModelStorage {
     }
   }
 
+  async replaceAllModels(
+    models: Record<string, StoredModel[]>,
+  ): Promise<Result<void, AppError>> {
+    try {
+      const all = (await browser.storage.local.get(null)) as Record<
+        string,
+        unknown
+      >;
+      const existingKeys = Object.keys(all).filter((key) =>
+        key.startsWith(MODELS_PREFIX),
+      );
+      const nextEntries = Object.fromEntries(
+        Object.entries(models).map(([provider, providerModels]) => [
+          `${MODELS_PREFIX}${provider}`,
+          providerModels,
+        ]),
+      );
+
+      if (Object.keys(nextEntries).length > 0) {
+        await browser.storage.local.set(nextEntries);
+      }
+
+      const nextKeys = new Set(Object.keys(nextEntries));
+      const staleKeys = existingKeys.filter((key) => !nextKeys.has(key));
+      if (staleKeys.length > 0) {
+        await browser.storage.local.remove(staleKeys);
+      }
+
+      return success(undefined);
+    } catch (error) {
+      return failure(
+        StorageError.writeFailed(
+          `${MODELS_PREFIX}*`,
+          error instanceof Error ? error : undefined,
+        ),
+      );
+    }
+  }
+
   async clearModels(provider: string): Promise<Result<void, AppError>> {
     try {
       const key = `${MODELS_PREFIX}${provider}`;

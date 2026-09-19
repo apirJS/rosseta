@@ -64,6 +64,8 @@ export class FetchModelsHandler {
       provider,
       apiKey,
       config.baseURL,
+      config.headers,
+      config.queryParams,
     );
     if (!result.success) {
       return this.toErrorResponse(result.error);

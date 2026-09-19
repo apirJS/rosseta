@@ -5,6 +5,7 @@ export type TranslationView =
   | 'manage-api-keys'
   | 'manage-models'
   | 'custom-providers'
+  | 'settings'
   | 'history';
 
 export type MenuDestination = Exclude<TranslationView, 'main'>;
@@ -43,6 +44,12 @@ export function createHomeController() {
     state.isMenuOpen = false;
   }
 
+  function showSettings() {
+    state.slideDirection = 'forward';
+    state.currentView = 'settings';
+    state.isMenuOpen = false;
+  }
+
   function toggleMenu() {
     state.isMenuOpen = !state.isMenuOpen;
   }
@@ -78,6 +85,7 @@ export function createHomeController() {
     showManageApiKeys,
     showManageModels,
     showCustomProviders,
+    showSettings,
     showHistory,
     navigateTo,
     toggleMenu,

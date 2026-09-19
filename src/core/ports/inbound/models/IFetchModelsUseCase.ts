@@ -7,5 +7,7 @@ export interface IFetchModelsUseCase {
     provider: string,
     apiKey: string,
     baseURL?: string,
+    headers?: Record<string, string>,
+    queryParams?: Record<string, string>,
   ): Promise<Result<StoredModel[], AppError>>;
 }

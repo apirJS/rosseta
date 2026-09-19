@@ -44,3 +44,9 @@ export {
   setPopupToastContext,
   getPopupToastContext,
 } from './toast';
+
+export {
+  type SettingsUseCases,
+  setSettingsContext,
+  getSettingsContext,
+} from './settings';

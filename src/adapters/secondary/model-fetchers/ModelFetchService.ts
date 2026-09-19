@@ -52,17 +52,26 @@ interface OpenAIModelsResponse {
 async function fetchOpenAICompatibleModels(
   apiKey: string,
   baseURL: string,
+  customHeaders?: Record<string, string>,
+  queryParams?: Record<string, string>,
 ): Promise<ModelInfo[]> {
-  const base = baseURL.replace(/\/$/, '');
-  const url = `${base}/models`;
+  const url = new URL(baseURL);
+  url.pathname = `${url.pathname.replace(/\/$/, '')}/models`;
+  for (const [name, value] of Object.entries(queryParams ?? {})) {
+    url.searchParams.set(name, value);
+  }
 
-  const headers: Record<string, string> = {};
-  if (apiKey) {
+  const headers: Record<string, string> = { ...customHeaders };
+  const hasAuthorization = Object.keys(headers).some(
+    (name) => name.toLowerCase() === 'authorization',
+  );
+  if (apiKey && !hasAuthorization) {
     headers.Authorization = `Bearer ${apiKey}`;
   }
 
-  const response = await fetch(url, { headers });
-  await assertOk(response, url);
+  const requestURL = url.toString();
+  const response = await fetch(requestURL, { headers });
+  await assertOk(response, requestURL);
 
   const json = (await parseJson(response)) as OpenAIModelsResponse;
   const data = Array.isArray(json?.data) ? json.data : [];
@@ -185,6 +194,8 @@ export class ModelFetchService implements IModelFetchService {
     provider: string,
     apiKey: string,
     baseURL?: string,
+    headers?: Record<string, string>,
+    queryParams?: Record<string, string>,
   ): Promise<Result<ModelInfo[], AppError>> {
     if (isCustomProviderId(provider)) {
       if (!baseURL) {
@@ -196,7 +207,13 @@ export class ModelFetchService implements IModelFetchService {
         );
       }
       return this.run(
-        () => fetchOpenAICompatibleModels(apiKey, baseURL),
+        () =>
+          fetchOpenAICompatibleModels(
+            apiKey,
+            baseURL,
+            headers,
+            queryParams,
+          ),
         provider,
       );
     }

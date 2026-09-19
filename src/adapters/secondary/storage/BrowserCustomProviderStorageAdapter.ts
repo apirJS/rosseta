@@ -69,6 +69,12 @@ export class BrowserCustomProviderStorageAdapter
     return this.persist(nextProviders);
   }
 
+  async replaceAll(
+    configs: CustomProviderConfig[],
+  ): Promise<Result<void, AppError>> {
+    return this.persist(configs);
+  }
+
   async remove(id: string): Promise<Result<void, AppError>> {
     const loadResult = await this.load();
     if (!loadResult.success) {

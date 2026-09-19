@@ -12,5 +12,7 @@ export interface IModelFetchService {
     provider: string,
     apiKey: string,
     baseURL?: string,
+    headers?: Record<string, string>,
+    queryParams?: Record<string, string>,
   ): Promise<Result<ModelInfo[], AppError>>;
 }

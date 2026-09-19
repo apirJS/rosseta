@@ -113,6 +113,7 @@ export function createCustomProvidersController(
     state.isSaving = false;
 
     if (!result.success) {
+      state.error = result.error.message;
       deps.toast.show({
         type: 'error',
         message: 'Could not save provider',

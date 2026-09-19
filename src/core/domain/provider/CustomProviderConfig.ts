@@ -17,6 +17,51 @@ export function isCustomProviderId(id: string): id is `custom-${string}` {
 }
 
 const URL_PATTERN = /^https?:\/\/.+/;
+const HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+
+function validateHeaders(
+  headers: Record<string, string> | undefined,
+): Result<void, DomainError> {
+  if (!headers) return success(undefined);
+
+  for (const [name, value] of Object.entries(headers)) {
+    if (!HEADER_NAME_PATTERN.test(name)) {
+      return failure(new DomainError(`Invalid header name: "${name}"`));
+    }
+    if (CONTROL_CHARACTER_PATTERN.test(value)) {
+      return failure(
+        new DomainError(`Header "${name}" contains control characters`),
+      );
+    }
+  }
+
+  return success(undefined);
+}
+
+function validateQueryParams(
+  queryParams: Record<string, string> | undefined,
+): Result<void, DomainError> {
+  if (!queryParams) return success(undefined);
+
+  for (const [name, value] of Object.entries(queryParams)) {
+    if (!name.trim()) {
+      return failure(new DomainError('Query parameter names cannot be empty'));
+    }
+    if (
+      CONTROL_CHARACTER_PATTERN.test(name) ||
+      CONTROL_CHARACTER_PATTERN.test(value)
+    ) {
+      return failure(
+        new DomainError(
+          `Query parameter "${name}" contains control characters`,
+        ),
+      );
+    }
+  }
+
+  return success(undefined);
+}
 
 export class CustomProviderConfig extends ValueObject {
   private constructor(private readonly props: CustomProviderConfigProps) {
@@ -75,6 +120,12 @@ export class CustomProviderConfig extends ValueObject {
         new DomainError('Base URL must start with http:// or https://'),
       );
     }
+
+    const headersResult = validateHeaders(props.headers);
+    if (!headersResult.success) return failure(headersResult.error);
+
+    const queryParamsResult = validateQueryParams(props.queryParams);
+    if (!queryParamsResult.success) return failure(queryParamsResult.error);
 
     return success(
       new CustomProviderConfig({

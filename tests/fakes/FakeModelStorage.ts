@@ -44,6 +44,23 @@ export class FakeModelStorage implements IModelStorage {
     return success(undefined);
   }
 
+  async replaceAllModels(
+    models: Record<string, StoredModel[]>,
+  ): Promise<Result<void, AppError>> {
+    if (this._failNext) {
+      const err = this._failNext;
+      this._failNext = null;
+      return failure(err);
+    }
+    this.store = new Map(
+      Object.entries(models).map(([provider, items]) => [
+        provider,
+        [...items],
+      ]),
+    );
+    return success(undefined);
+  }
+
   async clearModels(provider: string): Promise<Result<void, AppError>> {
     if (this._failNext) {
       const err = this._failNext;

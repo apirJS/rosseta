@@ -10,12 +10,14 @@ import {
 import {
   AppError,
   AuthError,
+  ErrorCode,
   NetworkError,
   ValidationError,
 } from '../../../shared/errors';
 import { isCustomProviderId } from '../../../core/domain/provider/CustomProviderConfig';
 import type { CustomProviderType } from '../../../core/domain/provider/CustomProviderConfig';
 import { buildCustomProviderURL } from '../shared/custom-provider-request';
+import puterSdk from '@heyputer/puter.js';
 
 class HttpError extends Error {
   constructor(
@@ -88,7 +90,7 @@ async function fetchOpenAICompatibleModels(
   return data
     .filter((m) => m.object === undefined || m.object === 'model')
     .map((m) => ({ id: m.id, name: m.id }))
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .toSorted((a, b) => a.id.localeCompare(b.id));
 }
 
 async function fetchAnthropicCompatibleModels(
@@ -98,9 +100,13 @@ async function fetchAnthropicCompatibleModels(
   queryParams?: Record<string, string>,
 ): Promise<ModelInfo[]> {
   const models: ModelInfo[] = [];
-  let cursor: string | undefined;
 
-  for (let page = 0; page < ANTHROPIC_MAX_PAGES; page++) {
+  async function fetchPage(
+    cursor: string | undefined,
+    remainingPages: number,
+  ): Promise<void> {
+    if (remainingPages === 0) return;
+
     const pageQueryParams = {
       limit: '100',
       ...queryParams,
@@ -133,11 +139,14 @@ async function fetchAnthropicCompatibleModels(
       })),
     );
 
-    if (!json.has_more || !json.last_id) break;
-    cursor = json.last_id;
+    if (json.has_more && json.last_id) {
+      await fetchPage(json.last_id, remainingPages - 1);
+    }
   }
 
-  return models.sort((a, b) => a.name.localeCompare(b.name));
+  await fetchPage(undefined, ANTHROPIC_MAX_PAGES);
+
+  return models.toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 interface GeminiModelEntry {
@@ -169,7 +178,7 @@ async function fetchGoogleModels(apiKey: string): Promise<ModelInfo[]> {
       id: m.name.replace('models/', ''),
       name: m.displayName,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 interface AnthropicModelEntry {
@@ -187,9 +196,13 @@ const ANTHROPIC_MAX_PAGES = 10;
 
 async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]> {
   const models: ModelInfo[] = [];
-  let cursor: string | undefined;
 
-  for (let page = 0; page < ANTHROPIC_MAX_PAGES; page++) {
+  async function fetchPage(
+    cursor: string | undefined,
+    remainingPages: number,
+  ): Promise<void> {
+    if (remainingPages === 0) return;
+
     const url = new URL('https://api.anthropic.com/v1/models');
     url.searchParams.set('limit', '100');
     if (cursor) url.searchParams.set('after_id', cursor);
@@ -209,17 +222,118 @@ async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]> {
       models.push({ id: m.id, name: m.display_name || m.id });
     }
 
-    if (!json.has_more || !json.last_id) break;
-    cursor = json.last_id;
+    if (json.has_more && json.last_id) {
+      await fetchPage(json.last_id, remainingPages - 1);
+    }
   }
 
-  return models.sort((a, b) => a.name.localeCompare(b.name));
+  await fetchPage(undefined, ANTHROPIC_MAX_PAGES);
+
+  return models.toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 type ModelFetcher = (
   apiKey: string,
   baseURL?: string,
 ) => Promise<ModelInfo[]>;
+
+async function fetchPuterModels(apiKey: string): Promise<ModelInfo[]> {
+  if (puterSdk.authToken !== apiKey) {
+    puterSdk.setAuthToken(apiKey);
+  }
+
+  await puterSdk.auth.getUser();
+  const rawModels = await puterSdk.ai.listModels();
+
+  return rawModels
+    .filter((model): model is Record<string, unknown> =>
+      typeof model === 'object' && model !== null,
+    )
+    .flatMap((model) => {
+      const id = typeof model.id === 'string' ? model.id : null;
+
+      if (!id) return [];
+
+      const name = typeof model.name === 'string' ? model.name : id;
+      const provider =
+        typeof model.provider === 'string' ? model.provider : null;
+
+      return [{ id, name: provider ? name + ' (' + provider + ')' : name }];
+    })
+    .toSorted((a, b) => a.name.localeCompare(b.name));
+}
+
+function mapStructuredProviderError(
+  provider: string,
+  error: unknown,
+): AppError | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const root = error as Record<string, unknown>;
+  const nested =
+    typeof root.error === 'object' && root.error !== null
+      ? (root.error as Record<string, unknown>)
+      : null;
+  const status = Number(root.status ?? nested?.status ?? root.statusCode);
+  const code = String(root.code ?? nested?.code ?? '').toLowerCase();
+  const message = String(
+    root.message ?? nested?.message ?? root.reason ?? '',
+  );
+
+  if (status === 401 || /auth|token|unauthori[sz]|reauth/.test(code)) {
+    if (provider === 'puter') {
+      return new AuthError({
+        code: ErrorCode.AUTH_INVALID_API_KEY,
+        userMessage:
+          'Invalid Puter token. Copy a fresh token from Puter account settings.',
+      });
+    }
+    return AuthError.invalidApiKey();
+  }
+
+  if (
+    status === 402 ||
+    /insufficient_funds|usage_limit|usage_limited|payment_required/.test(code)
+  ) {
+    return AuthError.paymentRequired();
+  }
+  
+  if (
+    status === 403 ||
+    /permission_denied|forbidden|access_denied/.test(code)
+  ) {
+    return AuthError.accessDenied();
+  }
+
+  if (status === 429 || /rate_limit|rate_limited|too_many_requests/.test(code)) {
+    return NetworkError.rateLimited();
+  }
+
+  if (status >= 500) return NetworkError.providerUnavailable(status);
+
+  if (status === 404) {
+    return ValidationError.invalidInput(
+      'No models were found for ' +
+        provider +
+        '. Check the provider token and try again.',
+      { provider, status },
+    );
+  }
+
+  if (/invalid_request|bad_request|unsupported/.test(code)) {
+    return ValidationError.invalidInput(
+      message || 'The ' + provider + ' model endpoint rejected the request.',
+      { provider, code },
+    );
+  }
+  
+  if (
+    status === 0 &&
+    ('readyState' in root || 'responseText' in root || 'statusText' in root)
+  ) {
+    return NetworkError.connectionFailed();
+  }
+  return null;
+}
 
 const MODEL_FETCHERS: Record<string, ModelFetcher> = {
   google: (apiKey) => fetchGoogleModels(apiKey),
@@ -241,6 +355,7 @@ const MODEL_FETCHERS: Record<string, ModelFetcher> = {
   huggingface: (apiKey) =>
     fetchOpenAICompatibleModels(apiKey, 'https://router.huggingface.co/v1'),
   anthropic: (apiKey) => fetchAnthropicModels(apiKey),
+  puter: (apiKey) => fetchPuterModels(apiKey),
 };
 
 export class ModelFetchService implements IModelFetchService {
@@ -326,6 +441,9 @@ export class ModelFetchService implements IModelFetchService {
       }
       return NetworkError.serverError(error.status, error.url);
     }
+
+    const structuredError = mapStructuredProviderError(provider, error);
+    if (structuredError) return structuredError;
 
     if (
       error instanceof TypeError ||

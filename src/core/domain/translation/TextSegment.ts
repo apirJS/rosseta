@@ -5,10 +5,10 @@ import type { Language } from './Language';
 
 export class TextSegment extends ValueObject {
   private constructor(
-    private readonly _text: string,
-    private readonly _language: Language,
-    private readonly _blockIndex: number,
-    private readonly _romanization?: string | null,
+    private readonly textValue: string,
+    private readonly languageValue: Language,
+    private readonly blockIndexValue: number,
+    private readonly romanizationValue?: string | null,
   ) {
     super();
   }
@@ -37,18 +37,18 @@ export class TextSegment extends ValueObject {
   }
 
   public get text(): string {
-    return this._text;
+    return this.textValue;
   }
 
   public get language(): Language {
-    return this._language;
+    return this.languageValue;
   }
 
   public get blockIndex(): number {
-    return this._blockIndex;
+    return this.blockIndexValue;
   }
 
   public get romanization(): string | null {
-    return this._romanization ?? null;
+    return this.romanizationValue ?? null;
   }
 }

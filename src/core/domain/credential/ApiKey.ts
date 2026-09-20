@@ -5,8 +5,8 @@ import type { AnyProvider } from './Provider';
 
 export class ApiKey extends ValueObject {
   private constructor(
-    private readonly _value: string,
-    private readonly _provider: AnyProvider,
+    private readonly apiKeyValue: string,
+    private readonly providerValue: AnyProvider,
   ) {
     super();
   }
@@ -30,10 +30,10 @@ export class ApiKey extends ValueObject {
   }
 
   public get value(): string {
-    return this._value;
+    return this.apiKeyValue;
   }
 
   public get provider(): AnyProvider {
-    return this._provider;
+    return this.providerValue;
   }
 }

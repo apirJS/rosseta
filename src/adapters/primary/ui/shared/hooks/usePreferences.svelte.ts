@@ -45,17 +45,17 @@ export interface PreferencesUseCasesDeps {
   onThemeApplied?: (theme: 'dark' | 'light') => void;
 }
 
+function resolveTheme(theme: Theme): 'dark' | 'light' {
+  if (theme.isSystem) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  }
+  return theme.isDark ? 'dark' : 'light';
+}
+
 export function usePreferences(useCases: PreferencesUseCasesDeps) {
   const state = new PreferencesState();
-
-  function resolveTheme(theme: Theme): 'dark' | 'light' {
-    if (theme.isSystem) {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
-    }
-    return theme.isDark ? 'dark' : 'light';
-  }
 
   function applyTheme(resolved: 'dark' | 'light') {
     state.resolvedTheme = resolved;

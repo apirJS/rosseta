@@ -11,6 +11,7 @@ Thank you for your interest in contributing! This document provides everything y
 - [Architecture Overview](#architecture-overview)
 - [Project Structure](#project-structure)
 - [Development Workflow](#development-workflow)
+- [Pull Request Checks](#pull-request-checks)
 - [Coding Standards](#coding-standards)
 - [Testing](#testing)
 - [Commit Guidelines](#commit-guidelines)
@@ -119,6 +120,7 @@ src/
 │       ├── google/ groq/ xai/     # @ai-sdk/* translation adapters (thin)
 │       ├── openai/ anthropic/ ... # one directory per provider
 │       ├── huggingface/ opencode/ # incl. Hugging Face + OpenCode
+│       ├── puter/                 # Puter SDK translation adapter
 │       ├── openai-compatible/     # custom OpenAI-compatible providers
 │       ├── anthropic-compatible/  # custom Anthropic-compatible providers
 │       ├── model-fetchers/        # ModelFetchService (provider /models APIs)
@@ -147,6 +149,7 @@ src/
 | `bun run build:dev:chrome`  | Development build with watch mode (Chrome)      |
 | `bun run build:dev:firefox` | Development build with watch mode (Firefox)     |
 | `bun run build:prod`        | Production build for both browsers              |
+| `bun run lint`              | Lint TypeScript, JavaScript, and Svelte files with Oxlint |
 | `bun run test:logic`        | Domain, application, background, content, adapter tests |
 | `bun run test:ui`           | Svelte component + `*.svelte.ts` controller tests (Vitest + jsdom) |
 | `bun run test`              | Run all tests                                   |
@@ -175,6 +178,24 @@ bun run test:logic
 # Before committing
 bun run check && bun run test
 ```
+
+## Pull Request Checks
+
+`.github/workflows/pr-checks.yml` runs for opened, updated, reopened, and
+ready-for-review pull requests. It runs four checks for each approved PR:
+
+- `lint` — Oxlint diagnostics with warnings treated as failures
+- `test` — the full logic and UI test suite
+- `typecheck` — Svelte and TypeScript checks
+- `build` — production Chrome and Firefox builds
+
+The `Verify & Test` job aggregates those jobs into the status required by the
+`main` branch ruleset. It fails if any individual check fails or is skipped.
+
+GitHub's outside-collaborator approval policy holds workflow runs from other
+authors before a runner checks out or executes their code. Once a maintainer
+approves the run, the same checks proceed normally. `.github/CODEOWNERS`
+requires review from `@apirJS` for every file.
 
 ## Coding Standards
 
@@ -371,7 +392,7 @@ ProviderRegistry.register({
 
 #### 3. Create the translation adapter
 
-Create `src/adapters/secondary/<provider>/YourProviderTranslationAdapter.ts`. Each adapter is a thin class that creates the `@ai-sdk/*` client, resolves the model id for **its own** provider, and delegates to the shared `executeTranslation()`. Copy an existing adapter (e.g. [GroqTranslationAdapter.ts](src/adapters/secondary/groq/GroqTranslationAdapter.ts)) verbatim and swap the client — every adapter has this exact shape:
+Create `src/adapters/secondary/<provider>/YourProviderTranslationAdapter.ts`. For providers supported by the Vercel AI SDK, the adapter creates the `@ai-sdk/*` client, resolves the model id for **its own** provider, and delegates to the shared `executeTranslation()`. Copy an existing adapter such as [GroqTranslationAdapter.ts](src/adapters/secondary/groq/GroqTranslationAdapter.ts) and swap the client:
 
 ```typescript
 import { createYourProvider } from '@ai-sdk/your-provider';
@@ -405,21 +426,25 @@ export class YourProviderTranslationAdapter implements ITranslationService {
 
 The prompt, response schema, parse/repair fallback, and domain mapping live in `src/adapters/secondary/shared/` — do not duplicate them per provider.
 
+Providers that need a separate SDK may implement `ITranslationService` directly. Keep the same domain boundary and reuse the shared prompt, JSON parser, and response mapper. [PuterTranslationAdapter.ts](src/adapters/secondary/puter/PuterTranslationAdapter.ts) is the reference: it uses `@heyputer/puter.js`, sends the full response schema through `buildPlainPrompt()`, parses the returned JSON manually, and maps SDK errors to the existing `AppError` types. It authenticates with a user-created token from [Puter account settings](https://puter.com/#account); do not use `puter.auth.signIn()` from the extension popup because Puter does not accept extension URLs as sign-in origins.
+
 #### 4. Wire into the adapter factory
 
 **File:** `src/adapters/secondary/TranslationAdapterFactory.ts` — add a `case` for your provider in the switch statement (the `default` branch is an exhaustive `never` check, so TypeScript will remind you).
 
 #### 5. Add model fetching
 
-**File:** `src/adapters/secondary/model-fetchers/ModelFetchService.ts` — add your provider to the `MODEL_FETCHERS` record. If the provider exposes an OpenAI-compatible `/v1/models` endpoint, reuse `fetchOpenAICompatibleModels`. If it has no list endpoint, omit it — users add models manually.
+**File:** `src/adapters/secondary/model-fetchers/ModelFetchService.ts` — add your provider to the `MODEL_FETCHERS` record. If the provider exposes an OpenAI-compatible `/v1/models` endpoint, reuse `fetchOpenAICompatibleModels`. A provider-specific SDK can use its own model-list method. If it has no list endpoint, omit it — users add models manually.
+
+Check the SDK's failure behavior before mapping errors. Puter's `ai.listModels()` returns an empty list when its endpoint or driver fails, so its fetcher first calls `auth.getUser()` to validate the token and surface an actionable authentication error.
 
 ### UI layer
 
 #### 6. Add UI metadata
 
-**File:** `src/adapters/primary/ui/shared/constants/providers.ts` — add a `PROVIDER_BADGE_COLORS` entry and the API key URL to `API_KEY_URLS`.
+**File:** `src/adapters/primary/ui/shared/constants/providers.ts` — add a `PROVIDER_BADGE_COLORS` entry and the API key URL to `API_KEY_URLS`. If credential setup needs provider-specific guidance, add a short note to the Manage Keys page; PuterJS links users to its account page because its credential is an auth token.
 
-The Manage Keys page reads the provider list straight from `PROVIDERS`, so no other UI edit is needed.
+The Manage Keys page reads the provider list straight from `PROVIDERS`, so no separate provider-list wiring is needed.
 
 ### Tests & fixtures
 

@@ -10,20 +10,20 @@ import { StorageError } from '../../src/shared/errors';
 
 export class FakeCustomProviderStorage implements ICustomProviderStorage {
   private providers: CustomProviderConfig[] = [];
-  private _failNext: AppError | null = null;
+  private nextFailure: AppError | null = null;
 
   constructor(initial: CustomProviderConfig[] = []) {
     this.providers = initial;
   }
 
   failNext(error: AppError): void {
-    this._failNext = error;
+    this.nextFailure = error;
   }
 
   private checkFailure(): AppError | null {
-    if (this._failNext) {
-      const err = this._failNext;
-      this._failNext = null;
+    if (this.nextFailure) {
+      const err = this.nextFailure;
+      this.nextFailure = null;
       return err;
     }
     return null;

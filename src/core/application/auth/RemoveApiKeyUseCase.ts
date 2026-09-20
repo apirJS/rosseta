@@ -1,7 +1,7 @@
 import type { IRemoveApiKeyUseCase } from '../../ports/inbound/auth/IRemoveApiKeyUseCase';
 import type { ICredentialStorage } from '../../ports/outbound/ICredentialStorage';
 import { success, failure, type Result } from '../../../shared/types/Result';
-import { AuthError, type AppError } from '../../../shared/errors';
+import type { AppError } from '../../../shared/errors';
 import { Credentials } from '../../domain/credential/Credentials';
 import { v4 as uuidv4 } from 'uuid';
 

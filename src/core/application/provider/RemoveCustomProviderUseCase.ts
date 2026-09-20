@@ -23,8 +23,14 @@ export class RemoveCustomProviderUseCase
     const credentialsResult = await this.credentialStorage.get();
     if (credentialsResult.success && credentialsResult.data) {
       const credentials = credentialsResult.data;
-      for (const credential of credentials.getByProvider(id)) {
-        const updated = credentials.remove(credential.id);
+      const providerCredentials = credentials.getByProvider(id);
+      const updated = providerCredentials
+        .reduce(
+          (current, credential) => current.remove(credential.id),
+          credentials,
+        );
+
+      if (providerCredentials.length > 0) {
         const saveResult = await this.credentialStorage.save(updated);
         if (!saveResult.success) {
           return failure(saveResult.error);

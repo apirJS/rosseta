@@ -1,19 +1,19 @@
 export class ThemeManager {
-  private _current: 'dark' | 'light';
+  private currentTheme: 'dark' | 'light';
   private readonly hosts: HTMLElement[] = [];
 
   constructor() {
-    this._current = window.matchMedia('(prefers-color-scheme: dark)').matches
+    this.currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
       ? 'dark'
       : 'light';
   }
 
   get current(): 'dark' | 'light' {
-    return this._current;
+    return this.currentTheme;
   }
 
   registerHost(host: HTMLElement): void {
-    this.applyThemeToHost(host, this._current);
+    this.applyThemeToHost(host, this.currentTheme);
     this.hosts.push(host);
   }
 
@@ -23,7 +23,7 @@ export class ThemeManager {
   }
 
   setTheme(theme: 'dark' | 'light'): void {
-    this._current = theme;
+    this.currentTheme = theme;
     for (const host of this.hosts) {
       this.applyThemeToHost(host, theme);
     }

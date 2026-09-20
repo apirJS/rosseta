@@ -8,63 +8,63 @@ import type { AppError } from '../../src/shared/errors';
 import { v4 as uuidv4 } from 'uuid';
 
 export class FakeUserPreferencesStorage implements IUserPreferencesStorage {
-  private _storage: UserPreferences | null = null;
-  private _error: AppError | null = null;
-  private _setError: AppError | null = null;
-  private _setCalls: Partial<UserPreferencesProps>[] = [];
+  private storageValue: UserPreferences | null = null;
+  private injectedError: AppError | null = null;
+  private setErrorValue: AppError | null = null;
+  private setCallValues: Partial<UserPreferencesProps>[] = [];
 
   /** Seed the fake with pre-existing preferences */
   seed(preferences: UserPreferences): void {
-    this._storage = preferences;
+    this.storageValue = preferences;
   }
 
   /** Make the next call fail once with the given error */
   failNextCallWith(error: AppError): void {
-    this._error = error;
+    this.injectedError = error;
   }
 
   /** Make the next set() call fail once with the given error */
   failNextSetWith(error: AppError): void {
-    this._setError = error;
+    this.setErrorValue = error;
   }
 
   get stored(): UserPreferences | null {
-    return this._storage;
+    return this.storageValue;
   }
 
   /** Every partial payload passed to set(), in call order */
   get setCalls(): readonly Partial<UserPreferencesProps>[] {
-    return this._setCalls;
+    return this.setCallValues;
   }
 
   async get(): Promise<Result<UserPreferences | null, AppError>> {
-    if (this._error) {
-      const error = this._error;
-      this._error = null;
+    if (this.injectedError) {
+      const error = this.injectedError;
+      this.injectedError = null;
       return failure(error);
     }
-    return success(this._storage);
+    return success(this.storageValue);
   }
 
   async set(
     preferences: Partial<UserPreferencesProps>,
   ): Promise<Result<void, AppError>> {
-    if (this._setError) {
-      const error = this._setError;
-      this._setError = null;
+    if (this.setErrorValue) {
+      const error = this.setErrorValue;
+      this.setErrorValue = null;
       return failure(error);
     }
 
-    if (this._error) {
-      const error = this._error;
-      this._error = null;
+    if (this.injectedError) {
+      const error = this.injectedError;
+      this.injectedError = null;
       return failure(error);
     }
 
-    this._setCalls.push(preferences);
+    this.setCallValues.push(preferences);
 
     const base: UserPreferencesProps =
-      this._storage?.toProps() ??
+      this.storageValue?.toProps() ??
       UserPreferences.createDefault(uuidv4()).toProps();
     const merged = { ...base, ...preferences };
     const result = UserPreferences.fromRaw({
@@ -75,18 +75,18 @@ export class FakeUserPreferencesStorage implements IUserPreferencesStorage {
       includeDescription: merged.includeDescription,
     });
     if (result.success) {
-      this._storage = result.data;
+      this.storageValue = result.data;
     }
     return success(undefined);
   }
 
   async clear(): Promise<Result<void, AppError>> {
-    if (this._error) {
-      const error = this._error;
-      this._error = null;
+    if (this.injectedError) {
+      const error = this.injectedError;
+      this.injectedError = null;
       return failure(error);
     }
-    this._storage = null;
+    this.storageValue = null;
     return success(undefined);
   }
 }

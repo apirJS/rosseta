@@ -5,40 +5,40 @@ import { AppError } from '../../src/shared/errors';
 import { failure, type Result, success } from '../../src/shared/types/Result';
 
 export class FakeKeySelectionStorage implements IKeySelectionStorage {
-  private _mode: KeySelectionMode = KeySelectionMode.manual();
-  private _lastUsedIds = new Map<string, string>();
-  private _error: AppError | null = null;
+  private selectionMode: KeySelectionMode = KeySelectionMode.manual();
+  private lastUsedIdValues = new Map<string, string>();
+  private injectedError: AppError | null = null;
 
   failNextCallWith(error: AppError): void {
-    this._error = error;
+    this.injectedError = error;
   }
 
   /** Seed the mode for testing. */
   seedMode(mode: KeySelectionMode): void {
-    this._mode = mode;
+    this.selectionMode = mode;
   }
 
   /** Seed a lastUsedId for testing. */
   seedLastUsedId(provider: string, id: string): void {
-    this._lastUsedIds.set(provider, id);
+    this.lastUsedIdValues.set(provider, id);
   }
 
   private consumeError(): AppError | null {
-    const e = this._error;
-    this._error = null;
+    const e = this.injectedError;
+    this.injectedError = null;
     return e;
   }
 
   async getMode(): Promise<Result<KeySelectionMode, AppError>> {
     const error = this.consumeError();
     if (error) return failure(error);
-    return success(this._mode);
+    return success(this.selectionMode);
   }
 
   async setMode(mode: KeySelectionMode): Promise<Result<void, AppError>> {
     const error = this.consumeError();
     if (error) return failure(error);
-    this._mode = mode;
+    this.selectionMode = mode;
     return success(undefined);
   }
 
@@ -47,7 +47,7 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
   ): Promise<Result<string | null, AppError>> {
     const error = this.consumeError();
     if (error) return failure(error);
-    return success(this._lastUsedIds.get(provider) ?? null);
+    return success(this.lastUsedIdValues.get(provider) ?? null);
   }
 
   async setLastUsedId(
@@ -56,7 +56,7 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
   ): Promise<Result<void, AppError>> {
     const error = this.consumeError();
     if (error) return failure(error);
-    this._lastUsedIds.set(provider, credentialId);
+    this.lastUsedIdValues.set(provider, credentialId);
     return success(undefined);
   }
 
@@ -65,7 +65,7 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
   > {
     const error = this.consumeError();
     if (error) return failure(error);
-    return success(Object.fromEntries(this._lastUsedIds));
+    return success(Object.fromEntries(this.lastUsedIdValues));
   }
 
   async replaceLastUsedIds(
@@ -73,7 +73,7 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
   ): Promise<Result<void, AppError>> {
     const error = this.consumeError();
     if (error) return failure(error);
-    this._lastUsedIds = new Map(Object.entries(ids));
+    this.lastUsedIdValues = new Map(Object.entries(ids));
     return success(undefined);
   }
 }

@@ -11,24 +11,24 @@ export const THEME_OPTIONS = {
 export type ThemeValue = keyof typeof THEME_OPTIONS;
 
 export class Theme extends ValueObject {
-  private constructor(private readonly _value: ThemeValue) {
+  private constructor(private readonly themeValue: ThemeValue) {
     super();
   }
 
   public get value(): ThemeValue {
-    return this._value;
+    return this.themeValue;
   }
 
   public get isSystem(): boolean {
-    return this._value === 'system';
+    return this.themeValue === 'system';
   }
 
   public get isDark(): boolean {
-    return this._value === 'dark';
+    return this.themeValue === 'dark';
   }
 
   public get isLight(): boolean {
-    return this._value === 'light';
+    return this.themeValue === 'light';
   }
 
   public static create(value: ThemeValue): Theme {

@@ -102,16 +102,16 @@ export class OverlayController {
       rafId = null;
     };
 
-    const handlePointerMove = (e: PointerEvent) => {
-      currentX = Math.max(0, Math.min(e.clientX, winWidth));
-      currentY = Math.max(0, Math.min(e.clientY, winHeight));
+    const handlePointerMove = (event: PointerEvent) => {
+      currentX = Math.max(0, Math.min(event.clientX, winWidth));
+      currentY = Math.max(0, Math.min(event.clientY, winHeight));
 
       if (rafId === null) {
         rafId = requestAnimationFrame(updateBox);
       }
     };
 
-    const handlePointerUp = async (e: PointerEvent) => {
+    const handlePointerUp = async (event: PointerEvent) => {
       if (rafId !== null) cancelAnimationFrame(rafId);
 
       this.isPointerMoving = false;
@@ -119,10 +119,10 @@ export class OverlayController {
 
       target.removeEventListener('pointermove', handlePointerMove);
       target.removeEventListener('pointerup', handlePointerUp);
-      target.releasePointerCapture(e.pointerId);
+      target.releasePointerCapture(event.pointerId);
 
-      const finalX = Math.max(0, Math.min(e.clientX, winWidth));
-      const finalY = Math.max(0, Math.min(e.clientY, winHeight));
+      const finalX = Math.max(0, Math.min(event.clientX, winWidth));
+      const finalY = Math.max(0, Math.min(event.clientY, winHeight));
 
       const width = Math.abs(finalX - initialX);
       const height = Math.abs(finalY - initialY);
@@ -176,7 +176,7 @@ export class OverlayController {
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.onload = () => {
+      img.addEventListener('load', () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -206,8 +206,8 @@ export class OverlayController {
         );
 
         resolve(canvas.toDataURL('image/jpeg', 0.8));
-      };
-      img.onerror = (e) => reject(e);
+      });
+      img.addEventListener('error', (event) => reject(event));
       img.src = sourceUrl;
     });
   }

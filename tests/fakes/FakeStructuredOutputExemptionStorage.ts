@@ -6,13 +6,13 @@ export class FakeStructuredOutputExemptionStorage
   implements IStructuredOutputExemptionStorage
 {
   private readonly exempted = new Set<string>();
-  private _error: AppError | null = null;
+  private injectedError: AppError | null = null;
 
   readonly isExemptCalls: string[] = [];
   readonly exemptCalls: string[] = [];
 
   failNextCallWith(error: AppError): void {
-    this._error = error;
+    this.injectedError = error;
   }
 
   seedExempt(modelKey: string): void {
@@ -24,8 +24,8 @@ export class FakeStructuredOutputExemptionStorage
   }
 
   private consumeError(): AppError | null {
-    const error = this._error;
-    this._error = null;
+    const error = this.injectedError;
+    this.injectedError = null;
     return error;
   }
 

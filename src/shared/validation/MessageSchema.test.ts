@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { MessageSchema, type Message, COMMAND } from './MessageSchema';
+import { MessageSchema, COMMAND } from './MessageSchema';
 
 describe('Shared: MessageSchema', () => {
   // ==================== VALID MESSAGES ====================

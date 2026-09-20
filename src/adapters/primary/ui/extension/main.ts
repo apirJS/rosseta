@@ -1,8 +1,12 @@
 import { mount } from 'svelte';
 import { ExtensionThemeBroadcaster } from './services/ExtensionThemeBroadcaster';
-import '../styles/app.css';
+import appStyles from '../styles/app.css?inline';
 import App from './App.svelte';
 import { uiContainer } from './di-container';
+
+const style = document.createElement('style');
+style.textContent = appStyles;
+document.head.appendChild(style);
 
 const authUseCases = {
   addApiKey: uiContainer.addApiKeyUseCase,

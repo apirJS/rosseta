@@ -14,8 +14,8 @@ export interface CredentialProps {
 export class Credential extends Entity<string> {
   private constructor(
     id: string,
-    private readonly _apiKey: ApiKey,
-    private readonly _provider: AnyProvider,
+    private readonly apiKeyValue: ApiKey,
+    private readonly providerValue: AnyProvider,
   ) {
     super(id);
   }
@@ -46,19 +46,19 @@ export class Credential extends Entity<string> {
   }
 
   get provider(): AnyProvider {
-    return this._provider;
+    return this.providerValue;
   }
 
   get apiKey(): ApiKey {
-    return this._apiKey;
+    return this.apiKeyValue;
   }
 
   toProps(): CredentialProps {
     return {
       id: this.id,
       type: 'API_KEY',
-      provider: this._provider,
-      apiKey: this._apiKey.value,
+      provider: this.providerValue,
+      apiKey: this.apiKeyValue.value,
     };
   }
 }

@@ -24,7 +24,13 @@ export function isCustomProviderId(id: string): id is `custom-${string}` {
 
 const URL_PATTERN = /^https?:\/\/.+/;
 const HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+
+function containsControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f);
+  });
+}
 
 function validateHeaders(
   headers: Record<string, string> | undefined,
@@ -35,7 +41,7 @@ function validateHeaders(
     if (!HEADER_NAME_PATTERN.test(name)) {
       return failure(new DomainError(`Invalid header name: "${name}"`));
     }
-    if (CONTROL_CHARACTER_PATTERN.test(value)) {
+    if (containsControlCharacter(value)) {
       return failure(
         new DomainError(`Header "${name}" contains control characters`),
       );
@@ -55,8 +61,8 @@ function validateQueryParams(
       return failure(new DomainError('Query parameter names cannot be empty'));
     }
     if (
-      CONTROL_CHARACTER_PATTERN.test(name) ||
-      CONTROL_CHARACTER_PATTERN.test(value)
+      containsControlCharacter(name) ||
+      containsControlCharacter(value)
     ) {
       return failure(
         new DomainError(

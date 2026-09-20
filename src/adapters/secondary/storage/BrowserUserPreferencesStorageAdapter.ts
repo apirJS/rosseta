@@ -68,7 +68,7 @@ export class BrowserUserPreferencesStorageAdapter implements IUserPreferencesSto
       }
 
       return success(preferencesResult.data);
-    } catch (error) {
+    } catch {
       return failure(StorageError.readFailed(STORAGE_KEY));
     }
   }

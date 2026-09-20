@@ -17,6 +17,7 @@ import { OpenCodeTranslationAdapter } from './opencode/OpenCodeTranslationAdapte
 import { HuggingFaceTranslationAdapter } from './huggingface/HuggingFaceTranslationAdapter';
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
 import { AnthropicCompatibleTranslationAdapter } from './anthropic-compatible/AnthropicCompatibleTranslationAdapter';
+import { PuterTranslationAdapter } from './puter/PuterTranslationAdapter';
 
 export function createTranslationAdapter(
   credential: Credential,
@@ -64,9 +65,11 @@ export function createTranslationAdapter(
       return new OpenCodeTranslationAdapter(credential, preferences, structuredOutputExemptions);
     case 'huggingface':
       return new HuggingFaceTranslationAdapter(credential, preferences, structuredOutputExemptions);
+    case 'puter':
+      return new PuterTranslationAdapter(credential, preferences);
     default: {
-      const _exhaustive: never = credential.provider;
-      throw new Error(`Unknown provider: ${_exhaustive}`);
+      const exhaustiveProvider: never = credential.provider;
+      throw new Error(`Unknown provider: ${exhaustiveProvider}`);
     }
   }
 }

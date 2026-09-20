@@ -7,18 +7,18 @@ export type LanguageCode = keyof typeof LANGUAGE_MAP;
 
 export class Language extends ValueObject {
   private constructor(
-    private readonly _code: LanguageCode,
-    private readonly _name: string,
+    private readonly codeValue: LanguageCode,
+    private readonly nameValue: string,
   ) {
     super();
   }
 
   public get code(): LanguageCode {
-    return this._code;
+    return this.codeValue;
   }
 
   public get name(): string {
-    return this._name;
+    return this.nameValue;
   }
 
   public static create(code: LanguageCode): Language {

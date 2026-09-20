@@ -3,6 +3,22 @@ import tailwindStyles from '../../ui/styles/app.css?inline';
 import Overlay from '../../ui/injected/screen-overlay/Overlay.svelte';
 import { CSS_MAX_Z_INDEX } from '../../ui/shared/constants/ui';
 
+const SCROLL_KEYS = new Set([
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  ' ',
+  'PageUp',
+  'PageDown',
+  'Home',
+  'End',
+]);
+
+function preventScroll(event: Event): void {
+  event.preventDefault();
+}
+
 export class OverlayHandler {
   private static readonly HOST_ID = 'rosseta-host';
 
@@ -34,18 +50,6 @@ export class OverlayHandler {
       pointerEvents: 'auto',
     } satisfies Partial<CSSStyleDeclaration>);
 
-    const preventScroll = (e: Event) => e.preventDefault();
-    const SCROLL_KEYS = new Set([
-      'ArrowUp',
-      'ArrowDown',
-      'ArrowLeft',
-      'ArrowRight',
-      ' ',
-      'PageUp',
-      'PageDown',
-      'Home',
-      'End',
-    ]);
     const preventScrollKeys = (e: KeyboardEvent) => {
       if (SCROLL_KEYS.has(e.key)) e.preventDefault();
     };

@@ -1,0 +1,54 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn"
+  },
+  "env": {
+    "browser": true,
+    "webextensions": true
+  },
+  "ignorePatterns": ["dist/**", "coverage/**"],
+  "overrides": [
+    {
+      "files": ["vite.config.ts", "release.config.mjs", "scripts/**/*.ts"],
+      "env": {
+        "node": true
+      }
+    },
+    {
+      "files": ["src/adapters/primary/background/**/*.ts"],
+      "env": {
+        "serviceworker": true
+      }
+    },
+    {
+      "files": ["src/**/*.svelte"],
+      "env": {
+        "svelte": true
+      }
+    },
+    {
+      "files": ["src/adapters/primary/ui/**/*.test.ts"],
+      "plugins": [
+        "eslint",
+        "typescript",
+        "unicorn",
+        "oxc",
+        "import",
+        "vitest"
+      ],
+      "env": {
+        "vitest": true
+      }
+    },
+    {
+      "files": ["**/*.test.ts"],
+      "env": {
+        "node": true
+      }
+    }
+  ]
+}

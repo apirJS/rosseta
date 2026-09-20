@@ -12,6 +12,7 @@ import { OpenRouterTranslationAdapter } from './openrouter/OpenRouterTranslation
 import { OpenCodeTranslationAdapter } from './opencode/OpenCodeTranslationAdapter';
 import { HuggingFaceTranslationAdapter } from './huggingface/HuggingFaceTranslationAdapter';
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
+import { PuterTranslationAdapter } from './puter/PuterTranslationAdapter';
 import { CustomProviderConfig } from '../../core/domain/provider/CustomProviderConfig';
 import { Credential } from '../../core/domain/credential/Credential';
 import { UserPreferences } from '../../core/domain/preferences/UserPreferences';
@@ -59,6 +60,7 @@ describe('Adapter: TranslationAdapterFactory', () => {
     openrouter: OpenRouterTranslationAdapter,
     opencode: OpenCodeTranslationAdapter,
     huggingface: HuggingFaceTranslationAdapter,
+    puter: PuterTranslationAdapter,
   };
 
   for (const provider of Object.keys(expectedAdapters) as Provider[]) {

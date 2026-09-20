@@ -51,14 +51,15 @@ describe('UI Controller: OverlayController', () => {
 
     // Mock Image API (for decodeImage)
     global.Image = class {
-      onload: (() => void) | null = null;
       src: string = '';
       naturalWidth = 100;
       naturalHeight = 100;
       decode = vi.fn().mockResolvedValue(undefined);
-      constructor() {
-        setTimeout(() => this.onload?.(), 10);
-      }
+      addEventListener = vi.fn((type: string, listener: EventListener) => {
+        if (type === 'load') {
+          setTimeout(() => listener(new Event('load')), 10);
+        }
+      });
     } as unknown as typeof Image;
 
     // Mock Fetch (for loadBlob)

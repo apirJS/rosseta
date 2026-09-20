@@ -20,6 +20,15 @@ class HistoryState {
   pendingDelete = $state<PendingDelete | null>(null);
 }
 
+async function openItem(translation: Translation): Promise<void> {
+  const payload = serializeForModal(translation);
+
+  await sendMessageToRuntime({
+    action: 'MOUNT_HISTORY_MODAL',
+    payload,
+  });
+}
+
 export function createHistoryController() {
   const ctx = getTranslationContext();
   const state = new HistoryState();
@@ -113,15 +122,6 @@ export function createHistoryController() {
     copy.splice(Math.min(index, copy.length), 0, translation);
     state.translations = copy;
     state.pendingDelete = null;
-  }
-
-  async function openItem(translation: Translation) {
-    const payload = serializeForModal(translation);
-
-    await sendMessageToRuntime({
-      action: 'MOUNT_HISTORY_MODAL',
-      payload,
-    });
   }
 
   function destroy() {

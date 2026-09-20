@@ -1,3 +1,9 @@
+## [2.2.0](https://github.com/apirJS/rosseta/compare/v2.1.0...v2.2.0) (2026-09-20)
+
+### Features
+
+* add puter js provider ([#8](https://github.com/apirJS/rosseta/issues/8)) ([4c6fc8a](https://github.com/apirJS/rosseta/commit/4c6fc8ad545df65b472e32c2385dba18878e2fba))
+
 ## [2.1.0](https://github.com/apirJS/rosseta/compare/v2.0.0...v2.1.0) (2026-09-19)
 
 ### Features

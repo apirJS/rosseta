@@ -1,0 +1,69 @@
+name: PR checks
+
+# Configure GitHub to require approval for all outside collaborators before
+# these pull_request workflows are allowed to start.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run build:prod
+
+  verify:
+    name: Verify & Test
+    if: always()
+    needs: [test, typecheck, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every PR check to pass
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          if [ "$TEST_RESULT" != "success" ] || \
+             [ "$TYPECHECK_RESULT" != "success" ] || \
+             [ "$BUILD_RESULT" != "success" ]; then
+            echo "::error::One or more required PR checks did not pass."
+            printf 'test=%s\ntypecheck=%s\nbuild=%s\n' \
+              "$TEST_RESULT" "$TYPECHECK_RESULT" "$BUILD_RESULT"
+            exit 1
+          fi

@@ -18,6 +18,19 @@ export default defineConfig({
       onwarn(warning, warn) {
         // @tailwindcss/vite transforms CSS without emitting sourcemaps (dev-only notice)
         if (warning.code === 'SOURCEMAP_BROKEN') return;
+
+        // @heyputer/puter.js ships ESM files with guarded CommonJS fallback
+        // assignments (`module.exports`). Rollup reports these even though the
+        // `typeof module` / `typeof exports` checks keep those branches
+        // inactive in the browser bundle.
+        const warningId = warning.id?.replaceAll('\\', '/');
+        if (
+          warning.code === 'COMMONJS_VARIABLE_IN_ESM' &&
+          warningId?.includes('/node_modules/@heyputer/puter.js/')
+        ) {
+          return;
+        }
+
         warn(warning);
       },
     },

@@ -46,9 +46,9 @@
       </button>
     </div>
 
-    <div class="flex items-start gap-2">
+    <div class="flex items-start gap-2 min-w-0">
       <div
-        class="flex-1 bg-surface border border-border rounded-lg p-3 text-sm text-foreground font-mono break-all select-all leading-relaxed"
+        class="flex-1 min-w-0 max-h-32 overflow-y-auto bg-surface border border-border rounded-lg p-3 text-sm text-foreground font-mono break-all select-all leading-relaxed"
       >
         {apiKey}
       </div>

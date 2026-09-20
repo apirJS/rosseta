@@ -98,19 +98,6 @@
     disabled={auth.state.loading}
     onadd={() => controller.addApiKey()}
   />
-  {#if controller.state.selectedProvider === 'puter'}
-    <p class="mb-3 text-xs text-muted">
-      Get your Puter token from
-      <a
-        href="https://puter.com/#account"
-        target="_blank"
-        rel="noreferrer"
-        class="text-primary hover:underline"
-      >
-        Puter account settings
-      </a>.
-    </p>
-  {/if}
 
   <div class="flex flex-col gap-1.5 overflow-y-auto flex-1">
     {#each controller.visibleKeys as credential (credential.id)}

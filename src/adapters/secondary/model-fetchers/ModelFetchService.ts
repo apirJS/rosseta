@@ -10,12 +10,14 @@ import {
 import {
   AppError,
   AuthError,
+  ErrorCode,
   NetworkError,
   ValidationError,
 } from '../../../shared/errors';
 import { isCustomProviderId } from '../../../core/domain/provider/CustomProviderConfig';
 import type { CustomProviderType } from '../../../core/domain/provider/CustomProviderConfig';
 import { buildCustomProviderURL } from '../shared/custom-provider-request';
+import puter from '@heyputer/puter.js';
 
 class HttpError extends Error {
   constructor(
@@ -221,6 +223,104 @@ type ModelFetcher = (
   baseURL?: string,
 ) => Promise<ModelInfo[]>;
 
+async function fetchPuterModels(apiKey: string): Promise<ModelInfo[]> {
+  if (puter.authToken !== apiKey) {
+    puter.setAuthToken(apiKey);
+  }
+
+  await puter.auth.getUser();
+  const rawModels = await puter.ai.listModels();
+
+  return rawModels
+    .filter((model): model is Record<string, unknown> =>
+      typeof model === 'object' && model !== null,
+    )
+    .flatMap((model) => {
+      const id = typeof model.id === 'string' ? model.id : null;
+
+      if (!id) return [];
+
+      const name = typeof model.name === 'string' ? model.name : id;
+      const provider =
+        typeof model.provider === 'string' ? model.provider : null;
+
+      return [{ id, name: provider ? name + ' (' + provider + ')' : name }];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function mapStructuredProviderError(
+  provider: string,
+  error: unknown,
+): AppError | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const root = error as Record<string, unknown>;
+  const nested =
+    typeof root.error === 'object' && root.error !== null
+      ? (root.error as Record<string, unknown>)
+      : null;
+  const status = Number(root.status ?? nested?.status ?? root.statusCode);
+  const code = String(root.code ?? nested?.code ?? '').toLowerCase();
+  const message = String(
+    root.message ?? nested?.message ?? root.reason ?? '',
+  );
+
+  if (status === 401 || /auth|token|unauthori[sz]|reauth/.test(code)) {
+    if (provider === 'puter') {
+      return new AuthError({
+        code: ErrorCode.AUTH_INVALID_API_KEY,
+        userMessage:
+          'Invalid Puter token. Copy a fresh token from Puter account settings.',
+      });
+    }
+    return AuthError.invalidApiKey();
+  }
+
+  if (
+    status === 402 ||
+    /insufficient_funds|usage_limit|usage_limited|payment_required/.test(code)
+  ) {
+    return AuthError.paymentRequired();
+  }
+  
+  if (
+    status === 403 ||
+    /permission_denied|forbidden|access_denied/.test(code)
+  ) {
+    return AuthError.accessDenied();
+  }
+
+  if (status === 429 || /rate_limit|rate_limited|too_many_requests/.test(code)) {
+    return NetworkError.rateLimited();
+  }
+
+  if (status >= 500) return NetworkError.providerUnavailable(status);
+
+  if (status === 404) {
+    return ValidationError.invalidInput(
+      'No models were found for ' +
+        provider +
+        '. Check the provider token and try again.',
+      { provider, status },
+    );
+  }
+
+  if (/invalid_request|bad_request|unsupported/.test(code)) {
+    return ValidationError.invalidInput(
+      message || 'The ' + provider + ' model endpoint rejected the request.',
+      { provider, code },
+    );
+  }
+  
+  if (
+    status === 0 &&
+    ('readyState' in root || 'responseText' in root || 'statusText' in root)
+  ) {
+    return NetworkError.connectionFailed();
+  }
+  return null;
+}
+
 const MODEL_FETCHERS: Record<string, ModelFetcher> = {
   google: (apiKey) => fetchGoogleModels(apiKey),
   openai: (apiKey) =>
@@ -241,6 +341,7 @@ const MODEL_FETCHERS: Record<string, ModelFetcher> = {
   huggingface: (apiKey) =>
     fetchOpenAICompatibleModels(apiKey, 'https://router.huggingface.co/v1'),
   anthropic: (apiKey) => fetchAnthropicModels(apiKey),
+  puter: (apiKey) => fetchPuterModels(apiKey),
 };
 
 export class ModelFetchService implements IModelFetchService {
@@ -326,6 +427,9 @@ export class ModelFetchService implements IModelFetchService {
       }
       return NetworkError.serverError(error.status, error.url);
     }
+
+    const structuredError = mapStructuredProviderError(provider, error);
+    if (structuredError) return structuredError;
 
     if (
       error instanceof TypeError ||

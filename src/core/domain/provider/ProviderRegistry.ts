@@ -191,3 +191,10 @@ ProviderRegistry.register({
   defaultModelId: 'Qwen/Qwen2.5-VL-72B-Instruct',
   models: [],
 });
+
+ProviderRegistry.register({
+  id: 'puter',
+  name: 'PuterJS',
+  defaultModelId: '',
+  models: [],
+});

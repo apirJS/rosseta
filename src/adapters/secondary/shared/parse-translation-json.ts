@@ -5,10 +5,7 @@ import {
 import { success, failure, type Result } from '../../../shared/types/Result';
 import { TranslationError, type AppError } from '../../../shared/errors';
 
-export function extractJsonObject(text: string): string | null {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-
+function extractBalancedObject(text: string, start: number): string | null {
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -41,29 +38,48 @@ export function extractJsonObject(text: string): string | null {
   return null;
 }
 
+/**
+ * Returns every balanced JSON object candidate in the response.
+ *
+ * LLMs sometimes put an example object, a tool trace, or explanatory prose
+ * before the actual response. Starting at every opening brace lets the parser
+ * skip those candidates and continue looking for the first object that matches
+ * our response schema.
+ */
+export function extractJsonObjects(text: string): string[] {
+  const candidates: string[] = [];
+  for (let start = 0; start < text.length; start++) {
+    if (text[start] !== '{') continue;
+    const candidate = extractBalancedObject(text, start);
+    if (candidate !== null) candidates.push(candidate);
+  }
+  return candidates;
+}
+
+export function extractJsonObject(text: string): string | null {
+  return extractJsonObjects(text)[0] ?? null;
+}
+
 export function parseTranslationResponse(
   text: string,
 ): Result<TranslationResponse, AppError> {
-  const candidate = extractJsonObject(text.trim());
-  if (candidate === null) {
-    return failure(TranslationError.malformedResponse());
+  for (const candidate of extractJsonObjects(text)) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(candidate);
+    } catch {
+      continue;
+    }
+
+    const parsed = translationDataLenientSchema.safeParse(raw);
+    if (!parsed.success) continue;
+
+    return success({
+      success: parsed.data.success,
+      error: parsed.data.error ?? null,
+      data: parsed.data.data ?? null,
+    });
   }
 
-  let raw: unknown;
-  try {
-    raw = JSON.parse(candidate);
-  } catch {
-    return failure(TranslationError.malformedResponse());
-  }
-
-  const parsed = translationDataLenientSchema.safeParse(raw);
-  if (!parsed.success) {
-    return failure(TranslationError.malformedResponse());
-  }
-
-  return success({
-    success: parsed.data.success,
-    error: parsed.data.error ?? null,
-    data: parsed.data.data ?? null,
-  });
+  return failure(TranslationError.malformedResponse());
 }

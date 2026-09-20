@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   extractJsonObject,
+  extractJsonObjects,
   parseTranslationResponse,
 } from './parse-translation-json';
 import { ErrorCode } from '../../../shared/errors';
@@ -36,6 +37,13 @@ describe('Adapter: extractJsonObject', () => {
 
   test('takes the first complete object when multiple exist', () => {
     expect(extractJsonObject('{"a":1} trailing {"b":2}')).toBe('{"a":1}');
+  });
+
+  test('returns all balanced object candidates in the response', () => {
+    expect(extractJsonObjects('trace: {"step":1}\nanswer: {"a":2}')).toEqual([
+      '{"step":1}',
+      '{"a":2}',
+    ]);
   });
 
   test('returns null for text without an object', () => {
@@ -84,6 +92,29 @@ describe('Adapter: parseTranslationResponse', () => {
   test('parses a payload with prose around it', () => {
     const result = parseTranslationResponse(
       'Sure! Here is the translation:\n' + VALID_PAYLOAD + '\nLet me know if you need anything else.',
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  test('skips an unrelated JSON object before the translation payload', () => {
+    const result = parseTranslationResponse(
+      'The model selected this route: {"provider":"puter"}.\n' +
+        'Final answer:\n' +
+        VALID_PAYLOAD,
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.data?.originalText.contents[0].text).toBe(
+        'Where to Find Your Likes',
+      );
+    }
+  });
+
+  test('finds the payload after an incomplete object in the response', () => {
+    const result = parseTranslationResponse(
+      'Debug details: {"attempt":1\n' + VALID_PAYLOAD,
     );
 
     expect(result.success).toBe(true);

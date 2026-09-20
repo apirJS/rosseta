@@ -11,7 +11,8 @@ export type Provider =
   | 'zai'
   | 'openrouter'
   | 'opencode'
-  | 'huggingface';
+  | 'huggingface'
+  | 'puter';
 
 export const PROVIDERS: Provider[] = [
   'google',
@@ -25,6 +26,7 @@ export const PROVIDERS: Provider[] = [
   'openrouter',
   'opencode',
   'huggingface',
+  'puter',
 ];
 
 export const DEFAULT_PROVIDER: Provider = 'google';

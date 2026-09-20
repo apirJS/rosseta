@@ -113,6 +113,7 @@ describe('Domain: ProviderRegistry', () => {
         'openai',
         'opencode',
         'openrouter',
+        'puter',
         'xai',
         'zai',
       ]);

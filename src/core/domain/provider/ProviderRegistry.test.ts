@@ -103,7 +103,7 @@ describe('Domain: ProviderRegistry', () => {
   describe('getAllProviders', () => {
     test('returns configs for all registered providers', () => {
       const providers = ProviderRegistry.getAllProviders();
-      expect(providers.map((p) => p.id).sort()).toEqual([
+      expect(providers.map((p) => p.id).toSorted()).toEqual([
         'anthropic',
         'deepinfra',
         'google',

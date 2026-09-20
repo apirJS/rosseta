@@ -2,7 +2,7 @@ import type { ISetKeySelectionModeUseCase } from '../../ports/inbound/auth/ISetK
 import type { IKeySelectionStorage } from '../../ports/outbound/IKeySelectionStorage';
 import type { ICredentialStorage } from '../../ports/outbound/ICredentialStorage';
 import type { KeySelectionMode } from '../../domain/credential/KeySelectionMode';
-import { success, failure, type Result } from '../../../shared/types/Result';
+import { failure, type Result } from '../../../shared/types/Result';
 import { ValidationError, type AppError } from '../../../shared/errors';
 
 export class SetKeySelectionModeUseCase implements ISetKeySelectionModeUseCase {

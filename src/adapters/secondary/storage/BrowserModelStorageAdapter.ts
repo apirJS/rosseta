@@ -47,16 +47,23 @@ export class BrowserModelStorageAdapter implements IModelStorage {
       >;
 
       const byProvider: Record<string, StoredModel[]> = {};
+      const invalidKeys: string[] = [];
       for (const [key, raw] of Object.entries(all)) {
         if (!key.startsWith(MODELS_PREFIX)) continue;
 
         const parsed = StoredModelsSchema.safeParse(raw);
         if (!parsed.success) {
-          await browser.storage.local.remove(key);
+          invalidKeys.push(key);
           continue;
         }
 
         byProvider[key.slice(MODELS_PREFIX.length)] = parsed.data;
+      }
+
+      if (invalidKeys.length > 0) {
+        await browser.storage.local.remove(
+          invalidKeys.length === 1 ? invalidKeys[0] : invalidKeys,
+        );
       }
 
       return success(byProvider);

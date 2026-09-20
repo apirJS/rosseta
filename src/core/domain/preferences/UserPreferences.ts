@@ -16,37 +16,37 @@ export interface UserPreferencesProps {
 export class UserPreferences extends AggregateRoot<string> {
   private constructor(
     id: string,
-    private readonly _theme: Theme,
-    private readonly _targetLanguage: Language,
-    private readonly _selectedModels: Readonly<Record<string, string>>,
-    private readonly _includeDescription: boolean = true,
-    private readonly _shortcut: string | null = null,
+    private readonly themeValue: Theme,
+    private readonly targetLanguageValue: Language,
+    private readonly selectedModelsValue: Readonly<Record<string, string>>,
+    private readonly includeDescriptionValue: boolean = true,
+    private readonly shortcutValue: string | null = null,
   ) {
     super(id);
   }
 
   public get theme(): Theme {
-    return this._theme;
+    return this.themeValue;
   }
 
   public get targetLanguage(): Language {
-    return this._targetLanguage;
+    return this.targetLanguageValue;
   }
 
   public get selectedModels(): Readonly<Record<string, string>> {
-    return this._selectedModels;
+    return this.selectedModelsValue;
   }
 
   public get includeDescription(): boolean {
-    return this._includeDescription;
+    return this.includeDescriptionValue;
   }
 
   public get shortcut(): string | null {
-    return this._shortcut;
+    return this.shortcutValue;
   }
 
   public getModelIdFor(provider: string): string {
-    return this._selectedModels[provider] ?? ProviderRegistry.getDefaultModelId(provider);
+    return this.selectedModelsValue[provider] ?? ProviderRegistry.getDefaultModelId(provider);
   }
 
   public hasSelectedModel(provider: string): boolean {
@@ -64,7 +64,7 @@ export class UserPreferences extends AggregateRoot<string> {
     provider: string,
     availableModels: ReadonlyArray<{ id: string }>,
   ): string {
-    const saved = this._selectedModels[provider];
+    const saved = this.selectedModelsValue[provider];
     if (saved && availableModels.some((m) => m.id === saved)) return saved;
 
     const defaultId = ProviderRegistry.getDefaultModelId(provider);
@@ -78,10 +78,10 @@ export class UserPreferences extends AggregateRoot<string> {
   public toProps(): UserPreferencesProps {
     return {
       id: this.id,
-      theme: this._theme.value,
-      targetLanguage: this._targetLanguage.code,
-      selectedModels: { ...this._selectedModels },
-      includeDescription: this._includeDescription,
+      theme: this.themeValue.value,
+      targetLanguage: this.targetLanguageValue.code,
+      selectedModels: { ...this.selectedModelsValue },
+      includeDescription: this.includeDescriptionValue,
     };
   }
 
@@ -135,21 +135,21 @@ export class UserPreferences extends AggregateRoot<string> {
     return new UserPreferences(
       this.id,
       theme,
-      this._targetLanguage,
-      this._selectedModels,
-      this._includeDescription,
-      this._shortcut,
+      this.targetLanguageValue,
+      this.selectedModelsValue,
+      this.includeDescriptionValue,
+      this.shortcutValue,
     );
   }
 
   public withTargetLanguage(language: Language): UserPreferences {
     return new UserPreferences(
       this.id,
-      this._theme,
+      this.themeValue,
       language,
-      this._selectedModels,
-      this._includeDescription,
-      this._shortcut,
+      this.selectedModelsValue,
+      this.includeDescriptionValue,
+      this.shortcutValue,
     );
   }
 
@@ -159,32 +159,32 @@ export class UserPreferences extends AggregateRoot<string> {
   ): UserPreferences {
     return new UserPreferences(
       this.id,
-      this._theme,
-      this._targetLanguage,
-      { ...this._selectedModels, [provider]: modelId },
-      this._includeDescription,
-      this._shortcut,
+      this.themeValue,
+      this.targetLanguageValue,
+      { ...this.selectedModelsValue, [provider]: modelId },
+      this.includeDescriptionValue,
+      this.shortcutValue,
     );
   }
 
   public withIncludeDescription(includeDescription: boolean): UserPreferences {
     return new UserPreferences(
       this.id,
-      this._theme,
-      this._targetLanguage,
-      this._selectedModels,
+      this.themeValue,
+      this.targetLanguageValue,
+      this.selectedModelsValue,
       includeDescription,
-      this._shortcut,
+      this.shortcutValue,
     );
   }
 
   public withShortcut(shortcut: string | null): UserPreferences {
     return new UserPreferences(
       this.id,
-      this._theme,
-      this._targetLanguage,
-      this._selectedModels,
-      this._includeDescription,
+      this.themeValue,
+      this.targetLanguageValue,
+      this.selectedModelsValue,
+      this.includeDescriptionValue,
       shortcut,
     );
   }

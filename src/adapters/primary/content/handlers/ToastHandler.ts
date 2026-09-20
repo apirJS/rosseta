@@ -14,6 +14,10 @@ interface ShowToastPayload {
   duration?: number;
 }
 
+function retryTranslation(): Promise<unknown> {
+  return browser.runtime.sendMessage({ action: 'START_OVERLAY' });
+}
+
 export class ToastHandler {
   private static readonly HOST_ID = 'rosseta-toast-host';
   private host: HTMLElement | null = null;
@@ -56,9 +60,6 @@ export class ToastHandler {
   private showError(payload: ShowToastPayload): void {
     const { id, message, description } = payload;
     const errorDuration = payload.duration ?? 6000;
-    const onAction = () =>
-      browser.runtime.sendMessage({ action: 'START_OVERLAY' });
-
     if (id && toastController.toasts.find((t) => t.id === id)) {
       toastController.update(id, {
         type: 'error',
@@ -66,7 +67,7 @@ export class ToastHandler {
         description,
         duration: errorDuration,
         actionLabel: 'Retry',
-        onAction,
+        onAction: retryTranslation,
       });
     } else {
       toastController.show({
@@ -76,7 +77,7 @@ export class ToastHandler {
         description,
         duration: errorDuration,
         actionLabel: 'Retry',
-        onAction,
+        onAction: retryTranslation,
       });
     }
   }

@@ -66,7 +66,7 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
       if (!raw) return success(null);
 
       return this.toDomain(raw);
-    } catch (error) {
+    } catch {
       return failure(StorageError.readFailed(STORAGE_KEY));
     }
   }
@@ -85,7 +85,7 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
       }
 
       return success(translations);
-    } catch (error) {
+    } catch {
       return failure(StorageError.readFailed(STORAGE_KEY));
     }
   }
@@ -160,7 +160,7 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
       }
 
       return success(validated);
-    } catch (error) {
+    } catch {
       return failure(StorageError.readFailed(STORAGE_KEY));
     }
   }

@@ -1,4 +1,3 @@
-import type { Provider } from '../credential/Provider';
 import { isCustomProviderId } from './CustomProviderConfig';
 
 export interface ProviderConfig {
@@ -8,112 +7,107 @@ export interface ProviderConfig {
   models: Array<{ id: string; name: string }>;
 }
 
-export class ProviderRegistry {
-  private static readonly configs = new Map<string, ProviderConfig>();
-  private static customIds = new Set<string>();
-  private static modelEntriesCache: Record<
-    string,
-    { name: string; provider: string }
-  > | null = null;
+const configs = new Map<string, ProviderConfig>();
+let customIds = new Set<string>();
+let modelEntriesCache: Record<
+  string,
+  { name: string; provider: string }
+> | null = null;
 
-  static register(config: ProviderConfig): void {
-    this.configs.set(config.id, config);
-    this.modelEntriesCache = null;
-  }
+export const ProviderRegistry = {
+  register(config: ProviderConfig): void {
+    configs.set(config.id, config);
+    modelEntriesCache = null;
+  },
 
-  static getConfig(provider: string): ProviderConfig {
-    const config = this.configs.get(provider);
+  getConfig(provider: string): ProviderConfig {
+    const config = configs.get(provider);
     if (!config) throw new Error(`Unknown provider: ${provider}`);
     return config;
-  }
+  },
 
-  static getDefaultModelId(provider: string): string {
-    return this.configs.get(provider)?.defaultModelId ?? '';
-  }
+  getDefaultModelId(provider: string): string {
+    return configs.get(provider)?.defaultModelId ?? '';
+  },
 
-  static syncCustomProviders(
-    providers: Array<{ id: string; name: string }>,
-  ): void {
-    const customs = providers.filter((p) => isCustomProviderId(p.id));
-    const nextIds = new Set(customs.map((p) => p.id));
+  syncCustomProviders(providers: Array<{ id: string; name: string }>): void {
+    const customs = providers.filter((provider) =>
+      isCustomProviderId(provider.id),
+    );
+    const nextIds = new Set(customs.map((provider) => provider.id));
 
-    for (const id of this.customIds) {
-      if (!nextIds.has(id)) this.configs.delete(id);
+    for (const id of customIds) {
+      if (!nextIds.has(id)) configs.delete(id);
     }
-    this.customIds = nextIds;
+    customIds = nextIds;
 
     for (const provider of customs) {
-      const existing = this.configs.get(provider.id);
-      this.configs.set(provider.id, {
+      const existing = configs.get(provider.id);
+      configs.set(provider.id, {
         id: provider.id,
         name: provider.name,
         defaultModelId: '',
         models: existing?.models ?? [],
       });
     }
-    this.modelEntriesCache = null;
-  }
+    modelEntriesCache = null;
+  },
 
-  static getModelsForProvider(
-    provider: string,
-  ): Array<{ id: string; name: string }> {
-    return [...this.getConfig(provider).models];
-  }
+  getModelsForProvider(provider: string): Array<{ id: string; name: string }> {
+    return [...ProviderRegistry.getConfig(provider).models];
+  },
 
-  static setModels(
+  setModels(
     provider: string,
     models: Array<{ id: string; name: string }>,
   ): void {
-    const config = this.configs.get(provider);
+    const config = configs.get(provider);
     if (config) {
       config.models = models;
-      this.modelEntriesCache = null;
+      modelEntriesCache = null;
     }
-  }
+  },
 
-  static addModel(
+  addModel(
     provider: string,
     model: { id: string; name: string },
   ): void {
-    const config = this.configs.get(provider);
-    if (config && !config.models.some((m) => m.id === model.id)) {
+    const config = configs.get(provider);
+    if (config && !config.models.some((entry) => entry.id === model.id)) {
       config.models = [...config.models, model];
-      this.modelEntriesCache = null;
+      modelEntriesCache = null;
     }
-  }
+  },
 
-  static removeModel(provider: string, modelId: string): void {
-    const config = this.configs.get(provider);
-    if (config && config.models.some((m) => m.id === modelId)) {
-      config.models = config.models.filter((m) => m.id !== modelId);
-      this.modelEntriesCache = null;
+  removeModel(provider: string, modelId: string): void {
+    const config = configs.get(provider);
+    if (config && config.models.some((model) => model.id === modelId)) {
+      config.models = config.models.filter((model) => model.id !== modelId);
+      modelEntriesCache = null;
     }
-  }
+  },
 
-  static getAllModelEntries(): Record<
-    string,
-    { name: string; provider: string }
-  > {
-    if (!this.modelEntriesCache) {
+  getAllModelEntries(): Record<string, { name: string; provider: string }> {
+    if (!modelEntriesCache) {
       const entries: Record<string, { name: string; provider: string }> = {};
-      for (const config of this.configs.values()) {
+      for (const config of configs.values()) {
         for (const model of config.models) {
           entries[model.id] = { name: model.name, provider: config.id };
         }
       }
-      this.modelEntriesCache = entries;
+      modelEntriesCache = entries;
     }
-    return this.modelEntriesCache;
-  }
+    return modelEntriesCache;
+  },
 
-  static getAllProviders(): ProviderConfig[] {
-    return Array.from(this.configs.values());
-  }
+  getAllProviders(): ProviderConfig[] {
+    return Array.from(configs.values());
+  },
 
-  static hasProvider(provider: string): boolean {
-    return this.configs.has(provider);
-  }
-}
+  hasProvider(provider: string): boolean {
+    return configs.has(provider);
+  },
+};
 
 ProviderRegistry.register({
   id: 'google',

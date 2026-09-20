@@ -3,25 +3,25 @@ import { DomainError } from '../shared/DomainError';
 import { failure, success, type Result } from '../../../shared/types/Result';
 
 export class EncodedImage extends ValueObject {
-  private readonly _value: string;
+  private readonly encodedValue: string;
 
   private constructor(value: string) {
     super();
-    this._value = value;
+    this.encodedValue = value;
   }
 
   public get value(): string {
-    return this._value;
+    return this.encodedValue;
   }
 
   public get mimeType(): string {
-    const match = this._value.match(/^data:(image\/[a-zA-Z0-9+-]+);base64,/);
+    const match = this.encodedValue.match(/^data:(image\/[a-zA-Z0-9+-]+);base64,/);
     return match?.[1] ?? 'image/png';
   }
 
   public get base64Data(): string {
-    const commaIndex = this._value.indexOf(',');
-    return commaIndex >= 0 ? this._value.slice(commaIndex + 1) : this._value;
+    const commaIndex = this.encodedValue.indexOf(',');
+    return commaIndex >= 0 ? this.encodedValue.slice(commaIndex + 1) : this.encodedValue;
   }
 
   public static create(value: string): Result<EncodedImage, DomainError> {

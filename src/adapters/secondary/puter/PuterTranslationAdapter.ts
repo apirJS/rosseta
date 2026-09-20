@@ -1,4 +1,4 @@
-import puter, { type ChatResponse } from '@heyputer/puter.js';
+import puterSdk, { type ChatResponse } from '@heyputer/puter.js';
 import type { ITranslationService } from '../../../core/ports/outbound/ITranslationService';
 import type { ICancellationToken } from '../../../core/ports/outbound/ICancellationToken';
 import type { Credential } from '../../../core/domain/credential/Credential';
@@ -214,8 +214,8 @@ export class PuterTranslationAdapter implements ITranslationService {
     }
 
     const token = this.credential.apiKey.value;
-    if (puter.authToken !== token) {
-      puter.setAuthToken(token);
+    if (puterSdk.authToken !== token) {
+      puterSdk.setAuthToken(token);
     }
     const prompt = buildPlainPrompt({
       targetLanguageCode: targetLanguage.code,
@@ -225,7 +225,7 @@ export class PuterTranslationAdapter implements ITranslationService {
     const model = this.userPreferences.getModelIdFor('puter');
 
     try {
-      const response = await puter.ai.chat(prompt, image.value, {
+      const response = await puterSdk.ai.chat(prompt, image.value, {
         model,
         temperature: 0,
         normalize: true,

@@ -65,7 +65,7 @@ describe('Adapter: BrowserCustomProviderStorageAdapter', () => {
     const result = await adapter.load();
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.map((p) => p.name).sort()).toEqual(['A2', 'B']);
+      expect(result.data.map((p) => p.name).toSorted()).toEqual(['A2', 'B']);
     }
   });
 

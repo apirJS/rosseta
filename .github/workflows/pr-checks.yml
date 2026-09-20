@@ -14,6 +14,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+
   test:
     name: test
     runs-on: ubuntu-latest
@@ -50,20 +61,22 @@ jobs:
   verify:
     name: Verify & Test
     if: always()
-    needs: [test, typecheck, build]
+    needs: [lint, test, typecheck, build]
     runs-on: ubuntu-latest
     steps:
       - name: Require every PR check to pass
         env:
+          LINT_RESULT: ${{ needs.lint.result }}
           TEST_RESULT: ${{ needs.test.result }}
           TYPECHECK_RESULT: ${{ needs.typecheck.result }}
           BUILD_RESULT: ${{ needs.build.result }}
         run: |
-          if [ "$TEST_RESULT" != "success" ] || \
+          if [ "$LINT_RESULT" != "success" ] || \
+             [ "$TEST_RESULT" != "success" ] || \
              [ "$TYPECHECK_RESULT" != "success" ] || \
              [ "$BUILD_RESULT" != "success" ]; then
             echo "::error::One or more required PR checks did not pass."
-            printf 'test=%s\ntypecheck=%s\nbuild=%s\n' \
-              "$TEST_RESULT" "$TYPECHECK_RESULT" "$BUILD_RESULT"
+            printf 'lint=%s\ntest=%s\ntypecheck=%s\nbuild=%s\n' \
+              "$LINT_RESULT" "$TEST_RESULT" "$TYPECHECK_RESULT" "$BUILD_RESULT"
             exit 1
           fi

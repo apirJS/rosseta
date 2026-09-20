@@ -2,6 +2,13 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from 'bun:test';
 import { ModelFetchService } from './ModelFetchService';
 import { AuthError, NetworkError, ValidationError, ErrorCode } from '../../../shared/errors';
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    statusText: status === 200 ? 'OK' : 'Error',
+  });
+}
+
 describe('Adapter: ModelFetchService', () => {
   let service: ModelFetchService;
   let fetchSpy: ReturnType<typeof spyOn>;
@@ -14,13 +21,6 @@ describe('Adapter: ModelFetchService', () => {
   afterEach(() => {
     fetchSpy.mockRestore();
   });
-
-  function jsonResponse(body: unknown, status = 200): Response {
-    return new Response(JSON.stringify(body), {
-      status,
-      statusText: status === 200 ? 'OK' : 'Error',
-    });
-  }
 
   test('canFetch is true for all supported providers', () => {
     for (const provider of [

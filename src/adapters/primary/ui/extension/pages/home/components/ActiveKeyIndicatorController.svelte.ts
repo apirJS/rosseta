@@ -22,6 +22,10 @@ class ActiveKeyIndicatorState {
   isOpen = $state(false);
 }
 
+function getDisplayLabel(credential: Credential): string {
+  return maskApiKey(credential.apiKey.value);
+}
+
 export function createActiveKeyIndicatorController(
   deps: ActiveKeyIndicatorDeps,
 ) {
@@ -59,10 +63,6 @@ export function createActiveKeyIndicatorController(
       currentMode.autoBalanceProvider === deps.getProvider() &&
       hasMultiple,
   );
-
-  function getDisplayLabel(cred: Credential): string {
-    return maskApiKey(cred.apiKey.value);
-  }
 
   function getTriggerLabel(): string {
     if (isAutoBalanceActive) return 'Auto ⟳';

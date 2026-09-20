@@ -68,8 +68,8 @@ export function createTranslationAdapter(
     case 'puter':
       return new PuterTranslationAdapter(credential, preferences);
     default: {
-      const _exhaustive: never = credential.provider;
-      throw new Error(`Unknown provider: ${_exhaustive}`);
+      const exhaustiveProvider: never = credential.provider;
+      throw new Error(`Unknown provider: ${exhaustiveProvider}`);
     }
   }
 }

@@ -123,7 +123,7 @@ describe('Adapter: BrowserModelStorageAdapter', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(Object.keys(result.data).sort()).toEqual([
+      expect(Object.keys(result.data).toSorted()).toEqual([
         'custom-abc-123',
         'google',
       ]);

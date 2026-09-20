@@ -59,14 +59,15 @@ export class TranslationModalHandler {
           position: 'fixed',
           top: '0',
           left: '0',
-          width: '100vw',
-          height: '100vh',
+          width: '0',
+          height: '0',
           zIndex: '2147483647',
           pointerEvents: 'none',
+          background: 'transparent',
           margin: '0',
           padding: '0',
           border: 'none',
-          overflow: 'hidden',
+          overflow: 'visible',
         },
       });
 

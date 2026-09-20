@@ -17,7 +17,7 @@ import {
 import { isCustomProviderId } from '../../../core/domain/provider/CustomProviderConfig';
 import type { CustomProviderType } from '../../../core/domain/provider/CustomProviderConfig';
 import { buildCustomProviderURL } from '../shared/custom-provider-request';
-import puter from '@heyputer/puter.js';
+import puterSdk from '@heyputer/puter.js';
 
 class HttpError extends Error {
   constructor(
@@ -90,7 +90,7 @@ async function fetchOpenAICompatibleModels(
   return data
     .filter((m) => m.object === undefined || m.object === 'model')
     .map((m) => ({ id: m.id, name: m.id }))
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .toSorted((a, b) => a.id.localeCompare(b.id));
 }
 
 async function fetchAnthropicCompatibleModels(
@@ -100,9 +100,13 @@ async function fetchAnthropicCompatibleModels(
   queryParams?: Record<string, string>,
 ): Promise<ModelInfo[]> {
   const models: ModelInfo[] = [];
-  let cursor: string | undefined;
 
-  for (let page = 0; page < ANTHROPIC_MAX_PAGES; page++) {
+  async function fetchPage(
+    cursor: string | undefined,
+    remainingPages: number,
+  ): Promise<void> {
+    if (remainingPages === 0) return;
+
     const pageQueryParams = {
       limit: '100',
       ...queryParams,
@@ -135,11 +139,14 @@ async function fetchAnthropicCompatibleModels(
       })),
     );
 
-    if (!json.has_more || !json.last_id) break;
-    cursor = json.last_id;
+    if (json.has_more && json.last_id) {
+      await fetchPage(json.last_id, remainingPages - 1);
+    }
   }
 
-  return models.sort((a, b) => a.name.localeCompare(b.name));
+  await fetchPage(undefined, ANTHROPIC_MAX_PAGES);
+
+  return models.toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 interface GeminiModelEntry {
@@ -171,7 +178,7 @@ async function fetchGoogleModels(apiKey: string): Promise<ModelInfo[]> {
       id: m.name.replace('models/', ''),
       name: m.displayName,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 interface AnthropicModelEntry {
@@ -189,9 +196,13 @@ const ANTHROPIC_MAX_PAGES = 10;
 
 async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]> {
   const models: ModelInfo[] = [];
-  let cursor: string | undefined;
 
-  for (let page = 0; page < ANTHROPIC_MAX_PAGES; page++) {
+  async function fetchPage(
+    cursor: string | undefined,
+    remainingPages: number,
+  ): Promise<void> {
+    if (remainingPages === 0) return;
+
     const url = new URL('https://api.anthropic.com/v1/models');
     url.searchParams.set('limit', '100');
     if (cursor) url.searchParams.set('after_id', cursor);
@@ -211,11 +222,14 @@ async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]> {
       models.push({ id: m.id, name: m.display_name || m.id });
     }
 
-    if (!json.has_more || !json.last_id) break;
-    cursor = json.last_id;
+    if (json.has_more && json.last_id) {
+      await fetchPage(json.last_id, remainingPages - 1);
+    }
   }
 
-  return models.sort((a, b) => a.name.localeCompare(b.name));
+  await fetchPage(undefined, ANTHROPIC_MAX_PAGES);
+
+  return models.toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 type ModelFetcher = (
@@ -224,12 +238,12 @@ type ModelFetcher = (
 ) => Promise<ModelInfo[]>;
 
 async function fetchPuterModels(apiKey: string): Promise<ModelInfo[]> {
-  if (puter.authToken !== apiKey) {
-    puter.setAuthToken(apiKey);
+  if (puterSdk.authToken !== apiKey) {
+    puterSdk.setAuthToken(apiKey);
   }
 
-  await puter.auth.getUser();
-  const rawModels = await puter.ai.listModels();
+  await puterSdk.auth.getUser();
+  const rawModels = await puterSdk.ai.listModels();
 
   return rawModels
     .filter((model): model is Record<string, unknown> =>
@@ -246,7 +260,7 @@ async function fetchPuterModels(apiKey: string): Promise<ModelInfo[]> {
 
       return [{ id, name: provider ? name + ' (' + provider + ')' : name }];
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 function mapStructuredProviderError(

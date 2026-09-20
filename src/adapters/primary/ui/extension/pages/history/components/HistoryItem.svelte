@@ -8,6 +8,10 @@
     ondelete: () => void;
   }
 
+  function pad(value: number): string {
+    return String(value).padStart(2, '0');
+  }
+
   const { translation, onopen, ondelete }: Props = $props();
 
   const previewText = $derived(
@@ -16,7 +20,6 @@
 
   const formattedDate = $derived.by(() => {
     const d = translation.createdAt;
-    const pad = (n: number) => String(n).padStart(2, '0');
     return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
 

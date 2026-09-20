@@ -19,7 +19,7 @@ interface CapturedProviderOptions {
 }
 
 const createOpenAICompatibleMock = mock(
-  (options: CapturedProviderOptions) => (modelId: string) => ({ modelId }),
+  (_options: CapturedProviderOptions) => (modelId: string) => ({ modelId }),
 );
 
 mock.module('@ai-sdk/openai-compatible', () => ({

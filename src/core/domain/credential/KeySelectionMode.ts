@@ -8,25 +8,25 @@ const AUTO_BALANCE_PREFIX = 'auto-balance:';
 export type KeySelectionModeValue = 'manual' | `auto-balance:${AnyProvider}`;
 
 export class KeySelectionMode extends ValueObject {
-  private constructor(private readonly _value: KeySelectionModeValue) {
+  private constructor(private readonly modeValue: KeySelectionModeValue) {
     super();
   }
 
   public get value(): KeySelectionModeValue {
-    return this._value;
+    return this.modeValue;
   }
 
   public get isManual(): boolean {
-    return this._value === 'manual';
+    return this.modeValue === 'manual';
   }
 
   public get isAutoBalance(): boolean {
-    return this._value.startsWith(AUTO_BALANCE_PREFIX);
+    return this.modeValue.startsWith(AUTO_BALANCE_PREFIX);
   }
 
   public get autoBalanceProvider(): AnyProvider | null {
     if (!this.isAutoBalance) return null;
-    return this._value.slice(AUTO_BALANCE_PREFIX.length) as AnyProvider;
+    return this.modeValue.slice(AUTO_BALANCE_PREFIX.length) as AnyProvider;
   }
 
   public get label(): string {

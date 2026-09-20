@@ -286,7 +286,7 @@ describe('UI Controller: MainPageController', () => {
   test('persists the effective model when it differs from the saved selection', () => {
     const { deps, models, preferences } = createDeps();
     models.modelsFor = vi.fn().mockReturnValue([makeModel('m1')]);
-    const { controller, cleanup } = createController(deps);
+    const { cleanup } = createController(deps);
 
     expect(preferences.setSelectedModelFor).toHaveBeenCalledWith('google', 'm1');
 

@@ -149,6 +149,7 @@ src/
 | `bun run build:dev:chrome`  | Development build with watch mode (Chrome)      |
 | `bun run build:dev:firefox` | Development build with watch mode (Firefox)     |
 | `bun run build:prod`        | Production build for both browsers              |
+| `bun run lint`              | Lint TypeScript, JavaScript, and Svelte files with Oxlint |
 | `bun run test:logic`        | Domain, application, background, content, adapter tests |
 | `bun run test:ui`           | Svelte component + `*.svelte.ts` controller tests (Vitest + jsdom) |
 | `bun run test`              | Run all tests                                   |
@@ -181,8 +182,9 @@ bun run check && bun run test
 ## Pull Request Checks
 
 `.github/workflows/pr-checks.yml` runs for opened, updated, reopened, and
-ready-for-review pull requests. It runs three checks for each approved PR:
+ready-for-review pull requests. It runs four checks for each approved PR:
 
+- `lint` — Oxlint diagnostics with warnings treated as failures
 - `test` — the full logic and UI test suite
 - `typecheck` — Svelte and TypeScript checks
 - `build` — production Chrome and Firefox builds

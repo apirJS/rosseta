@@ -1,16 +1,15 @@
 import type { IModelStorage, StoredModel } from '../../src/core/ports/outbound/IModelStorage';
 import { success, failure, type Result } from '../../src/shared/types/Result';
 import type { AppError } from '../../src/shared/errors';
-import { StorageError } from '../../src/shared/errors';
 
 export class FakeModelStorage implements IModelStorage {
   private store = new Map<string, StoredModel[]>();
-  private _failNext: AppError | null = null;
+  private nextFailure: AppError | null = null;
 
   async getModels(provider: string): Promise<Result<StoredModel[], AppError>> {
-    if (this._failNext) {
-      const err = this._failNext;
-      this._failNext = null;
+    if (this.nextFailure) {
+      const err = this.nextFailure;
+      this.nextFailure = null;
       return failure(err);
     }
     return success(this.store.get(provider) ?? []);
@@ -19,9 +18,9 @@ export class FakeModelStorage implements IModelStorage {
   async getAllModels(): Promise<
     Result<Record<string, StoredModel[]>, AppError>
   > {
-    if (this._failNext) {
-      const err = this._failNext;
-      this._failNext = null;
+    if (this.nextFailure) {
+      const err = this.nextFailure;
+      this.nextFailure = null;
       return failure(err);
     }
     const byProvider: Record<string, StoredModel[]> = {};
@@ -35,9 +34,9 @@ export class FakeModelStorage implements IModelStorage {
     provider: string,
     models: StoredModel[],
   ): Promise<Result<void, AppError>> {
-    if (this._failNext) {
-      const err = this._failNext;
-      this._failNext = null;
+    if (this.nextFailure) {
+      const err = this.nextFailure;
+      this.nextFailure = null;
       return failure(err);
     }
     this.store.set(provider, models);
@@ -47,9 +46,9 @@ export class FakeModelStorage implements IModelStorage {
   async replaceAllModels(
     models: Record<string, StoredModel[]>,
   ): Promise<Result<void, AppError>> {
-    if (this._failNext) {
-      const err = this._failNext;
-      this._failNext = null;
+    if (this.nextFailure) {
+      const err = this.nextFailure;
+      this.nextFailure = null;
       return failure(err);
     }
     this.store = new Map(
@@ -62,9 +61,9 @@ export class FakeModelStorage implements IModelStorage {
   }
 
   async clearModels(provider: string): Promise<Result<void, AppError>> {
-    if (this._failNext) {
-      const err = this._failNext;
-      this._failNext = null;
+    if (this.nextFailure) {
+      const err = this.nextFailure;
+      this.nextFailure = null;
       return failure(err);
     }
     this.store.delete(provider);
@@ -77,7 +76,7 @@ export class FakeModelStorage implements IModelStorage {
   }
 
   failNextCallWith(error: AppError): void {
-    this._failNext = error;
+    this.nextFailure = error;
   }
 
   getStoredModels(provider: string): StoredModel[] {

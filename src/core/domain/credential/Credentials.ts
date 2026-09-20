@@ -12,8 +12,8 @@ export interface CredentialsProps {
 export class Credentials extends AggregateRoot<string> {
   private constructor(
     id: string,
-    private _items: Credential[],
-    private _activeCredentialId: string | null,
+    private credentialItems: Credential[],
+    private activeCredentialIdValue: string | null,
   ) {
     super(id);
   }
@@ -45,32 +45,32 @@ export class Credentials extends AggregateRoot<string> {
   }
 
   get items(): readonly Credential[] {
-    return this._items;
+    return this.credentialItems;
   }
 
   get activeCredentialId(): string | null {
-    return this._activeCredentialId;
+    return this.activeCredentialIdValue;
   }
 
   hasKeys(): boolean {
-    return this._items.length > 0;
+    return this.credentialItems.length > 0;
   }
 
   getActive(): Credential | null {
-    if (!this._activeCredentialId) return null;
-    return this._items.find((c) => c.id === this._activeCredentialId) ?? null;
+    if (!this.activeCredentialIdValue) return null;
+    return this.credentialItems.find((c) => c.id === this.activeCredentialIdValue) ?? null;
   }
 
   add(credential: Credential): Credentials {
-    const filtered = this._items.filter((c) => c.id !== credential.id);
+    const filtered = this.credentialItems.filter((c) => c.id !== credential.id);
     const newItems = [...filtered, credential];
     const activeId = credential.id;
     return new Credentials(this.id, newItems, activeId);
   }
 
   remove(credentialId: string): Credentials {
-    const newItems = this._items.filter((c) => c.id !== credentialId);
-    let activeId = this._activeCredentialId;
+    const newItems = this.credentialItems.filter((c) => c.id !== credentialId);
+    let activeId = this.activeCredentialIdValue;
 
     if (activeId === credentialId) {
       activeId = newItems.length > 0 ? newItems[0].id : null;
@@ -80,15 +80,15 @@ export class Credentials extends AggregateRoot<string> {
   }
 
   setActive(credentialId: string): Result<Credentials, DomainError> {
-    const exists = this._items.some((c) => c.id === credentialId);
+    const exists = this.credentialItems.some((c) => c.id === credentialId);
     if (!exists) {
       return failure(new DomainError('Credential not found'));
     }
-    return success(new Credentials(this.id, [...this._items], credentialId));
+    return success(new Credentials(this.id, [...this.credentialItems], credentialId));
   }
 
   getByProvider(provider: string): Credential[] {
-    return this._items.filter((c) => c.provider === provider);
+    return this.credentialItems.filter((c) => c.provider === provider);
   }
 
   getNextRoundRobin(
@@ -108,8 +108,8 @@ export class Credentials extends AggregateRoot<string> {
   toProps(): CredentialsProps {
     return {
       id: this.id,
-      activeCredentialId: this._activeCredentialId,
-      items: this._items.map((c) => c.toProps()),
+      activeCredentialId: this.activeCredentialIdValue,
+      items: this.credentialItems.map((c) => c.toProps()),
     };
   }
 }

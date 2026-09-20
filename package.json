@@ -11,8 +11,9 @@
     "build:prod:chrome": "NODE_ENV=production TARGET=chrome vite build",
     "build:prod:firefox": "NODE_ENV=production TARGET=firefox vite build",
     "build:prod": "bun run build:prod:chrome && bun run build:prod:firefox",
+    "lint": "oxlint . --deny-warnings",
     "test:logic": "bun test src/shared src/core src/adapters/primary/background src/adapters/primary/content src/adapters/secondary",
-    "test:ui": "vitest run src/adapters/primary/ui",
+    "test:ui": "vitest run src/adapters/primary/ui --maxWorkers=1",
     "test": "bun run test:logic && bun run test:ui",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
@@ -30,6 +31,7 @@
     "@vitest/coverage-v8": "5.0.0",
     "conventional-changelog-conventionalcommits": "^9.1.0",
     "jsdom": "^30.0.1",
+    "oxlint": "^1.83.0",
     "semantic-release": "^25.0.9",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",

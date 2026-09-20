@@ -10,7 +10,6 @@ import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySe
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import { success } from '../../../../../../shared/types/Result';
 import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
-import { v4 as uuidv4 } from 'uuid';
 
 function makeCredential(id: string, rawKey: string, provider: 'google' | 'groq') {
   const apiKey = ApiKey.createWithProvider(rawKey, provider);
@@ -57,6 +56,10 @@ function createDeps(overrides: Partial<ManageKeysDeps> = {}) {
   };
 
   return { deps, show, credentials };
+}
+
+function flush(): Promise<unknown> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('UI Controller: ManageKeysController', () => {
@@ -302,8 +305,6 @@ describe('UI Controller: ManageKeysController', () => {
   });
 
   describe('setActiveKey', () => {
-    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-
     test('drops out of auto-balance before activating the chosen key', async () => {
       const { deps } = createDeps({
         currentKeySelectionMode: () => KeySelectionMode.autoBalance('groq'),

@@ -20,6 +20,11 @@ class TranslationControllerState {
   selectedProvider = $state<AnyProvider | null>(null);
 }
 
+async function startTranslation(): Promise<void> {
+  await sendMessageToRuntime({ action: 'START_OVERLAY' });
+  window.close();
+}
+
 export function createHomeController() {
   const state = new TranslationControllerState();
 
@@ -58,11 +63,6 @@ export function createHomeController() {
 
   function closeMenu() {
     state.isMenuOpen = false;
-  }
-
-  async function startTranslation() {
-    await sendMessageToRuntime({ action: 'START_OVERLAY' });
-    window.close();
   }
 
   function showHistory() {

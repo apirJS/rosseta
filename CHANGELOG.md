@@ -1,3 +1,9 @@
+## [2.2.1](https://github.com/apirJS/rosseta/compare/v2.2.0...v2.2.1) (2026-09-20)
+
+### Bug Fixes
+
+* api key viewer modal should wrap and scroll on overflow ([#10](https://github.com/apirJS/rosseta/issues/10)) ([e01f14f](https://github.com/apirJS/rosseta/commit/e01f14fa41e842cf4ab82f943528ebf202055f65))
+
 ## [2.2.0](https://github.com/apirJS/rosseta/compare/v2.1.0...v2.2.0) (2026-09-20)
 
 ### Features

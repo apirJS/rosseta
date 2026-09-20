@@ -79,9 +79,18 @@ Runs on both Chrome and Firefox as a Manifest V3 extension.
 
 ---
 
+## Tips for free users
+
+- Explore [awesome-free-llm-apis](https://github.com/mnfst/awesome-free-llm-apis) for providers offering free API access or trial quotas. Limits and availability can change, so check each provider's current terms before adding a key.
+- Use **PuterJS** to access its supported models with a Puter account token. Create a token in [Puter account settings](https://puter.com/#account), add it under **Manage API Keys**, then fetch and select a model under **Manage Models**.
+- Choose a model that supports **image or vision input**. Rosseta sends a screenshot of the selected region, so text-only models cannot perform the translation.
+- If a provider's model list is incomplete, add a compatible vision model manually from **Manage Models**.
+
+---
+
 ## Tech stack
 
-Built with Svelte 5 (runes), TypeScript (strict, no `any`), Tailwind CSS v4, and a DDD + Hexagonal (Ports & Adapters) architecture. Most translation calls go through the Vercel AI SDK (`@ai-sdk/*`); PuterJS uses `@heyputer/puter.js` directly.
+Built with Svelte 5 (runes), TypeScript (strict, no `any`), Tailwind CSS v4, and a DDD + Hexagonal (Ports & Adapters) architecture. Most translation calls go through the Vercel AI SDK (`@ai-sdk/*`).
 
 ---
 

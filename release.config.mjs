@@ -34,7 +34,7 @@ export default {
       },
     ],
 
-    // Bump the version in package.json (We disable publishing to the npm registry)
+    // Bump the version in package.json
     [
       '@semantic-release/npm',
       {

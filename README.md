@@ -12,12 +12,13 @@ Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone). Su
 
 ![Rosseta demo banner 1](demo/chrome_banner_big_1.png)
 
+![Rosseta demo banner 4](demo/chrome_banner_big_5.png)
+
 ![Rosseta demo banner 2](demo/chrome_banner_big_2.png)
 
 ![Rosseta demo banner 4](demo/chrome_banner_big_4.png)
 
 ![Rosseta demo banner 3](demo/chrome_banner_big_3.png)
-
 ---
 
 ## Features

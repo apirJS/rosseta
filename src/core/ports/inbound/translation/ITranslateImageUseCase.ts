@@ -1,12 +1,11 @@
 import type { Result } from '../../../../shared/types/Result';
 import type { AppError } from '../../../../shared/errors';
 import type { Translation } from '../../../domain/translation/Translation';
-import type { ICancellationToken } from '../../outbound/ICancellationToken';
+import type { TranslationExecutionOptions } from '../../outbound/TranslationExecutionOptions';
 
-export interface TranslateImageCommand {
+export interface TranslateImageCommand extends TranslationExecutionOptions {
   imageBase64: string;
   targetLanguageCode: string;
-  cancellationToken?: ICancellationToken;
 }
 
 export interface ITranslateImageUseCase {

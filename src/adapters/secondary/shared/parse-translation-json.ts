@@ -1,85 +1,67 @@
-import {
-  translationDataLenientSchema,
-  type TranslationResponse,
-} from './translation-schema';
+import type { TranslationResponse } from './translation-schema';
+import { normalizeTranslationResponse } from './translation-response-normalizer';
 import { success, failure, type Result } from '../../../shared/types/Result';
-import { TranslationError, type AppError } from '../../../shared/errors';
+import { ErrorCode, TranslationError, type AppError } from '../../../shared/errors';
+import { MAX_TRANSLATION_BYTES } from './translation-response-limits';
 
-function extractBalancedObject(text: string, start: number): string | null {
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = start; i < text.length; i++) {
-    const char = text[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (inString && char === '\\') {
-      escaped = true;
-      continue;
-    }
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-
-    if (char === '{') {
-      depth++;
-    } else if (char === '}') {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-
-  return null;
-}
-
+const MAX_OBJECT_OPENINGS = 8192;
+const MAX_CANDIDATE_CHARACTERS = 8 * MAX_TRANSLATION_BYTES;
 /**
  * Returns every balanced JSON object candidate in the response.
  *
  * LLMs sometimes put an example object, a tool trace, or explanatory prose
- * before the actual response. Starting at every opening brace lets the parser
- * skip those candidates and continue looking for the first object that matches
- * our response schema.
+ * before the actual response. A single string-aware pass also finds balanced
+ * children of incomplete wrappers without repeatedly rescanning their contents.
  */
 export function extractJsonObjects(text: string): string[] {
-  const candidates: string[] = [];
-  for (let start = 0; start < text.length; start++) {
-    if (text[start] !== '{') continue;
-    const candidate = extractBalancedObject(text, start);
-    if (candidate !== null) candidates.push(candidate);
-  }
-  return candidates;
-}
-
-export function extractJsonObject(text: string): string | null {
-  return extractJsonObjects(text)[0] ?? null;
-}
-
-export function parseTranslationResponse(
-  text: string,
-): Result<TranslationResponse, AppError> {
-  for (const candidate of extractJsonObjects(text)) {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(candidate);
-    } catch {
-      continue;
+    const openings: number[] = [];
+    const ranges: { start: number; end: number }[] = [];
+    let inString = false;
+    let escaped = false;
+    let openingCount = 0;
+    for (let index = 0; index < text.length; index++) {
+        const char = text[index];
+        if (escaped) { escaped = false; continue; }
+        if (inString && char === '\\') { escaped = true; continue; }
+        if (char === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (char === '{') {
+            if (++openingCount > MAX_OBJECT_OPENINGS) return [];
+            openings.push(index);
+        } else if (char === '}' && openings.length) {
+            ranges.push({ start: openings.pop()!, end: index + 1 });
+        }
     }
-
-    const parsed = translationDataLenientSchema.safeParse(raw);
-    if (!parsed.success) continue;
-
-    return success({
-      success: parsed.data.success,
-      error: parsed.data.error ?? null,
-      data: parsed.data.data ?? null,
-    });
-  }
-
-  return failure(TranslationError.malformedResponse());
+    const candidates: string[] = [];
+    let budget = MAX_CANDIDATE_CHARACTERS;
+    for (const range of ranges.toSorted((a, b) => a.start - b.start)) {
+        const length = range.end - range.start;
+        if (length > budget) break;
+        budget -= length;
+        candidates.push(text.slice(range.start, range.end));
+    }
+    return candidates;
+}
+export function extractJsonObject(text: string): string | null {
+    return extractJsonObjects(text)[0] ?? null;
+}
+export function parseTranslationResponse(text: string, includeDescription?: boolean): Result<TranslationResponse, AppError> {
+    if (new TextEncoder().encode(text).byteLength > MAX_TRANSLATION_BYTES)
+        return failure(TranslationError.responseLimit());
+    for (const candidate of extractJsonObjects(text)) {
+        let raw: unknown;
+        try {
+            raw = JSON.parse(candidate);
+        }
+        catch {
+            continue;
+        }
+        const parsed = normalizeTranslationResponse(raw, includeDescription);
+        if (!parsed.success && parsed.error.code === ErrorCode.TRANSLATION_RESPONSE_LIMIT)
+            return failure(parsed.error);
+        if (!parsed.success)
+            continue;
+        return success(parsed.data);
+    }
+    return failure(TranslationError.malformedResponse());
 }

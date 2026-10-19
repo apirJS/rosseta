@@ -6,9 +6,16 @@
     onclick: () => void;
     label?: string;
     small?: boolean;
+    disabled?: boolean;
   }
 
-  const { state, onclick, label = 'Copy', small = false }: Props = $props();
+  const {
+    state,
+    onclick,
+    label = 'Copy',
+    small = false,
+    disabled = false,
+  }: Props = $props();
 </script>
 
 <button
@@ -16,6 +23,7 @@
   class:icon-btn-sm={small}
   class:copy-feedback={state === 'copied'}
   {onclick}
+  {disabled}
   title={state === 'copied' ? 'Copied!' : label}
   aria-label={label}
 >

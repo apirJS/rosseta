@@ -2,7 +2,9 @@ import type { Container } from '../../../../shared/di/container-factory';
 import { isProvider } from '../../../../core/domain/credential/Provider';
 import { isCustomProviderId } from '../../../../core/domain/provider/CustomProviderConfig';
 import type { Credentials } from '../../../../core/domain/credential/Credentials';
+import type { StoredModel } from '../../../../core/ports/outbound/IModelStorage';
 import { AuthError, ValidationError, type AppError } from '../../../../shared/errors';
+import type { Result } from '../../../../shared/types/Result';
 import type { FetchModelsResponse } from '../../../../shared/validation/MessageSchema';
 
 export class FetchModelsHandler {
@@ -30,11 +32,7 @@ export class FetchModelsHandler {
       provider,
       apiKey,
     );
-    if (!result.success) {
-      return this.toErrorResponse(result.error);
-    }
-
-    return { success: true, models: result.data };
+    return this.finishFetch(provider, result);
   }
 
   private async fetchForCustomProvider(
@@ -68,11 +66,28 @@ export class FetchModelsHandler {
       config.queryParams,
       config.type,
     );
-    if (!result.success) {
-      return this.toErrorResponse(result.error);
-    }
+    return this.finishFetch(provider, result);
+  }
 
-    return { success: true, models: result.data };
+  private async finishFetch(
+    provider: string,
+    fetched: Result<StoredModel[], AppError>,
+  ): Promise<FetchModelsResponse> {
+    if (!fetched.success) return this.toErrorResponse(fetched.error);
+
+    const reset = await this.container.resetProviderCapabilitiesUseCase.execute(provider);
+    if (!reset.success) {
+      const userMessage = 'Models were updated, but compatibility could not be reset. Try fetching models again.';
+      return {
+        success: false,
+        error: {
+          code: reset.error.code,
+          message: userMessage,
+          userMessage,
+        },
+      };
+    }
+    return { success: true, models: fetched.data };
   }
 
   private async resolveApiKey(

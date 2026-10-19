@@ -27,18 +27,22 @@ function createDeps(overrides: Partial<ManageModelsDeps> = {}) {
       { id: 'm1', name: 'Model 1', source: 'fetched' as const },
       { id: 'm2', name: 'Model 2', source: 'manual' as const },
     ]),
-    addModel: vi.fn().mockResolvedValue(
-      success<StoredModel[]>([
-        { id: 'm1', name: 'Model 1', source: 'fetched' },
-      ]),
-    ),
+    addModel: vi
+      .fn()
+      .mockResolvedValue(
+        success<StoredModel[]>([
+          { id: 'm1', name: 'Model 1', source: 'fetched' },
+        ]),
+      ),
     removeModel: vi.fn().mockResolvedValue(success<StoredModel[]>([])),
     clearModels: vi.fn().mockResolvedValue(success(undefined)),
-    fetchModels: vi.fn().mockResolvedValue(
-      success<StoredModel[]>([
-        { id: 'm1', name: 'Model 1', source: 'fetched' },
-      ]),
-    ),
+    fetchModels: vi
+      .fn()
+      .mockResolvedValue(
+        success<StoredModel[]>([
+          { id: 'm1', name: 'Model 1', source: 'fetched' },
+        ]),
+      ),
     hasApiKeyFor: vi.fn().mockReturnValue(true),
     selectedModelFor: vi.fn().mockReturnValue(undefined),
     selectModel: vi.fn(),
@@ -140,9 +144,11 @@ describe('UI Controller: ManageModelsController', () => {
 
   test('addModel failure shows an error toast', async () => {
     const { deps, show } = createDeps({
-      addModel: vi.fn().mockResolvedValue(
-        failure(ValidationError.invalidInput('Storage broken')),
-      ),
+      addModel: vi
+        .fn()
+        .mockResolvedValue(
+          failure(ValidationError.invalidInput('Storage broken')),
+        ),
     });
     const controller = createManageModelsController(deps);
     controller.state.modelInput = 'new-model';
@@ -179,7 +185,9 @@ describe('UI Controller: ManageModelsController', () => {
   });
 
   test('fetchModels without a key shows an info toast and does not fetch', async () => {
-    const { deps, show } = createDeps({ hasApiKeyFor: vi.fn().mockReturnValue(false) });
+    const { deps, show } = createDeps({
+      hasApiKeyFor: vi.fn().mockReturnValue(false),
+    });
     const controller = createManageModelsController(deps);
 
     await controller.fetchModels();
@@ -207,7 +215,9 @@ describe('UI Controller: ManageModelsController', () => {
     const { deps, show } = createDeps({
       fetchModels: vi
         .fn()
-        .mockResolvedValue(failure(ValidationError.invalidInput('401 Unauthorized'))),
+        .mockResolvedValue(
+          failure(ValidationError.invalidInput('401 Unauthorized')),
+        ),
     });
     const controller = createManageModelsController(deps);
 

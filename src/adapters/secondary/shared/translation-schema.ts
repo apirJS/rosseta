@@ -2,18 +2,54 @@ import { z } from 'zod';
 import type { TranslationData } from './translation-response-mapper';
 
 const blockIndexSchema = z.number().int().nonnegative();
+const segmentSchema = z.object({
+  blockIndex: blockIndexSchema,
+  originalText: z.string(),
+  translatedText: z.string(),
+  originalLanguageBcp47Code: z.string(),
+  romanization: z.string().nullable(),
+}).strict();
 
-const textSegmentSchema = z.object({
+export function createTranslationDataSchema(includeDescription = true) {
+  const shape = { segments: z.array(segmentSchema) };
+  const data = includeDescription
+    ? z.object({ ...shape, description: z.string() }).strict()
+    : z.object(shape).strict();
+  return z.object({
+    success: z.boolean(),
+    error: z.string().nullable(),
+    data: data.nullable(),
+  }).strict();
+}
+
+export const pairedTranslationSchema = z.object({
+  success: z.boolean(),
+  error: z.string().nullable(),
+  data: z.object({
+    segments: z.array(segmentSchema),
+    description: z.string().optional(),
+  }).strict().nullable(),
+}).strict();
+
+export const translationDataSchema = createTranslationDataSchema();
+
+const legacySegment = z.object({
   text: z.string(),
   languageBcp47Code: z.string(),
   language: z.string(),
-  romanization: z.nullable(z.string()),
-  blockIndex: blockIndexSchema,
-});
-
-const textSegmentLenientSchema = textSegmentSchema.extend({
+  romanization: z.string().nullable(),
   blockIndex: blockIndexSchema.default(0),
-});
+}).strict();
+
+export const translationDataLenientSchema = z.object({
+  success: z.boolean(),
+  error: z.string().nullish(),
+  data: z.object({
+    originalText: z.object({ contents: z.array(legacySegment) }).strict(),
+    translatedText: z.object({ contents: z.array(legacySegment) }).strict(),
+    description: z.string().nullish(),
+  }).strict().nullish(),
+}).strict();
 
 export interface TranslationResponse {
   success: boolean;
@@ -21,44 +57,7 @@ export interface TranslationResponse {
   data: TranslationData | null;
 }
 
-export function createTranslationDataSchema(
-  includeDescription = true,
-): z.ZodType<TranslationResponse> {
-  const baseShape = {
-    originalText: z.object({ contents: z.array(textSegmentSchema) }),
-    translatedText: z.object({ contents: z.array(textSegmentSchema) }),
-  };
-
-  const dataSchema = includeDescription
-    ? z.object({ ...baseShape, description: z.string() })
-    : z.object(baseShape);
-
-  return z.object({
-    success: z.boolean(),
-    error: z.string().nullable(),
-    data: dataSchema.nullable(),
-  });
-}
-
-export const translationDataSchema = createTranslationDataSchema(true);
-
-const translationDataInnerLenientSchema = z.object({
-  originalText: z.object({
-    contents: z.array(textSegmentLenientSchema),
-  }),
-  translatedText: z.object({
-    contents: z.array(textSegmentLenientSchema),
-  }),
-  description: z.string().nullish(),
-});
-
-export const translationDataLenientSchema = z.object({
-  success: z.boolean(),
-  error: z.string().nullish(),
-  data: translationDataInnerLenientSchema.nullish(),
-});
-
-export type TranslationSchemaOutput = z.infer<typeof translationDataSchema>;
-export type TranslationSchemaLenientOutput = z.infer<
-  typeof translationDataLenientSchema
->;
+// Existing completed/domain fixtures deliberately retain the legacy representation.
+export type TranslationSchemaOutput = TranslationResponse;
+export type TranslationSchemaLenientOutput = z.infer<typeof translationDataLenientSchema>;
+export type PairedTranslationResponse = z.infer<typeof pairedTranslationSchema>;

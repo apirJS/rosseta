@@ -13,6 +13,16 @@ import { z } from 'zod';
 
 const STORAGE_KEY = 'translations';
 
+// Concurrent jobs can commit in the same worker. Serialize the whole mutation,
+// including its read, across instances so one completion cannot erase another.
+let historyMutation: Promise<void> = Promise.resolve();
+
+function serializeMutation<T>(work: () => Promise<T>): Promise<T> {
+  const operation = historyMutation.then(work, work);
+  historyMutation = operation.then(() => undefined, () => undefined);
+  return operation;
+}
+
 const TextSegmentSchema = z.object({
   text: z.string(),
   languageCode: z.string(),
@@ -31,30 +41,32 @@ const TranslationPropsSchema = z.object({
 
 export class BrowserTranslationStorageAdapter implements ITranslationStorage {
   async save(translation: Translation): Promise<Result<void, AppError>> {
-    try {
-      const allResult = await this.getAllRaw();
-      if (!allResult.success) return failure(allResult.error);
+    return serializeMutation(async () => {
+      try {
+        const allResult = await this.getAllRaw();
+        if (!allResult.success) return failure(allResult.error);
 
-      const items = allResult.data;
-      const existingIndex = items.findIndex((i) => i.id === translation.id);
-      const props = translation.toProps();
+        const items = allResult.data;
+        const existingIndex = items.findIndex((i) => i.id === translation.id);
+        const props = translation.toProps();
 
-      if (existingIndex >= 0) {
-        items[existingIndex] = props;
-      } else {
-        items.unshift(props);
+        if (existingIndex >= 0) {
+          items[existingIndex] = props;
+        } else {
+          items.unshift(props);
+        }
+
+        await browser.storage.local.set({ [STORAGE_KEY]: items });
+        return success(undefined);
+      } catch (error) {
+        return failure(
+          StorageError.writeFailed(
+            STORAGE_KEY,
+            error instanceof Error ? error : undefined,
+          ),
+        );
       }
-
-      await browser.storage.local.set({ [STORAGE_KEY]: items });
-      return success(undefined);
-    } catch (error) {
-      return failure(
-        StorageError.writeFailed(
-          STORAGE_KEY,
-          error instanceof Error ? error : undefined,
-        ),
-      );
-    }
+    });
   }
 
   async getById(id: string): Promise<Result<Translation | null, AppError>> {
@@ -93,53 +105,59 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
   async replaceAll(
     translations: Translation[],
   ): Promise<Result<void, AppError>> {
-    try {
-      await browser.storage.local.set({
-        [STORAGE_KEY]: translations.map((translation) =>
-          translation.toProps(),
-        ),
-      });
-      return success(undefined);
-    } catch (error) {
-      return failure(
-        StorageError.writeFailed(
-          STORAGE_KEY,
-          error instanceof Error ? error : undefined,
-        ),
-      );
-    }
+    return serializeMutation(async () => {
+      try {
+        await browser.storage.local.set({
+          [STORAGE_KEY]: translations.map((translation) =>
+            translation.toProps(),
+          ),
+        });
+        return success(undefined);
+      } catch (error) {
+        return failure(
+          StorageError.writeFailed(
+            STORAGE_KEY,
+            error instanceof Error ? error : undefined,
+          ),
+        );
+      }
+    });
   }
 
   async delete(id: string): Promise<Result<void, AppError>> {
-    try {
-      const allResult = await this.getAllRaw();
-      if (!allResult.success) return failure(allResult.error);
+    return serializeMutation(async () => {
+      try {
+        const allResult = await this.getAllRaw();
+        if (!allResult.success) return failure(allResult.error);
 
-      const filtered = allResult.data.filter((i) => i.id !== id);
-      await browser.storage.local.set({ [STORAGE_KEY]: filtered });
-      return success(undefined);
-    } catch (error) {
-      return failure(
-        StorageError.writeFailed(
-          STORAGE_KEY,
-          error instanceof Error ? error : undefined,
-        ),
-      );
-    }
+        const filtered = allResult.data.filter((i) => i.id !== id);
+        await browser.storage.local.set({ [STORAGE_KEY]: filtered });
+        return success(undefined);
+      } catch (error) {
+        return failure(
+          StorageError.writeFailed(
+            STORAGE_KEY,
+            error instanceof Error ? error : undefined,
+          ),
+        );
+      }
+    });
   }
 
   async clear(): Promise<Result<void, AppError>> {
-    try {
-      await browser.storage.local.remove(STORAGE_KEY);
-      return success(undefined);
-    } catch (error) {
-      return failure(
-        StorageError.writeFailed(
-          STORAGE_KEY,
-          error instanceof Error ? error : undefined,
-        ),
-      );
-    }
+    return serializeMutation(async () => {
+      try {
+        await browser.storage.local.remove(STORAGE_KEY);
+        return success(undefined);
+      } catch (error) {
+        return failure(
+          StorageError.writeFailed(
+            STORAGE_KEY,
+            error instanceof Error ? error : undefined,
+          ),
+        );
+      }
+    });
   }
 
   private async getAllRaw(): Promise<Result<TranslationProps[], AppError>> {

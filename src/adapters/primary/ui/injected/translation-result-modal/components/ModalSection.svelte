@@ -10,6 +10,7 @@
     oncopy: () => void;
     labelTag?: string;
     copyLabel?: string;
+    disabled?: boolean;
     children: Snippet;
   }
 
@@ -19,6 +20,7 @@
     oncopy,
     labelTag,
     copyLabel = 'Copy',
+    disabled = false,
     children,
   }: Props = $props();
 </script>
@@ -31,7 +33,13 @@
         <span class="section-label-tag">— {labelTag}</span>
       {/if}
     </span>
-    <CopyButton small state={copyState} onclick={oncopy} label={copyLabel} />
+    <CopyButton
+      small
+      state={copyState}
+      onclick={oncopy}
+      label={copyLabel}
+      {disabled}
+    />
   </div>
   {@render children()}
 </div>

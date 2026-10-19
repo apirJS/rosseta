@@ -29,12 +29,6 @@ let nextId = 0;
 export class ToastController {
   public toasts = $state<ToastItem[]>([]);
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
-  private onLoadingDismissed: ((id: string) => void) | null = null;
-
-  setLoadingDismissHandler(handler: (id: string) => void): void {
-    this.onLoadingDismissed = handler;
-  }
-
   show(opts: ShowOptions): string {
     const id = opts.id ?? `toast-${nextId++}`;
     const duration = opts.duration ?? (opts.type === 'loading' ? 0 : 4000);
@@ -90,11 +84,7 @@ export class ToastController {
     const idx = this.toasts.findIndex((t) => t.id === id);
     if (idx === -1) return;
 
-    const toast = this.toasts[idx];
-    if (toast.dismissing) return;
-    if (toast.type === 'loading') {
-      this.onLoadingDismissed?.(id);
-    }
+    if (this.toasts[idx].dismissing) return;
 
     const copy = [...this.toasts];
     copy[idx] = { ...copy[idx], dismissing: true };

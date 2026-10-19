@@ -2,7 +2,11 @@ import { getModelsContext } from '../context';
 import { sendMessageToRuntime } from '../../../../../shared/messaging';
 import type { FetchModelsResponse } from '../../../../../shared/validation/MessageSchema';
 import { AppError, ErrorCode } from '../../../../../shared/errors';
-import { success, failure, type Result } from '../../../../../shared/types/Result';
+import {
+  success,
+  failure,
+  type Result,
+} from '../../../../../shared/types/Result';
 import type { StoredModel } from '../../../../../core/ports/outbound/IModelStorage';
 
 export class ModelsState {

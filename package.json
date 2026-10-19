@@ -14,7 +14,8 @@
     "lint": "oxlint . --deny-warnings",
     "test:logic": "bun test src/shared src/core src/adapters/primary/background src/adapters/primary/content src/adapters/secondary",
     "test:ui": "vitest run src/adapters/primary/ui --maxWorkers=1",
-    "test": "bun run test:logic && bun run test:ui",
+    "test:streaming-sdk": "vitest run --config tests/vitest.streaming-sdk.config.ts",
+    "test": "bun run test:logic && bun run test:ui && bun run test:streaming-sdk",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
   "devDependencies": {

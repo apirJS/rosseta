@@ -1,93 +1,123 @@
-import { mount, unmount } from 'svelte';
-import translationModalStyles from '../../ui/injected/translation-result-modal/translation-modal.css?inline';
-import TranslationModal from '../../ui/injected/translation-result-modal/TranslationModal.svelte';
-import { createShadowDomHost } from '../hosts/ShadowDomHost';
+﻿import { sendMessageToRuntime } from '../../../../shared/messaging';
+import type { TranslationModalPayload } from '../../../../shared/types/TranslationModalPayload';
+import type {
+  TranslationAcknowledgement,
+  TranslationEvent,
+  TranslationRequestIdentity,
+} from '../../../../shared/validation/MessageSchema';
+import {
+  mountTranslationModal,
+  type MountedTranslationView,
+} from '../../ui/injected/translation-result-modal/mountTranslationModal.svelte';
+import {
+  TranslationSession,
+  type TranslationSessionDeps,
+} from '../services/TranslationSession';
 import type { ThemeManager } from '../hosts/ThemeManager';
-import type { Translation } from '../../../../core/domain/translation/Translation';
 
-export interface TranslationModalPayload {
-  id: string;
-  original: {
-    language: { code: string; name: string };
-    text: string;
-    romanization: string | null;
-    blockIndex: number;
-  }[];
-  translated: {
-    language: { code: string; name: string };
-    text: string;
-    romanization: string | null;
-    blockIndex: number;
-  }[];
-  description: string;
-  createdAt: Date;
-}
-
-export function serializeForModal(
-  translation: Translation,
-): TranslationModalPayload {
-  return {
-    id: translation.id,
-    original: translation.original.map((s) => ({
-      language: { code: s.language.code, name: s.language.name },
-      text: s.text,
-      romanization: s.romanization,
-      blockIndex: s.blockIndex,
-    })),
-    translated: translation.translated.map((s) => ({
-      language: { code: s.language.code, name: s.language.name },
-      text: s.text,
-      romanization: s.romanization,
-      blockIndex: s.blockIndex,
-    })),
-    description: translation.description,
-    createdAt: translation.createdAt,
-  };
-}
+export type TranslationViewMount = typeof mountTranslationModal;
+const CLOSED_REQUEST_RETENTION_MS = 120_000;
+const MAX_CLOSED_REQUESTS = 500;
 
 export class TranslationModalHandler {
-  constructor(private readonly themeManager: ThemeManager) {}
+  private documentSessionId = crypto.randomUUID();
+  private readonly live = new Map<string, TranslationSession>();
+  private readonly closed = new Map<string, number>();
+
+  constructor(
+    private readonly themeManager: ThemeManager,
+    private readonly mountView: TranslationViewMount = mountTranslationModal,
+    private readonly sessionDeps: TranslationSessionDeps = {
+      cancel: (payload) =>
+        sendMessageToRuntime({ action: 'CANCEL_TRANSLATION', payload }),
+      status: (payload) =>
+        sendMessageToRuntime({ action: 'GET_TRANSLATION_STATUS', payload }),
+    },
+  ) {}
+
+  get sessionId(): string {
+    return this.documentSessionId;
+  }
+
+  register(requestId: string): TranslationRequestIdentity {
+    this.prune();
+    const identity = { requestId, documentSessionId: this.documentSessionId };
+    if (this.live.has(requestId) || this.closed.has(requestId)) return identity;
+    const mounted = this.mountView(
+      this.themeManager,
+      'rosseta-live-' + requestId,
+      () => this.live.get(requestId)?.close(),
+    );
+    const session = new TranslationSession(
+      identity,
+      mounted.view,
+      this.sessionDeps,
+      () => this.detachSession(requestId, mounted),
+    );
+    this.live.set(requestId, session);
+    return identity;
+  }
+
+  private detachSession(
+    requestId: string,
+    mounted: MountedTranslationView,
+  ): void {
+    mounted.detach();
+    this.live.delete(requestId);
+    this.closed.set(requestId, Date.now());
+    this.prune();
+  }
+
+  receive(event: TranslationEvent): TranslationAcknowledgement {
+    if (event.documentSessionId !== this.documentSessionId)
+      return { status: 'unknown' };
+    this.prune();
+    if (this.closed.has(event.requestId)) return { status: 'closed' };
+    return (
+      this.live.get(event.requestId)?.accept(event) ?? { status: 'unknown' }
+    );
+  }
+
+  runtimeSettled(requestId: string): void {
+    this.live.get(requestId)?.runtimeSettled();
+  }
+
+  runtimeFailed(requestId: string): void {
+    this.live.get(requestId)?.runtimeFailed();
+  }
+
+  checkDeadlines(): void {
+    for (const session of this.live.values()) session.checkDeadline();
+  }
+
+  dispose(): void {
+    for (const session of this.live.values()) session.close();
+  }
+
+  resetDocument(): void {
+    this.dispose();
+    this.documentSessionId = crypto.randomUUID();
+    this.closed.clear();
+  }
 
   handle(payload: TranslationModalPayload): void {
-    try {
-      const hostId = `rosseta-modal-${payload.id}`;
+    let mounted: MountedTranslationView;
+    mounted = this.mountView(
+      this.themeManager,
+      'rosseta-modal-' + payload.id,
+      () => mounted.detach(),
+      payload,
+    );
+  }
 
-      const { host, appContainer } = createShadowDomHost({
-        hostId,
-        styles: translationModalStyles,
-        hostStyles: {
-          position: 'fixed',
-          top: '0',
-          left: '0',
-          width: '0',
-          height: '0',
-          zIndex: '2147483647',
-          pointerEvents: 'none',
-          background: 'transparent',
-          margin: '0',
-          padding: '0',
-          border: 'none',
-          overflow: 'visible',
-        },
-      });
-
-      this.themeManager.registerHost(host);
-
-      const detachModal = () => {
-        unmount(app);
-        host.remove();
-        this.themeManager.unregisterHost(host);
-      };
-
-      const app = mount(TranslationModal, {
-        target: appContainer,
-        props: {
-          ...payload,
-          detachModal,
-        },
-      });
-    } catch (error) {
-      console.error('[TranslationModalHandler] Failed to mount modal:', error);
+  private prune(): void {
+    const cutoff = Date.now() - CLOSED_REQUEST_RETENTION_MS;
+    for (const [id, closedAt] of this.closed) {
+      if (closedAt < cutoff) this.closed.delete(id);
+    }
+    while (this.closed.size > MAX_CLOSED_REQUESTS) {
+      const oldest = this.closed.keys().next().value;
+      if (oldest !== undefined) this.closed.delete(oldest);
     }
   }
 }

@@ -1,11 +1,11 @@
-import { describe, expect, test } from 'bun:test';
-import { serializeForModal } from './TranslationModalHandler';
-import { Translation } from '../../../../core/domain/translation/Translation';
-import { TextSegment } from '../../../../core/domain/translation/TextSegment';
+﻿import { describe, expect, test } from 'bun:test';
+import { serializeForModal } from './TranslationModalPayload';
+import { Translation } from '../../core/domain/translation/Translation';
+import { TextSegment } from '../../core/domain/translation/TextSegment';
 import {
   Language,
   type LanguageCode,
-} from '../../../../core/domain/translation/Language';
+} from '../../core/domain/translation/Language';
 import { v4 as uuidv4 } from 'uuid';
 
 function seg(
@@ -22,7 +22,7 @@ describe('serializeForModal', () => {
   test('maps a Translation domain object to TranslationModalPayload', () => {
     const translation = Translation.create(
       uuidv4(),
-      [seg('こんにちは', 'ja-JP', 'konnichiwa')],
+      [seg('ã“ã‚“ã«ã¡ã¯', 'ja-JP', 'konnichiwa')],
       [seg('Hello', 'en-US')],
       'A greeting in Japanese',
       new Date('2026-01-01T00:00:00Z'),
@@ -37,7 +37,7 @@ describe('serializeForModal', () => {
     expect(payload.original).toHaveLength(1);
     expect(payload.original[0]).toEqual({
       language: { code: 'ja-JP', name: 'Japanese' },
-      text: 'こんにちは',
+      text: 'ã“ã‚“ã«ã¡ã¯',
       romanization: 'konnichiwa',
       blockIndex: 0,
     });
@@ -55,8 +55,8 @@ describe('serializeForModal', () => {
     const translation = Translation.create(
       uuidv4(),
       [
-        seg('こんにちは', 'ja-JP', 'konnichiwa'),
-        seg('ありがとう', 'ja-JP', 'arigatou'),
+        seg('ã“ã‚“ã«ã¡ã¯', 'ja-JP', 'konnichiwa'),
+        seg('ã‚ã‚ŠãŒã¨ã†', 'ja-JP', 'arigatou'),
       ],
       [seg('Hello', 'en-US'), seg('Thank you', 'en-US')],
       'Greetings',
@@ -67,7 +67,7 @@ describe('serializeForModal', () => {
 
     expect(payload.original).toHaveLength(2);
     expect(payload.translated).toHaveLength(2);
-    expect(payload.original[1].text).toBe('ありがとう');
+    expect(payload.original[1].text).toBe('ã‚ã‚ŠãŒã¨ã†');
     expect(payload.translated[1].text).toBe('Thank you');
   });
 });

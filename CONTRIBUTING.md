@@ -152,6 +152,7 @@ src/
 | `bun run lint`              | Lint TypeScript, JavaScript, and Svelte files with Oxlint |
 | `bun run test:logic`        | Domain, application, background, content, adapter tests |
 | `bun run test:ui`           | Svelte component + `*.svelte.ts` controller tests (Vitest + jsdom) |
+| `bun run test:streaming-sdk` | Actual AI SDK stream integration (isolated Vitest + Node) |
 | `bun run test`              | Run all tests                                   |
 | `bun run check`             | Type-check Svelte files and Node config         |
 
@@ -165,6 +166,8 @@ src/
 >   where the Svelte compiler is needed for `$state`/`$derived` in `*.svelte.ts`.
 >
 > Import from `bun:test` in the first scope and from `vitest` in the second.
+
+`test:streaming-sdk` is a third, isolated boundary suite. Its dedicated config loads the actual installed AI SDK without the Bun browser/SDK preload. `bun run test` runs all three suites; do not accidentally place ordinary UI or logic tests outside their existing runner paths.
 
 ### Recommended Dev Loop
 
@@ -205,6 +208,8 @@ requires review from `@apirJS` for every file.
 - **Imports** — Use `import type` for type-only imports to enable proper tree-shaking.
 - **Value objects** — Domain types are immutable. Use `create()` / `fromRaw()` factory methods, never raw constructors for validation.
 - **Result type** — Never throw exceptions for expected failures. Return `Result<T, AppError>` from use cases and storage adapters.
+- **Cohesive classes** — Give each class one purpose. Keep orchestration readable as named steps; extract a helper when it owns a distinct rule, resource, or transformation.
+- **Small functions** — Use guard clauses and descriptive names to keep branching shallow. Share repeated behavior and constants; avoid speculative domains, generic frameworks, and one-line classes that only forward calls.
 
 ```typescript
 // ✅ Good — Result-based error handling
@@ -353,10 +358,12 @@ One of the most common contributions is adding support for a new AI provider. Th
 > Rosseta sends screenshots of selected regions for translation.
 >
 > Structured outputs (`json_schema` / response schema) are strongly preferred but
-> **not required**: `executeTranslation()` detects a model that rejects the
-> `json_schema` response format, caches it in `structuredOutputExemptModels`
-> (keyed `provider:modelId`), and falls back to prompt-only JSON mode with a
-> manual parse + repair retry on every later call.
+> **not required**. Streaming is also optional. The shared execution facade uses
+> durable model/endpoint capability facts to choose a known working mode, or to
+> learn from a real first request when support is unknown. Unsupported modes are
+> skipped on later requests within a fixed 7-day compatibility window. The next
+> real translation after expiry starts a fresh window. Successful Fetch Models
+> refreshes compatibility for that provider; no background test requests are sent.
 
 ### Domain layer
 
@@ -401,32 +408,68 @@ export class YourProviderTranslationAdapter implements ITranslationService {
   constructor(
     private readonly credential: Credential,
     private readonly userPreferences: UserPreferences,
-    private readonly structuredOutputExemptions: IStructuredOutputExemptionStorage,
+    private readonly capabilities: ITranslationCapabilityStorage,
   ) {}
 
   public async translateImage(
     image: EncodedImage,
     targetLanguage: Language,
+    options?: TranslationExecutionOptions,
   ): Promise<Result<Translation, AppError>> {
     const client = createYourProvider({ apiKey: this.credential.apiKey.value });
     const model = client(
       this.userPreferences.getModelIdFor(this.credential.provider),
     );
     return executeTranslation(
-      model,
+      new AiSdkGenerationTransport(model),
+      {
+        providerId: this.credential.provider,
+        modelId: this.userPreferences.getModelIdFor(this.credential.provider),
+        protocol: providerProtocol(this.credential.provider),
+      },
       image,
       targetLanguage,
-      'YOUR_PROVIDER', // uppercase log tag
       this.userPreferences.includeDescription,
-      this.structuredOutputExemptions,
+      this.capabilities,
+      options,
     );
   }
 }
 ```
 
-The prompt, response schema, parse/repair fallback, and domain mapping live in `src/adapters/secondary/shared/` — do not duplicate them per provider.
+The prompt, response schema, capability-state selection, bounded fallback/repair, and domain mapping live in `src/adapters/secondary/shared/`. Keep them shared. Add the provider's actual endpoint/protocol to `translation-capability-key.ts` to preserve stable model/endpoint identity. Translation and the successful-fetch reset path must use the same opaque provider namespace, spanning that provider's model/endpoint scopes.
 
-Providers that need a separate SDK may implement `ITranslationService` directly. Keep the same domain boundary and reuse the shared prompt, JSON parser, and response mapper. [PuterTranslationAdapter.ts](src/adapters/secondary/puter/PuterTranslationAdapter.ts) is the reference: it uses `@heyputer/puter.js`, sends the full response schema through `buildPlainPrompt()`, parses the returned JSON manually, and maps SDK errors to the existing `AppError` types. It authenticates with a user-created token from [Puter account settings](https://puter.com/#account); do not use `puter.auth.signIn()` from the extension popup because Puter does not accept extension URLs as sign-in origins.
+For a separate SDK, implement the adapter-local `ITranslationGenerationTransport` and pass it to the same facade. Normalize its text/partial/error/completion behavior there; do not add provider-specific modes to core contracts or copy the fallback state machine. [PuterTranslationAdapter.ts](src/adapters/secondary/puter/PuterTranslationAdapter.ts) and its transport demonstrate this boundary. Puter authenticates with a token from [Puter account settings](https://puter.com/#account). Its native SDK access is serialized across translation and model fetching because authentication uses a singleton. Logical cancellation stops the app promptly, but the installed SDK cannot abort its submitted network request.
+
+### Translation contracts and responsibility boundaries
+
+`ITranslationService` always returns `Promise<Result<Translation, AppError>>`. Optional execution options carry cancellation, an absolute deadline, and a provider-neutral progress observer. `reset` starts a replacement preview; `snapshot` carries a normalized `TranslationDraft`. A buffered provider can emit no snapshots and still fulfill this same contract. Provider support changes require no core command, use-case, UI, or messaging-contract edits.
+
+The generated JSON contains `success`, nullable `error`, and nullable `data`. Successful data holds ordered `segments`, each with `blockIndex`, `originalText`, `translatedText`, `originalLanguageBcp47Code`, and nullable `romanization`. Description is generated last and omitted entirely from both prompt and schema when disabled. Required properties stay required for strict providers. Paired segments are normalized into the existing domain/history representation after complete validation. Partial JSON repair is for previews only.
+
+`TranslateImageUseCase` validates input and invokes translation once. `SaveTranslationUseCase` persists a final result, `GetTranslationUseCase` loads one, and `ResetProviderCapabilitiesUseCase` clears one opaque namespace without contacting a provider. `FetchModelsHandler` composes model fetching and compatibility reset after a successful fetch; `FetchModelsUseCase` retains its model-catalog responsibility. The background preparer/coordinator manage extension lifecycle; SDK compatibility stays in secondary adapters. The existing modal controller class remains the sole reactive presentation state.
+
+The streaming implementation separates the following responsibilities:
+
+| Component | Purpose |
+| --- | --- |
+| `executeTranslation` | Compose preparation, provider attempts, complete validation, and final mapping under one execution scope. |
+| `TranslationAttemptPolicy` | Choose modes and enforce fallback, restart, and repair budgets. |
+| `TranslationAttemptPreview` | Buffer, parse, and publish provisional output from one attempt; discard its timer and callbacks when it ends. |
+| `translation-completion` / `translation-response-normalizer` | Inspect completion and validate paired or legacy final data before domain mapping. |
+| `TranslationCapabilityState` | Interpret feature and schema facts as mode support and translate provider observations into facts. |
+| `TranslationCapabilityJournal` | Retain failed observations, retry writes, and prevent stale jobs from learning across a model-window or provider-namespace refresh. |
+| `BrowserTranslationCapabilityStorage` | Serialize browser persistence and fixed-window/namespace refreshes; the codec validates stored records and merges facts. |
+| `TranslationJobCoordinator` / `TranslationProgressPublisher` | Coordinate extension job stages and deliver ordered, acknowledged progress respectively. |
+| `TranslationSession` / `TranslationModalController` | Own content-session ordering/liveness and reactive presentation respectively. Pure row transformations and clipboard I/O live in separate helpers. |
+
+Keep these adapter responsibilities outside core use cases. Public provider contracts, final validation, cancellation boundaries, and durable capability identity must remain stable during readability refactors.
+
+Capability facts are `unknown`, `supported`, or `unsupported`, with scoped evidence and observation time. Persist positive and negative observations. Within a compatibility window, select known-supported eligible paths before unknown paths and never probe an unsupported mode, including during repair. Model generations have a fixed 7-day refresh time; ordinary successful requests do not slide it forward. On expiry, clear positive and negative facts together so known-working selection cannot prevent rediscovery. Refresh happens lazily during real translation, without alarms or background generation. Successful Fetch Models advances that provider's namespace epoch, including manual models and models absent from the fetched list. Failed model fetching or catalog persistence preserves compatibility; a compatibility-reset failure after catalog persistence must be reported as a partial failure. The model list has no per-model Forget control. Both model and namespace generations prevent stale jobs or failed-write caches from restoring cleared facts. Provider namespaces are opaque to core and separate from model/endpoint identity. Bind older records lazily and honor namespace reset markers before importing legacy exclusions.
+
+Store model-wide limitations separately from schema-specific facts so description/schema changes do not discard general observations within an active window. Transport mode declarations are current per-request constraints; do not persist them as permanent exclusions, and ignore obsolete stored declarations when an SDK now supports a mode. Do not infer incompatibility or trigger refresh from rate limits, authentication, malformed generations, or connection failures. Operational facts and refresh markers remain excluded from settings backups.
+
+Live UI messages carry a request ID, document session, display revision, and sequence. They update locally registered modals only. Keep resets, acknowledgements, cancellation ownership, navigation, final-only copy/history, and commit-boundary tests when changing the flow. The pure final serializer lives in `src/shared/types/TranslationModalPayload.ts`; background imports must never pull injected modal components/styles into the worker bundle.
 
 #### 4. Wire into the adapter factory
 

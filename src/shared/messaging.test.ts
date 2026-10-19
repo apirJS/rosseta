@@ -13,6 +13,15 @@ const tabs = browser.tabs as unknown as {
 };
 
 describe('Shared: messaging', () => {
+  test('targets exactly the originating document and frame', async () => {
+    const options = { frameId: 2, documentId: 'original-document' };
+    await sendMessageToTab(42, { action: 'PING' }, options);
+    expect(tabs.sendMessage).toHaveBeenCalledWith(
+      42,
+      { action: 'PING' },
+      options,
+    );
+  });
   beforeEach(() => resetBrowserMock());
 
   // ── sendMessageToRuntime ───────────────────────────────────
@@ -28,12 +37,20 @@ describe('Shared: messaging', () => {
   test('sendMessageToRuntime passes action with payload', async () => {
     await sendMessageToRuntime({
       action: 'TRANSLATE_IMAGE',
-      payload: { imageBase64: 'data:test' },
+      payload: {
+        imageBase64: 'data:test',
+        requestId: 'request',
+        documentSessionId: 'document',
+      },
     });
 
     expect(runtime.sendMessage).toHaveBeenCalledWith({
       action: 'TRANSLATE_IMAGE',
-      payload: { imageBase64: 'data:test' },
+      payload: {
+        imageBase64: 'data:test',
+        requestId: 'request',
+        documentSessionId: 'document',
+      },
     });
   });
 

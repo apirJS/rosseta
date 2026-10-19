@@ -21,6 +21,12 @@ function preventScroll(event: Event): void {
 
 export class OverlayHandler {
   private static readonly HOST_ID = 'rosseta-host';
+  constructor(
+    private readonly startTranslation: (
+      requestId: string,
+      imageBase64: string,
+    ) => Promise<void>,
+  ) {}
 
   handle(rawImage: string): void {
     if (document.getElementById(OverlayHandler.HOST_ID)) return;
@@ -81,6 +87,7 @@ export class OverlayHandler {
         captureWidth,
         detachOverlay,
         onReady,
+        startTranslation: this.startTranslation,
       },
     });
   }

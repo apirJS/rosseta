@@ -22,9 +22,7 @@ export interface ManageModelsDeps {
     modelId: string,
   ) => Promise<Result<StoredModel[], AppError>>;
   clearModels: (provider: string) => Promise<Result<void, AppError>>;
-  fetchModels: (
-    provider: string,
-  ) => Promise<Result<StoredModel[], AppError>>;
+  fetchModels: (provider: string) => Promise<Result<StoredModel[], AppError>>;
   hasApiKeyFor: (provider: string) => boolean;
   selectedModelFor: (provider: string) => string | undefined;
   selectModel: (provider: string, modelId: string) => void;

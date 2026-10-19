@@ -1,38 +1,20 @@
 import { sendMessageToTab } from '../../../../shared/messaging';
+import type { TranslationModalPayload } from '../../../../shared/types/TranslationModalPayload';
 import {
   getActiveTab,
   injectContentScriptIfNeeded,
 } from '../service-worker.utils';
 import { TabNotifier } from '../services/TabNotifier';
 
-interface MountHistoryModalPayload {
-  id: string;
-  original: {
-    language: { code: string; name: string };
-    text: string;
-    romanization: string | null;
-    blockIndex: number;
-  }[];
-  translated: {
-    language: { code: string; name: string };
-    text: string;
-    romanization: string | null;
-    blockIndex: number;
-  }[];
-  description: string;
-  createdAt: Date;
-}
-
 export class MountHistoryModalHandler {
-  async handle(payload: MountHistoryModalPayload): Promise<void> {
+  async handle(payload: TranslationModalPayload): Promise<void> {
     const activeTab = await getActiveTab();
-    if (!activeTab?.id) {
+    if (typeof activeTab?.id !== 'number') {
       console.error('[MountHistoryModalHandler] No active tab found');
       return;
     }
 
     await injectContentScriptIfNeeded(activeTab.id);
-
     const notifier = new TabNotifier(activeTab.id);
     await notifier.showInfo('Opening Translation', 2000);
 

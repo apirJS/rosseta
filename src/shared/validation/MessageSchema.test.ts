@@ -2,6 +2,44 @@ import { describe, expect, test } from 'bun:test';
 import { MessageSchema, COMMAND } from './MessageSchema';
 
 describe('Shared: MessageSchema', () => {
+  test('live snapshots validate provisional strings and nullable metadata', () => {
+    const event = {
+      requestId: 'r',
+      documentSessionId: 'd',
+      revision: 1,
+      sequence: 2,
+      kind: 'snapshot',
+      draft: {
+        segments: [
+          {
+            index: 0,
+            blockIndex: null,
+            originalText: 'こんに',
+            translatedText: 'Hel',
+            sourceLanguageCode: null,
+            romanization: null,
+          },
+        ],
+        description: null,
+      },
+    };
+    expect(
+      MessageSchema.safeParse({ action: 'TRANSLATION_EVENT', payload: event })
+        .success,
+    ).toBe(true);
+    expect(
+      MessageSchema.safeParse({
+        action: 'TRANSLATION_EVENT',
+        payload: { ...event, revision: -1 },
+      }).success,
+    ).toBe(false);
+    expect(
+      MessageSchema.safeParse({
+        action: 'CANCEL_TRANSLATION',
+        payload: { id: 'old-toast' },
+      }).success,
+    ).toBe(false);
+  });
   // ==================== VALID MESSAGES ====================
   describe('valid messages', () => {
     test('PING', () => {
@@ -30,7 +68,11 @@ describe('Shared: MessageSchema', () => {
     test('TRANSLATE_IMAGE with valid payload', () => {
       const result = MessageSchema.safeParse({
         action: 'TRANSLATE_IMAGE',
-        payload: { imageBase64: 'data:image/png;base64,abc123' },
+        payload: {
+          imageBase64: 'data:image/png;base64,abc123',
+          requestId: 'request',
+          documentSessionId: 'document',
+        },
       });
       expect(result.success).toBe(true);
     });

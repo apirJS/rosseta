@@ -51,8 +51,6 @@ globalThis.window =
 import { ContentMessageRouter } from './ContentMessageRouter';
 import { ThemeManager } from '../hosts/ThemeManager';
 
-// ── Tests ────────────────────────────────────────────────────────────
-
 const runtimeOnMessage = browser.runtime as unknown as {
   onMessage: { addListener: ReturnType<typeof mock> };
 };
@@ -136,9 +134,9 @@ describe('Adapter: ContentMessageRouter', () => {
     expect(mockToastDismiss).toHaveBeenCalledWith('toast-123');
   });
 
-  test('PING → returns { type: "PONG" }', async () => {
+  test('PING → returns { action: "PONG" }', async () => {
     const result = await callback({ action: 'PING' });
-    expect(result).toEqual({ type: 'PONG' });
+    expect(result).toEqual({ action: 'PONG' });
   });
 
   test('invalid message (schema fail) → no handler called', async () => {

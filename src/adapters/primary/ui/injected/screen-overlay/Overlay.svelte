@@ -6,11 +6,12 @@
     captureWidth: number;
     detachOverlay: () => void;
     onReady?: () => void;
+    startTranslation: (requestId: string, imageBase64: string) => Promise<void>;
   }
-  const { viewportImg, captureWidth, detachOverlay, onReady }: Props = $props();
+  const { viewportImg, captureWidth, detachOverlay, onReady, startTranslation }: Props = $props();
 
   // svelte-ignore state_referenced_locally
-  const controller = new OverlayController(viewportImg, detachOverlay, onReady);
+  const controller = new OverlayController(viewportImg, detachOverlay, onReady, startTranslation);
 
   let overlayEl: HTMLDivElement;
 

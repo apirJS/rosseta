@@ -5,7 +5,7 @@ import { BrowserKeySelectionStorageAdapter } from '../../adapters/secondary/stor
 import { BrowserModelStorageAdapter } from '../../adapters/secondary/storage/BrowserModelStorageAdapter';
 import { BrowserCommandStorageAdapter } from '../../adapters/secondary/storage/BrowserCommandStorageAdapter';
 import { BrowserCustomProviderStorageAdapter } from '../../adapters/secondary/storage/BrowserCustomProviderStorageAdapter';
-import { BrowserStructuredOutputExemptionStorage } from '../../adapters/secondary/storage/BrowserStructuredOutputExemptionStorage';
+import { BrowserTranslationCapabilityStorage } from '../../adapters/secondary/storage/BrowserTranslationCapabilityStorage';
 import { ModelFetchService } from '../../adapters/secondary/model-fetchers/ModelFetchService';
 import { GetCredentialsUseCase } from '../../core/application/auth/GetCredentialUseCase';
 import { AddApiKeyUseCase } from '../../core/application/auth/AddApiKeyUseCase';
@@ -26,6 +26,7 @@ import { FetchModelsUseCase } from '../../core/application/models/FetchModelsUse
 import { AddCustomModelUseCase } from '../../core/application/models/AddCustomModelUseCase';
 import { RemoveCustomModelUseCase } from '../../core/application/models/RemoveCustomModelUseCase';
 import { ClearModelsUseCase } from '../../core/application/models/ClearModelsUseCase';
+import { ResetProviderCapabilitiesUseCase } from '../../core/application/models/ResetProviderCapabilitiesUseCase';
 import { SaveCustomProviderUseCase } from '../../core/application/provider/SaveCustomProviderUseCase';
 import { GetCustomProvidersUseCase } from '../../core/application/provider/GetCustomProvidersUseCase';
 import { RemoveCustomProviderUseCase } from '../../core/application/provider/RemoveCustomProviderUseCase';
@@ -38,7 +39,7 @@ import type { IUserPreferencesStorage } from '../../core/ports/outbound/IUserPre
 import type { IKeySelectionStorage } from '../../core/ports/outbound/IKeySelectionStorage';
 import type { IModelStorage } from '../../core/ports/outbound/IModelStorage';
 import type { ICustomProviderStorage } from '../../core/ports/outbound/ICustomProviderStorage';
-import type { IStructuredOutputExemptionStorage } from '../../core/ports/outbound/IStructuredOutputExemptionStorage';
+import type { ITranslationCapabilityStorage } from '../../core/ports/outbound/ITranslationCapabilityStorage';
 import type { IModelFetchService } from '../../core/ports/outbound/IModelFetchService';
 import type { ICommandStorage } from '../../core/ports/outbound/ICommandStorage';
 
@@ -55,8 +56,8 @@ export function createContainer() {
   const commandStorage: ICommandStorage = new BrowserCommandStorageAdapter();
   const customProviderStorage: ICustomProviderStorage =
     new BrowserCustomProviderStorageAdapter();
-  const structuredOutputExemptionStorage: IStructuredOutputExemptionStorage =
-    new BrowserStructuredOutputExemptionStorage();
+  const translationCapabilityStorage: ITranslationCapabilityStorage =
+    new BrowserTranslationCapabilityStorage();
   const modelFetchService: IModelFetchService = new ModelFetchService();
 
   return {
@@ -66,7 +67,7 @@ export function createContainer() {
     keySelectionStorage,
     modelStorage,
     customProviderStorage,
-    structuredOutputExemptionStorage,
+    translationCapabilityStorage,
 
     getCredentialsUseCase: new GetCredentialsUseCase(credentialStorage),
     addApiKeyUseCase: new AddApiKeyUseCase(credentialStorage),
@@ -107,6 +108,7 @@ export function createContainer() {
     addCustomModelUseCase: new AddCustomModelUseCase(modelStorage),
     removeCustomModelUseCase: new RemoveCustomModelUseCase(modelStorage),
     clearModelsUseCase: new ClearModelsUseCase(modelStorage),
+    resetProviderCapabilitiesUseCase: new ResetProviderCapabilitiesUseCase(translationCapabilityStorage),
 
     getCustomProvidersUseCase: new GetCustomProvidersUseCase(
       customProviderStorage,

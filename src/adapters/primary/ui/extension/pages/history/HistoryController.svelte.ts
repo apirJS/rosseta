@@ -1,6 +1,6 @@
 import { getTranslationContext } from '../../../shared/context';
 import { sendMessageToRuntime } from '../../../../../../shared/messaging';
-import { serializeForModal } from '../../../../content/handlers/TranslationModalHandler';
+import { serializeForModal } from '../../../../../../shared/types/TranslationModalPayload';
 import type { Translation } from '../../../../../../core/domain/translation/Translation';
 
 export type TimeFilter = '24h' | '7d' | 'all';
@@ -53,14 +53,16 @@ export function createHistoryController() {
             seg.text.toLowerCase().includes(query) ||
             seg.language.name.toLowerCase().includes(query) ||
             seg.language.code.toLowerCase().includes(query) ||
-            (seg.romanization && seg.romanization.toLowerCase().includes(query)),
+            (seg.romanization &&
+              seg.romanization.toLowerCase().includes(query)),
         );
         const matchTranslated = t.translated.some(
           (seg) =>
             seg.text.toLowerCase().includes(query) ||
             seg.language.name.toLowerCase().includes(query) ||
             seg.language.code.toLowerCase().includes(query) ||
-            (seg.romanization && seg.romanization.toLowerCase().includes(query)),
+            (seg.romanization &&
+              seg.romanization.toLowerCase().includes(query)),
         );
         const matchDescription = t.description.toLowerCase().includes(query);
         return matchOriginal || matchTranslated || matchDescription;

@@ -12,6 +12,11 @@ export class AbortCancellationToken implements ICancellationToken {
   }
 
   onCancellationRequested(listener: () => void): () => void {
+    if (this.isCancellationRequested) {
+      listener();
+      return () => {};
+    }
+
     this.controller.signal.addEventListener('abort', listener, { once: true });
     return () => this.controller.signal.removeEventListener('abort', listener);
   }

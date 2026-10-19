@@ -1,0 +1,2 @@
+export const MAX_TRANSLATION_BYTES = 1024 * 1024;
+export const MAX_TRANSLATION_SEGMENTS = 2048;

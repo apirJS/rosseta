@@ -8,14 +8,15 @@ import {
   afterEach,
 } from 'bun:test';
 import * as browser from 'webextension-polyfill';
-import { APICallError } from 'ai';
 import { MessageRouter } from './MessageRouter';
 import { container } from './di-container';
 import { OverlayService } from './services/OverlayService';
 import type { Message } from '../../../shared/validation/MessageSchema';
-import { resetBrowserMock, generateTextMock } from '../../../../tests/browser-mock';
+import { resetBrowserMock } from '../../../../tests/browser-mock';
+import { TranslationJobCoordinator } from './services/TranslationJobCoordinator';
+import { TranslationError } from '../../../shared/errors';
+import { success, failure } from '../../../shared/types/Result';
 import {
-  VALID_TRANSLATION_RESPONSE,
   VALID_IMAGE_BASE64,
   seedCredentialsAndPreferences,
 } from '../../../../tests/test-fixtures';
@@ -63,6 +64,7 @@ describe('Adapter: MessageRouter', () => {
 
   afterEach(() => {
     fetchSpy.mockRestore();
+    mock.restore();
   });
 
   function getCallback() {
@@ -75,62 +77,108 @@ describe('Adapter: MessageRouter', () => {
     ) => Promise<unknown>;
   }
 
-  test('TRANSLATE_IMAGE → full pipeline succeeds → sends MOUNT_TRANSLATION_MODAL', async () => {
-    seedCredentialsAndPreferences();
-    generateTextMock.mockResolvedValueOnce({
-      output: VALID_TRANSLATION_RESPONSE,
-    });
-
+  test('TRANSLATE_IMAGE routes a full logical job with trusted tab, frame, document and session identity', async () => {
+    const handle = spyOn(
+      TranslationJobCoordinator.prototype,
+      'handle',
+    ).mockResolvedValue(success(undefined));
     const callback = getCallback();
-    const message: Message = {
-      action: 'TRANSLATE_IMAGE',
-      payload: { imageBase64: VALID_IMAGE_BASE64 },
+    const payload = {
+      imageBase64: VALID_IMAGE_BASE64,
+      requestId: 'router-request',
+      documentSessionId: 'router-session',
     };
-
-    await callback(message, createSender(1));
-
-    const calls = tabMessaging.sendMessage.mock.calls;
-    const modalCall = calls.find(
-      (c: unknown[]) =>
-        (c[1] as { action: string })?.action === 'MOUNT_TRANSLATION_MODAL',
-    );
-    expect(modalCall).toBeDefined();
+    const sender = {
+      ...createSender(11),
+      frameId: 3,
+      documentId: 'document-3',
+    };
+    expect(
+      await callback({ action: 'TRANSLATE_IMAGE', payload }, sender),
+    ).toEqual(success(undefined));
+    expect(handle).toHaveBeenCalledWith(payload, {
+      tabId: 11,
+      frameId: 3,
+      documentId: 'document-3',
+    });
   });
 
-  test('TRANSLATE_IMAGE → provider failure → error toast, no modal', async () => {
-    seedCredentialsAndPreferences();
-    generateTextMock.mockRejectedValueOnce(
-      new APICallError({
-        message: 'Rate limit exceeded',
-        url: 'https://api.test',
-        requestBodyValues: {},
-        statusCode: 429,
-      }),
+  test('TRANSLATE_IMAGE maps only safe final error fields', async () => {
+    spyOn(TranslationJobCoordinator.prototype, 'handle').mockResolvedValue(
+      failure(TranslationError.rateLimited()),
     );
-
     const callback = getCallback();
-    const message: Message = {
-      action: 'TRANSLATE_IMAGE',
-      payload: { imageBase64: VALID_IMAGE_BASE64 },
-    };
+    const result = (await callback(
+      {
+        action: 'TRANSLATE_IMAGE',
+        payload: {
+          imageBase64: VALID_IMAGE_BASE64,
+          requestId: 'router-request',
+          documentSessionId: 'router-session',
+        },
+      },
+      createSender(1),
+    )) as { success: boolean; error?: { code: string } };
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe('TRANSLATION_RATE_LIMITED');
+    expect(Object.keys(result.error ?? {}).toSorted()).toEqual([
+      'code',
+      'message',
+      'userMessage',
+    ]);
+    expect(tabMessaging.sendMessage).not.toHaveBeenCalled();
+  });
 
-    const result = (await callback(message, createSender(1))) as {
-      success: boolean;
+  test('cancel and status routes use the same trusted owner scope', async () => {
+    const cancel = spyOn(
+      TranslationJobCoordinator.prototype,
+      'cancel',
+    ).mockImplementation(() => {});
+    const status = spyOn(
+      TranslationJobCoordinator.prototype,
+      'status',
+    ).mockResolvedValue({ state: 'active' });
+    const callback = getCallback();
+    const payload = {
+      requestId: 'router-request',
+      documentSessionId: 'router-session',
     };
+    const sender = { ...createSender(7), frameId: 4, documentId: 'doc' };
+    await callback({ action: 'CANCEL_TRANSLATION', payload }, sender);
+    expect(cancel).toHaveBeenCalledWith(payload, {
+      tabId: 7,
+      frameId: 4,
+      documentId: 'doc',
+    });
+    expect(
+      await callback({ action: 'GET_TRANSLATION_STATUS', payload }, sender),
+    ).toEqual({ state: 'active' });
+    expect(status).toHaveBeenCalledWith(payload, {
+      tabId: 7,
+      frameId: 4,
+      documentId: 'doc',
+    });
+    expect(
+      await callback(
+        { action: 'GET_TRANSLATION_STATUS', payload },
+        createSender(),
+      ),
+    ).toEqual({ state: 'unknown' });
+  });
 
-    expect(result?.success).toBe(false);
-    const calls = tabMessaging.sendMessage.mock.calls;
-    const modalCall = calls.find(
-      (c: unknown[]) =>
-        (c[1] as { action: string })?.action === 'MOUNT_TRANSLATION_MODAL',
-    );
-    expect(modalCall).toBeUndefined();
-    const errorToastCall = calls.find(
-      (c: unknown[]) =>
-        (c[1] as { action: string })?.action === 'SHOW_TOAST' &&
-        (c[1] as { payload?: { type?: string } })?.payload?.type === 'error',
-    );
-    expect(errorToastCall).toBeDefined();
+  test('legacy translation requests lacking request identity are rejected by validation', async () => {
+    const handle = spyOn(TranslationJobCoordinator.prototype, 'handle');
+    const callback = getCallback();
+    expect(
+      await callback(
+        {
+          action: 'TRANSLATE_IMAGE',
+          payload: { imageBase64: VALID_IMAGE_BASE64 },
+        },
+        createSender(1),
+      ),
+    ).toBeUndefined();
+    expect(handle).not.toHaveBeenCalled();
   });
 
   test('FETCH_MODELS → resolves provider key, fetches, persists, returns models', async () => {
@@ -190,7 +238,11 @@ describe('Adapter: MessageRouter', () => {
     const callback = getCallback();
     const message: Message = {
       action: 'TRANSLATE_IMAGE',
-      payload: { imageBase64: VALID_IMAGE_BASE64 },
+      payload: {
+        imageBase64: VALID_IMAGE_BASE64,
+        requestId: 'router-request',
+        documentSessionId: 'router-session',
+      },
     };
 
     const result = (await callback(message, createSender())) as {

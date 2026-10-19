@@ -365,6 +365,19 @@ describe('Shared: BrowserError', () => {
 // Inheritance chain
 // =============================================================
 describe('Shared: Error hierarchy', () => {
+  test('translation lifecycle errors retain distinct safe messages', () => {
+    const cases = [
+      [TranslationError.cancelled(), ErrorCode.TRANSLATION_CANCELLED],
+      [TranslationError.interrupted(), ErrorCode.TRANSLATION_INTERRUPTED],
+      [TranslationError.responseLimit(), ErrorCode.TRANSLATION_RESPONSE_LIMIT],
+    ] as const;
+    for (const [error, code] of cases) {
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.code).toBe(code);
+      expect(error.userMessage).toBeTruthy();
+    }
+  });
+
   test('all subclasses are instanceof AppError', () => {
     const errors = [
       AuthError.notAuthenticated(),

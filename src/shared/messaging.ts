@@ -14,6 +14,9 @@ export async function sendMessageToRuntime<T extends Message['action']>(
 export async function sendMessageToTab<T extends Message['action']>(
   tabId: number,
   message: MessageByAction<T>,
+  options?: { frameId?: number; documentId?: string },
 ): Promise<MessageReturnTypeMap[T]> {
-  return await browser.tabs.sendMessage(tabId, message);
+  return options
+    ? await browser.tabs.sendMessage(tabId, message, options)
+    : await browser.tabs.sendMessage(tabId, message);
 }

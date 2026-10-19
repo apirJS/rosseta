@@ -91,7 +91,21 @@ describe('UI Controller: OverlayController', () => {
   ): { controller: OverlayController; cleanup: () => void } {
     let controller!: OverlayController;
     const cleanup = $effect.root(() => {
-      controller = new OverlayController(mockImageBase64, detach, onReady);
+      controller = new OverlayController(
+        mockImageBase64,
+        detach,
+        onReady,
+        async (requestId, imageBase64) => {
+          await sendMessageToRuntime({
+            action: 'TRANSLATE_IMAGE',
+            payload: {
+              requestId,
+              documentSessionId: 'test-session',
+              imageBase64,
+            },
+          });
+        },
+      );
     });
     flushSync(); // Trigger any pending effects
     return { controller, cleanup };
@@ -237,7 +251,11 @@ describe('UI Controller: OverlayController', () => {
 
       expect(sendMessageToRuntime).toHaveBeenCalledWith({
         action: 'TRANSLATE_IMAGE',
-        payload: { imageBase64: 'data:image/jpeg;base64,CROPPED_RESULT' },
+        payload: {
+          imageBase64: 'data:image/jpeg;base64,CROPPED_RESULT',
+          requestId: expect.any(String),
+          documentSessionId: 'test-session',
+        },
       });
 
       expect(detachMock).toHaveBeenCalled();

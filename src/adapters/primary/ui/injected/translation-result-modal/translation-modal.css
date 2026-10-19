@@ -101,6 +101,29 @@
   outline: none;
 }
 
+.modal-container-compact {
+  /* Native resizing writes inline dimensions; terminal errors must shrink too. */
+  width: 380px !important;
+  height: auto !important;
+  min-width: 0;
+  min-height: 0;
+  resize: none;
+}
+
+.modal-container-compact .modal-body {
+  flex: 0 1 auto;
+  gap: 12px;
+}
+
+.modal-container-compact .translation-error,
+.modal-container-compact .translation-retry {
+  margin: 0;
+}
+
+.modal-container-compact .translation-retry {
+  align-self: flex-start;
+}
+
 .modal-footer-drag {
   display: flex;
   align-items: center;
@@ -120,7 +143,8 @@
 .modal-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--modal-border);
   cursor: grab;
@@ -133,6 +157,8 @@
 }
 
 .modal-header-title {
+  flex-shrink: 0;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--modal-fg);
@@ -146,6 +172,8 @@
   justify-content: center;
   width: 28px;
   height: 28px;
+  flex-shrink: 0;
+  margin-left: auto;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -419,4 +447,68 @@
 
 .copy-feedback {
   color: #81c784;
+}
+.translation-status {
+  display: inline-flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  color: var(--modal-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.translation-status-dots {
+  display: inline-block;
+  width: 3ch;
+  font-family: monospace;
+}
+
+.translation-status-dots > span {
+  display: block;
+  width: 1ch;
+  overflow: hidden;
+  animation: translation-progress-dots 1.2s steps(3, jump-none) infinite;
+}
+
+@keyframes translation-progress-dots {
+  from {
+    width: 1ch;
+  }
+  to {
+    width: 3ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .translation-status-dots > span {
+    animation: none;
+    width: 3ch;
+  }
+}
+
+.translation-error-title {
+  color: var(--modal-fg);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.translation-error {
+  color: var(--modal-fg);
+  font-size: 13px;
+  margin: 4px 0 10px;
+}
+
+.translation-pending {
+  color: var(--modal-muted);
+}
+
+.translation-retry {
+  color: var(--modal-fg);
+  background: var(--modal-surface);
+  border: 1px solid var(--modal-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
 }

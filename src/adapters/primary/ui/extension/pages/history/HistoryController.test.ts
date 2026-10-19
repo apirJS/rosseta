@@ -7,8 +7,6 @@ import { AppError } from '../../../../../../shared/errors/AppError';
 import type { IGetAllTranslationsUseCase } from '../../../../../../core/ports/inbound/translation/IGetAllTranslationsUseCase';
 import type { IDeleteTranslationUseCase } from '../../../../../../core/ports/inbound/translation/IDeleteTranslationUseCase';
 
-// ── Mocks ────────────────────────────────────────────────────────
-
 const mockGetAllTranslations: IGetAllTranslationsUseCase = {
   execute: vi.fn(),
 };
@@ -28,7 +26,7 @@ vi.mock('../../../../../../shared/messaging', () => ({
   sendMessageToRuntime: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../../content/handlers/TranslationModalHandler', () => ({
+vi.mock('../../../../../../shared/types/TranslationModalPayload', () => ({
   serializeForModal: vi.fn((t: Translation) => ({
     id: t.id,
     original: t.original.map((s) => ({
@@ -51,8 +49,6 @@ vi.mock('../../../../content/handlers/TranslationModalHandler', () => ({
 import { createHistoryController } from './HistoryController.svelte';
 import { sendMessageToRuntime } from '../../../../../../shared/messaging';
 
-// ── Helpers ──────────────────────────────────────────────────────
-
 function makeSegment(text: string, langCode: 'ja-JP' | 'en-US'): TextSegment {
   const lang = Language.create(langCode);
   const result = TextSegment.create(text, lang);
@@ -74,14 +70,10 @@ function makeTranslation(
   );
 }
 
-// ── Tests ────────────────────────────────────────────────────────
-
 describe('UI Controller: HistoryController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
-  // ── Initial State ────────────────────────────────────────────
 
   test('initial state has empty arrays and no search/filter', () => {
     const controller = createHistoryController();
@@ -93,12 +85,10 @@ describe('UI Controller: HistoryController', () => {
     expect(controller.state.error).toBeNull();
   });
 
-  // ── load() ───────────────────────────────────────────────────
-
   test('load() sets loading=true, then populates translations on success', async () => {
     const items = [
-      makeTranslation('t-1', 'こんにちは'),
-      makeTranslation('t-2', '世界'),
+      makeTranslation('t-1', 'ã“ã‚“ã«ã¡ã¯'),
+      makeTranslation('t-2', 'ä¸–ç•Œ'),
     ];
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
@@ -127,12 +117,10 @@ describe('UI Controller: HistoryController', () => {
     expect(controller.state.translations).toEqual([]);
   });
 
-  // ── Filtering ────────────────────────────────────────────────
-
   test('setSearchQuery updates state and filters by original text', async () => {
     const items = [
-      makeTranslation('t-1', 'こんにちは'),
-      makeTranslation('t-2', '世界'),
+      makeTranslation('t-1', 'ã“ã‚“ã«ã¡ã¯'),
+      makeTranslation('t-2', 'ä¸–ç•Œ'),
     ];
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
@@ -142,8 +130,8 @@ describe('UI Controller: HistoryController', () => {
     const controller = createHistoryController();
     await controller.load();
 
-    controller.setSearchQuery('こんにちは');
-    expect(controller.state.searchQuery).toBe('こんにちは');
+    controller.setSearchQuery('ã“ã‚“ã«ã¡ã¯');
+    expect(controller.state.searchQuery).toBe('ã“ã‚“ã«ã¡ã¯');
     expect(controller.filtered).toHaveLength(1);
     expect(controller.filtered[0].id).toBe('t-1');
   });
@@ -247,8 +235,6 @@ describe('UI Controller: HistoryController', () => {
     expect(controller.filtered[0].id).toBe('t-1');
   });
 
-  // ── deleteItem() ──────────────────────────────────────────────
-
   test('deleteItem removes translation from state immediately (pending undo)', async () => {
     const items = [
       makeTranslation('t-1', 'keep'),
@@ -265,13 +251,10 @@ describe('UI Controller: HistoryController', () => {
 
     controller.deleteItem('t-2');
 
-    // Item removed from UI immediately
     expect(controller.state.translations).toHaveLength(1);
     expect(controller.state.translations[0].id).toBe('t-1');
-    // pendingDelete is set
     expect(controller.state.pendingDelete).not.toBeNull();
     expect(controller.state.pendingDelete!.translation.id).toBe('t-2');
-    // Actual delete not called yet (waiting for 5s timer)
     expect(mockDeleteTranslation.execute).not.toHaveBeenCalled();
   });
 
@@ -295,8 +278,6 @@ describe('UI Controller: HistoryController', () => {
     expect(controller.state.translations).toHaveLength(2);
     expect(controller.state.pendingDelete).toBeNull();
   });
-
-  // ── openItem() ────────────────────────────────────────────────
 
   test('openItem serializes and sends MOUNT_HISTORY_MODAL message', async () => {
     const t = makeTranslation('t-1', 'hello');

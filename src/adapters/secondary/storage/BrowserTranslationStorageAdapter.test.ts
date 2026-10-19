@@ -108,6 +108,59 @@ describe('Adapter: BrowserTranslationStorageAdapter', () => {
       expect(result.error.code).toBe(ErrorCode.STORAGE_WRITE_FAILED);
   });
 
+  test('parallel final saves across adapter instances preserve both translations', async () => {
+    seedStore({ translations: [validTranslationProps('existing')] });
+    const results = await Promise.all([
+      adapter.save(createTranslation('first')),
+      new BrowserTranslationStorageAdapter().save(createTranslation('second')),
+    ]);
+    expect(results.every((result) => result.success)).toBe(true);
+    const all = await adapter.getAll();
+    expect(
+      all.success && all.data.map((translation) => translation.id),
+    ).toEqual(['second', 'first', 'existing']);
+  });
+
+  test('a failed final write does not block the next concurrent commit', async () => {
+    storage.set.mockRejectedValueOnce(new Error('quota'));
+    const [failed, succeeded] = await Promise.all([
+      adapter.save(createTranslation('failed')),
+      new BrowserTranslationStorageAdapter().save(createTranslation('saved')),
+    ]);
+    expect(failed.success).toBe(false);
+    expect(succeeded.success).toBe(true);
+    const all = await adapter.getAll();
+    expect(
+      all.success && all.data.map((translation) => translation.id),
+    ).toEqual(['saved']);
+  });
+
+  test('serializes deletion with final commits instead of restoring a deleted record', async () => {
+    seedStore({ translations: [validTranslationProps('remove')] });
+    const results = await Promise.all([
+      adapter.delete('remove'),
+      new BrowserTranslationStorageAdapter().save(createTranslation('new')),
+    ]);
+    expect(results.every((result) => result.success)).toBe(true);
+    const all = await adapter.getAll();
+    expect(
+      all.success && all.data.map((translation) => translation.id),
+    ).toEqual(['new']);
+  });
+
+  test('backup replacement preserves the existing final history shape', async () => {
+    const translation = createTranslation('restored');
+    expect((await adapter.replaceAll([translation])).success).toBe(true);
+    const raw = await browser.storage.local.get('translations');
+    expect(raw.translations).toEqual([translation.toProps()]);
+    const loaded = await new BrowserTranslationStorageAdapter().getById(
+      'restored',
+    );
+    expect(loaded.success && loaded.data?.toProps()).toEqual(
+      translation.toProps(),
+    );
+  });
+
   // ── getAll ──────────────────────────────────────────────────────
   test('getAll() returns empty array when storage is empty', async () => {
     const result = await adapter.getAll();

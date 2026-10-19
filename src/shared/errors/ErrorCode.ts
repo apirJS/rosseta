@@ -5,6 +5,9 @@ export enum ErrorCode {
   AUTH_PAYMENT_REQUIRED = 'AUTH_PAYMENT_REQUIRED',
 
   TRANSLATION_FAILED = 'TRANSLATION_FAILED',
+  TRANSLATION_CANCELLED = 'TRANSLATION_CANCELLED',
+  TRANSLATION_INTERRUPTED = 'TRANSLATION_INTERRUPTED',
+  TRANSLATION_RESPONSE_LIMIT = 'TRANSLATION_RESPONSE_LIMIT',
   TRANSLATION_RATE_LIMITED = 'TRANSLATION_RATE_LIMITED',
   TRANSLATION_INVALID_IMAGE = 'TRANSLATION_INVALID_IMAGE',
   TRANSLATION_UNSUPPORTED_LANGUAGE = 'TRANSLATION_UNSUPPORTED_LANGUAGE',
@@ -18,8 +21,7 @@ export enum ErrorCode {
   TRANSLATION_IMAGE_TOO_LARGE = 'TRANSLATION_IMAGE_TOO_LARGE',
   TRANSLATION_REQUEST_REJECTED = 'TRANSLATION_REQUEST_REJECTED',
   TRANSLATION_EMPTY_RESPONSE = 'TRANSLATION_EMPTY_RESPONSE',
-  TRANSLATION_PROVIDER_QUOTA_EXCEEDED =
-    'TRANSLATION_PROVIDER_QUOTA_EXCEEDED',
+  TRANSLATION_PROVIDER_QUOTA_EXCEEDED = 'TRANSLATION_PROVIDER_QUOTA_EXCEEDED',
 
   NETWORK_OFFLINE = 'NETWORK_OFFLINE',
   NETWORK_TIMEOUT = 'NETWORK_TIMEOUT',
@@ -59,6 +61,11 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
     'The provider requires billing or credits for this request.',
 
   [ErrorCode.TRANSLATION_FAILED]: 'Translation failed. Please try again.',
+  [ErrorCode.TRANSLATION_CANCELLED]: 'Translation cancelled.',
+  [ErrorCode.TRANSLATION_INTERRUPTED]:
+    'Translation was interrupted. Select an area to try again.',
+  [ErrorCode.TRANSLATION_RESPONSE_LIMIT]:
+    'The translation response is too large. Select a smaller area.',
   [ErrorCode.TRANSLATION_RATE_LIMITED]:
     'Too many requests. Please wait a moment.',
   [ErrorCode.TRANSLATION_INVALID_IMAGE]: 'Could not process the image.',
@@ -115,6 +122,9 @@ export const ERROR_TITLES: Record<ErrorCode, string> = {
   [ErrorCode.AUTH_ACCESS_DENIED]: 'Access Denied',
   [ErrorCode.AUTH_PAYMENT_REQUIRED]: 'Billing Required',
   [ErrorCode.TRANSLATION_FAILED]: 'Translation Failed',
+  [ErrorCode.TRANSLATION_CANCELLED]: 'Translation Cancelled',
+  [ErrorCode.TRANSLATION_INTERRUPTED]: 'Translation Interrupted',
+  [ErrorCode.TRANSLATION_RESPONSE_LIMIT]: 'Response Too Large',
   [ErrorCode.TRANSLATION_RATE_LIMITED]: 'Rate Limit Reached',
   [ErrorCode.TRANSLATION_INVALID_IMAGE]: 'Invalid Image',
   [ErrorCode.TRANSLATION_UNSUPPORTED_LANGUAGE]: 'Unsupported Language',

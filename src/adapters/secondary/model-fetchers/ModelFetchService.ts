@@ -17,7 +17,7 @@ import {
 import { isCustomProviderId } from '../../../core/domain/provider/CustomProviderConfig';
 import type { CustomProviderType } from '../../../core/domain/provider/CustomProviderConfig';
 import { buildCustomProviderURL } from '../shared/custom-provider-request';
-import puterSdk from '@heyputer/puter.js';
+import { withPuterSession } from '../puter/PuterSdkSession';
 
 class HttpError extends Error {
   constructor(
@@ -238,12 +238,10 @@ type ModelFetcher = (
 ) => Promise<ModelInfo[]>;
 
 async function fetchPuterModels(apiKey: string): Promise<ModelInfo[]> {
-  if (puterSdk.authToken !== apiKey) {
-    puterSdk.setAuthToken(apiKey);
-  }
-
-  await puterSdk.auth.getUser();
-  const rawModels = await puterSdk.ai.listModels();
+  const rawModels = await withPuterSession(apiKey, async (puterSdk) => {
+    await puterSdk.auth.getUser();
+    return puterSdk.ai.listModels();
+  });
 
   return rawModels
     .filter((model): model is Record<string, unknown> =>

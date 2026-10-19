@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { FetchModelsHandler } from './FetchModelsHandler';
+import { FakeTranslationCapabilityStorage } from '../../../../../tests/fakes/FakeTranslationCapabilityStorage';
+import { ResetProviderCapabilitiesUseCase } from '../../../../core/application/models/ResetProviderCapabilitiesUseCase';
+import { NetworkError, StorageError } from '../../../../shared/errors';
 import {
   FakeCredentialStorage,
 } from '../../../../../tests/fakes/FakeCredentialStorage';
@@ -54,6 +57,7 @@ function createTestContainer() {
   const modelStorage = new FakeModelStorage();
   const fetchService = new FakeModelFetchService();
   const customProviderStorage = new FakeCustomProviderStorage();
+  const capabilityStorage = new FakeTranslationCapabilityStorage();
 
   const container = {
     getCredentialsUseCase: new GetCredentialsUseCase(credentialStorage),
@@ -61,6 +65,7 @@ function createTestContainer() {
     getCustomProvidersUseCase: new GetCustomProvidersUseCase(
       customProviderStorage,
     ),
+    resetProviderCapabilitiesUseCase: new ResetProviderCapabilitiesUseCase(capabilityStorage),
   } as unknown as Container;
 
   return {
@@ -68,6 +73,8 @@ function createTestContainer() {
     credentialStorage,
     fetchService,
     customProviderStorage,
+    capabilityStorage,
+    modelStorage,
   };
 }
 
@@ -138,6 +145,7 @@ describe('Adapter: FetchModelsHandler', () => {
       getCustomProvidersUseCase: new GetCustomProvidersUseCase(
         customProviderStorage,
       ),
+      resetProviderCapabilitiesUseCase: new ResetProviderCapabilitiesUseCase(new FakeTranslationCapabilityStorage()),
     } as unknown as Container;
 
     const handler = new FetchModelsHandler(containerWithCustom);
@@ -168,6 +176,7 @@ describe('Adapter: FetchModelsHandler', () => {
       getCustomProvidersUseCase: new GetCustomProvidersUseCase(
         customProviderStorage,
       ),
+      resetProviderCapabilitiesUseCase: new ResetProviderCapabilitiesUseCase(new FakeTranslationCapabilityStorage()),
     } as unknown as Container;
     fetchService.seedModels('custom-endpoint', [
       { id: 'custom-model', name: 'Custom Model' },
@@ -184,4 +193,73 @@ describe('Adapter: FetchModelsHandler', () => {
       baseURL: 'https://my-endpoint.example/v1',
     });
   });
+
+  test('successful fetching resets all cached models for that provider, including models outside the fetched list', async () => {
+    const { container, credentialStorage, fetchService, capabilityStorage } = createTestContainer();
+    credentialStorage.seedWith(Credentials.createEmpty(uuidv4()).add(makeCredential('q1', 'key', 'groq')));
+    fetchService.seedModels('groq', [{ id: 'new', name: 'New model' }]);
+    seedCompatibility(capabilityStorage, 'fetched-before', 'groq');
+    seedCompatibility(capabilityStorage, 'manual-or-removed', 'groq');
+    seedCompatibility(capabilityStorage, 'unrelated', 'google');
+
+    const result = await new FetchModelsHandler(container).handle({ provider: 'groq' });
+    expect(result.success).toBe(true);
+    expect(capabilityStorage.records.get('fetched-before')?.facts).toEqual({});
+    expect(capabilityStorage.records.get('manual-or-removed')?.facts).toEqual({});
+    expect(capabilityStorage.records.get('unrelated')?.facts['feature.structured']?.support).toBe('unsupported');
+  });
+
+  test('a successful custom-provider fetch resets only that custom provider namespace', async () => {
+    const { container, credentialStorage, fetchService, capabilityStorage, customProviderStorage } = createTestContainer();
+    await customProviderStorage.save(makeCustomConfig('custom-endpoint'));
+    credentialStorage.seedWith(Credentials.createEmpty(uuidv4()).add(makeCredential('c1', 'key', 'custom-endpoint')));
+    fetchService.seedModels('custom-endpoint', []);
+    seedCompatibility(capabilityStorage, 'old-endpoint-scope', 'custom-endpoint');
+    seedCompatibility(capabilityStorage, 'another-custom', 'custom-another');
+
+    expect((await new FetchModelsHandler(container).handle({ provider: 'custom-endpoint' })).success).toBe(true);
+    expect(capabilityStorage.records.get('old-endpoint-scope')?.facts).toEqual({});
+    expect(capabilityStorage.records.get('another-custom')?.facts['feature.structured']?.support).toBe('unsupported');
+  });
+
+  test('a failed model fetch preserves working compatibility knowledge', async () => {
+    const { container, credentialStorage, fetchService, capabilityStorage } = createTestContainer();
+    credentialStorage.seedWith(Credentials.createEmpty(uuidv4()).add(makeCredential('q1', 'key', 'groq')));
+    seedCompatibility(capabilityStorage, 'model', 'groq');
+    fetchService.seedError('groq', NetworkError.providerUnavailable(503));
+
+    const result = await new FetchModelsHandler(container).handle({ provider: 'groq' });
+    expect(result.success).toBe(false);
+    expect(capabilityStorage.records.get('model')?.generation).toBe(0);
+    expect(capabilityStorage.records.get('model')?.facts['feature.structured']?.support).toBe('unsupported');
+  });
+
+  test('a model storage failure does not reset compatibility', async () => {
+    const { container, credentialStorage, modelStorage, capabilityStorage } = createTestContainer();
+    credentialStorage.seedWith(Credentials.createEmpty(uuidv4()).add(makeCredential('q1', 'key', 'groq')));
+    seedCompatibility(capabilityStorage, 'model', 'groq');
+    modelStorage.failNextCallWith(StorageError.writeFailed('models'));
+
+    expect((await new FetchModelsHandler(container).handle({ provider: 'groq' })).success).toBe(false);
+    expect(capabilityStorage.records.get('model')?.generation).toBe(0);
+  });
+
+  test('reports compatibility reset failure after models were updated', async () => {
+    const { container, credentialStorage, fetchService, capabilityStorage } = createTestContainer();
+    credentialStorage.seedWith(Credentials.createEmpty(uuidv4()).add(makeCredential('q1', 'key', 'groq')));
+    fetchService.seedModels('groq', [{ id: 'new', name: 'New' }]);
+    capabilityStorage.failWith(StorageError.writeFailed('translationCapabilitiesV1'));
+
+    const result = await new FetchModelsHandler(container).handle({ provider: 'groq' });
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe('STORAGE_WRITE_FAILED');
+    expect(result.error?.userMessage).toContain('Models were updated');
+  });
 });
+
+function seedCompatibility(storage: FakeTranslationCapabilityStorage, identity: string, namespace: string): void {
+  storage.records.set(identity, {
+    identity, namespace, namespaceGeneration: 0, refreshedAt: Date.now(), generation: 0, legacyCleared: false,
+    facts: { 'feature.structured': { support: 'unsupported', source: 'explicit-provider', observedAt: Date.now(), scope: 'model' } },
+  });
+}

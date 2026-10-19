@@ -20,18 +20,17 @@ import { ApiKey } from '../../core/domain/credential/ApiKey';
 import { v4 as uuidv4 } from 'uuid';
 import type { Provider } from '../../core/domain/credential/Provider';
 import type { ITranslationService } from '../../core/ports/outbound/ITranslationService';
-import { FakeStructuredOutputExemptionStorage } from '../../../tests/fakes/FakeStructuredOutputExemptionStorage';
-
+import { FakeTranslationCapabilityStorage } from '../../../tests/fakes/FakeTranslationCapabilityStorage';
 function createCredential(provider: string) {
-  const apiKey = ApiKey.createWithProvider('test-key-value-12345', provider as never);
+  const apiKey = ApiKey.createWithProvider(
+    'test-key-value-12345',
+    provider as never,
+  );
   if (!apiKey.success) throw new Error('bad key');
-
   const cred = Credential.create(uuidv4(), apiKey.data, provider as never);
   if (!cred.success) throw new Error('bad cred');
-
   return cred.data;
 }
-
 function createCustomConfig() {
   const result = CustomProviderConfig.create({
     id: 'custom-factory-1',
@@ -41,10 +40,8 @@ function createCustomConfig() {
   if (!result.success) throw new Error('bad config');
   return result.data;
 }
-
 describe('Adapter: TranslationAdapterFactory', () => {
   const preferences = UserPreferences.createDefault(uuidv4());
-
   const expectedAdapters: Record<
     Provider,
     new (...args: never[]) => ITranslationService
@@ -62,38 +59,34 @@ describe('Adapter: TranslationAdapterFactory', () => {
     huggingface: HuggingFaceTranslationAdapter,
     puter: PuterTranslationAdapter,
   };
-
   for (const provider of Object.keys(expectedAdapters) as Provider[]) {
     const expected = expectedAdapters[provider];
-
     test(`returns ${expected.name} for ${provider} provider`, () => {
       const adapter = createTranslationAdapter(
         createCredential(provider),
         preferences,
         undefined,
-        new FakeStructuredOutputExemptionStorage(),
+        new FakeTranslationCapabilityStorage(),
       );
       expect(adapter).toBeInstanceOf(expected);
     });
   }
-
   test('returns OpenAICompatibleTranslationAdapter for a custom provider with config', () => {
     const adapter = createTranslationAdapter(
       createCredential('custom-factory-1'),
       preferences,
       createCustomConfig(),
-      new FakeStructuredOutputExemptionStorage(),
+      new FakeTranslationCapabilityStorage(),
     );
     expect(adapter).toBeInstanceOf(OpenAICompatibleTranslationAdapter);
   });
-
   test('throws for a custom provider without config', () => {
     expect(() =>
       createTranslationAdapter(
         createCredential('custom-factory-1'),
         preferences,
         undefined,
-        new FakeStructuredOutputExemptionStorage(),
+        new FakeTranslationCapabilityStorage(),
       ),
     ).toThrow('Custom provider config is required');
   });

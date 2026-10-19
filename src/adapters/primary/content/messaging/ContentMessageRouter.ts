@@ -4,6 +4,7 @@ import { OverlayHandler } from '../handlers/OverlayHandler';
 import { TranslationModalHandler } from '../handlers/TranslationModalHandler';
 import { ToastHandler } from '../handlers/ToastHandler';
 import type { ThemeManager } from '../hosts/ThemeManager';
+import { sendMessageToRuntime } from '../../../../shared/messaging';
 
 export class ContentMessageRouter {
   private readonly overlayHandler: OverlayHandler;
@@ -11,12 +12,15 @@ export class ContentMessageRouter {
   private readonly toastHandler: ToastHandler;
 
   constructor(private readonly themeManager: ThemeManager) {
-    this.overlayHandler = new OverlayHandler();
     this.translationModalHandler = new TranslationModalHandler(themeManager);
+    this.overlayHandler = new OverlayHandler((requestId, imageBase64) =>
+      this.startTranslation(requestId, imageBase64),
+    );
     this.toastHandler = new ToastHandler(themeManager);
   }
 
   register(): void {
+    this.registerDocumentLifecycle();
     browser.runtime.onMessage.addListener(async (message: unknown) => {
       const result = MessageSchema.safeParse(message);
       if (!result.success) {
@@ -31,6 +35,38 @@ export class ContentMessageRouter {
     });
   }
 
+  private async startTranslation(
+    requestId: string,
+    imageBase64: string,
+  ): Promise<void> {
+    const identity = this.translationModalHandler.register(requestId);
+    try {
+      await sendMessageToRuntime({
+        action: 'TRANSLATE_IMAGE',
+        payload: { ...identity, imageBase64 },
+      });
+      this.translationModalHandler.runtimeSettled(requestId);
+    } catch {
+      this.translationModalHandler.runtimeFailed(requestId);
+    }
+  }
+
+  private registerDocumentLifecycle(): void {
+    if (typeof window !== 'undefined') {
+      window.addEventListener?.('pagehide', () =>
+        this.translationModalHandler.dispose(),
+      );
+      window.addEventListener?.('pageshow', (event) => {
+        if (event.persisted) this.translationModalHandler.resetDocument();
+      });
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) this.translationModalHandler.checkDeadlines();
+      });
+    }
+  }
+
   private dispatch(message: ReturnType<typeof MessageSchema.parse>) {
     switch (message.action) {
       case 'MOUNT_OVERLAY':
@@ -40,6 +76,9 @@ export class ContentMessageRouter {
       case 'MOUNT_TRANSLATION_MODAL':
         this.translationModalHandler.handle(message.payload);
         break;
+
+      case 'TRANSLATION_EVENT':
+        return this.translationModalHandler.receive(message.payload);
 
       case 'THEME_CHANGED':
         this.themeManager.setTheme(message.payload.theme);
@@ -54,7 +93,7 @@ export class ContentMessageRouter {
         break;
 
       case 'PING':
-        return { type: 'PONG' };
+        return { action: 'PONG' as const };
 
       default:
         break;

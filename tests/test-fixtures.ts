@@ -54,10 +54,7 @@ const GOOGLE_KEY = 'AIza' + 'X'.repeat(35);
 const GROQ_KEY = 'gsk_' + 'X'.repeat(52);
 const XAI_KEY = 'a'.repeat(32) + '.abcdefghijklmn';
 
-function createCredentialFor(
-  rawKey: string,
-  provider: Provider,
-): Credential {
+function createCredentialFor(rawKey: string, provider: Provider): Credential {
   const apiKey = ApiKey.createWithProvider(rawKey, provider);
   if (!apiKey.success) throw apiKey.error;
   const credential = Credential.create(uuidv4(), apiKey.data, provider);
@@ -101,3 +98,21 @@ export function seedCredentialsAndPreferences(
 
   return { credentials, credential, userPreferences };
 }
+
+// Model wire fixtures use paired segments; legacy fixtures above stay explicit for history/parser compatibility.
+export const VALID_PAIRED_TRANSLATION_RESPONSE = {
+  success: true,
+  error: null,
+  data: {
+    segments: [
+      {
+        blockIndex: 0,
+        originalText: '\u3053\u3093\u306b\u3061\u306f',
+        translatedText: 'Hello',
+        originalLanguageBcp47Code: 'ja-JP',
+        romanization: 'konnichiwa',
+      },
+    ],
+    description: 'A greeting in Japanese',
+  },
+};

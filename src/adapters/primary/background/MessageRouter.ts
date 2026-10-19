@@ -4,9 +4,10 @@ import { TranslateImageHandler } from './handlers/TranslateImageHandler';
 import { StartOverlayHandler } from './handlers/StartOverlayHandler';
 import { MountHistoryModalHandler } from './handlers/MountHistoryModalHandler';
 import { FetchModelsHandler } from './handlers/FetchModelsHandler';
+import type { TranslationOrigin } from './services/TranslationRequestRegistry';
 import type { OverlayService } from './services/OverlayService';
 import { BrowserError } from '../../../shared/errors';
-import { failure } from '../../../shared/types/Result';
+import { failure, success } from '../../../shared/types/Result';
 import type { Container } from '../../../shared/di/container-factory';
 
 export class MessageRouter {
@@ -45,12 +46,23 @@ export class MessageRouter {
   ) {
     switch (message.action) {
       case 'TRANSLATE_IMAGE': {
-        const senderTabId = sender.tab?.id;
-        if (!senderTabId) {
+        const origin = this.origin(sender);
+        if (!origin) {
           console.error('[MessageRouter] No sender tab for TRANSLATE_IMAGE');
           return failure(BrowserError.noActiveTab());
         }
-        return this.translateImageHandler.handle(message.payload, senderTabId);
+
+        const result = await this.translateImageHandler.handle(
+          message.payload,
+          origin,
+        );
+        return result.success
+          ? success(undefined)
+          : failure({
+              code: result.error.code,
+              message: result.error.userMessage,
+              userMessage: result.error.userMessage,
+            });
       }
 
       case 'START_OVERLAY':
@@ -63,11 +75,34 @@ export class MessageRouter {
         return this.mountHistoryModalHandler.handle(message.payload);
 
       case 'CANCEL_TRANSLATION':
-        this.translateImageHandler.cancel(message.payload.id);
+        {
+          const origin = this.origin(sender);
+          if (origin)
+            this.translateImageHandler.cancel(message.payload, origin);
+        }
         return;
+
+      case 'GET_TRANSLATION_STATUS': {
+        const origin = this.origin(sender);
+        return origin
+          ? this.translateImageHandler.status(message.payload, origin)
+          : { state: 'unknown' as const };
+      }
 
       default:
         break;
     }
+  }
+
+  private origin(
+    sender: browser.Runtime.MessageSender,
+  ): TranslationOrigin | null {
+    const tabId = sender.tab?.id;
+    if (typeof tabId !== 'number') return null;
+    return {
+      tabId,
+      frameId: sender.frameId ?? 0,
+      documentId: sender.documentId,
+    };
   }
 }

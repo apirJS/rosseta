@@ -22,14 +22,7 @@ export class ToastHandler {
   private static readonly HOST_ID = 'rosseta-toast-host';
   private host: HTMLElement | null = null;
 
-  constructor(private readonly themeManager: ThemeManager) {
-    toastController.setLoadingDismissHandler((id) => {
-      void browser.runtime.sendMessage({
-        action: 'CANCEL_TRANSLATION',
-        payload: { id },
-      });
-    });
-  }
+  constructor(private readonly themeManager: ThemeManager) {}
 
   show(payload: ShowToastPayload): void {
     this.ensureHost();

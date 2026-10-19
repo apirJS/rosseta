@@ -1,4 +1,3 @@
-import { sendMessageToRuntime } from '../../../../../shared/messaging';
 import { SelectionBox } from './SelectionBox';
 
 export class OverlayController {
@@ -19,7 +18,11 @@ export class OverlayController {
   constructor(
     private viewportImg: string,
     private detachOverlay: () => void,
-    private onReady?: () => void,
+    private onReady: (() => void) | undefined,
+    private readonly startTranslation: (
+      requestId: string,
+      imageBase64: string,
+    ) => Promise<void>,
   ) {
     $effect(() => {
       let active = true;
@@ -145,25 +148,27 @@ export class OverlayController {
     width: number,
     height: number,
   ): Promise<void> {
+    let cropped: string;
     try {
-      const cropped = await this.cropImage(
+      cropped = await this.cropImage(
         this.viewportImg,
         left,
         top,
         width,
         height,
       );
-
-      this.detachOverlay();
-
-      await sendMessageToRuntime({
-        action: 'TRANSLATE_IMAGE',
-        payload: {
-          imageBase64: cropped,
-        },
-      });
     } catch (error) {
       console.error('Failed to crop image:', error);
+      return;
+    }
+
+    this.detachOverlay();
+    const requestId = crypto.randomUUID();
+
+    try {
+      await this.startTranslation(requestId, cropped);
+    } catch (error) {
+      console.error('Failed to start translation:', error);
     }
   }
 

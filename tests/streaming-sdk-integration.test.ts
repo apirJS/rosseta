@@ -14,6 +14,8 @@ import { createTranslationDataSchema } from '../src/adapters/secondary/shared/tr
 import { createTranslationFixture } from './fixtures/translation-provider-server';
 import { OpenAICompatibleTranslationAdapter } from '../src/adapters/secondary/openai-compatible/OpenAICompatibleTranslationAdapter';
 import { AnthropicCompatibleTranslationAdapter } from '../src/adapters/secondary/anthropic-compatible/AnthropicCompatibleTranslationAdapter';
+import { DeepSeekTranslationAdapter } from '../src/adapters/secondary/deepseek/DeepSeekTranslationAdapter';
+import { NvidiaTranslationAdapter } from '../src/adapters/secondary/nvidia/NvidiaTranslationAdapter';
 import { ApiKey } from '../src/core/domain/credential/ApiKey';
 import { Credential } from '../src/core/domain/credential/Credential';
 import { UserPreferences } from '../src/core/domain/preferences/UserPreferences';
@@ -22,6 +24,7 @@ import { Language } from '../src/core/domain/translation/Language';
 import { FakeTranslationCapabilityStorage } from './fakes/FakeTranslationCapabilityStorage';
 import { success } from '../src/shared/types/Result';
 import type { TranslationProgress } from '../src/core/ports/outbound/TranslationExecutionOptions';
+import type { ITranslationService } from '../src/core/ports/outbound/ITranslationService';
 
 const usage = {
   inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
@@ -326,4 +329,74 @@ describe('Production custom adapters against deterministic provider HTTP streams
       }
     },
   );
+});
+
+describe('Native DeepSeek and NVIDIA provider HTTP contracts', () => {
+  const cases = [
+    { provider: 'deepseek', scenario: 'success', model: 'deepseek-flash' },
+    { provider: 'deepseek', scenario: 'no-stream', model: 'deepseek-flash' },
+    { provider: 'nvidia', scenario: 'success', model: 'meta/llama-3.2-11b-vision-instruct' },
+    { provider: 'nvidia', scenario: 'unavailable-response-format', model: 'meta/llama-3.2-11b-vision-instruct' },
+  ] as const;
+
+  test.each(cases)('$provider/$scenario preserves vision input and reuses its working mode', async ({ provider, scenario, model }) => {
+    const fixture = createTranslationFixture({ delayMs: 1 });
+    const outgoing: {
+      url: string;
+      authorization: string | null;
+      body: {
+        model: string;
+        response_format?: { type: string };
+        messages: { role: string; content: unknown }[];
+      };
+    }[] = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      outgoing.push({
+        url: request.url,
+        authorization: request.headers.get('authorization'),
+        body: await request.clone().json(),
+      });
+      const target = `http://fixture.invalid/openai/${scenario}/v1/chat/completions`;
+      return fixture.fetch(new Request(target, request));
+    });
+    try {
+      const key = ApiKey.createWithProvider('fixture-key', provider);
+      const image = EncodedImage.create('data:image/png;base64,AQ==');
+      if (!key.success || !image.success) throw new Error('Invalid provider fixture setup');
+      const credential = Credential.create(crypto.randomUUID(), key.data, provider);
+      if (!credential.success) throw credential.error;
+      const preferences = UserPreferences.createDefault(crypto.randomUUID()).withSelectedModel(provider, model);
+      const storage = new FakeTranslationCapabilityStorage();
+      const adapter: ITranslationService = provider === 'deepseek'
+        ? new DeepSeekTranslationAdapter(credential.data, preferences, storage)
+        : new NvidiaTranslationAdapter(credential.data, preferences, storage);
+      expect((await adapter.translateImage(image.data, Language.create('en-US'))).success).toBe(true);
+
+      const expectedModes = scenario === 'no-stream' ? [[true, false], [false, false]]
+        : scenario === 'unavailable-response-format' ? [[true, true], [true, false]]
+        : [[true, provider === 'nvidia']];
+      expect(fixture.requests.map(request => [request.streamed, request.structured])).toEqual(expectedModes);
+      const previousCalls = outgoing.length;
+      expect((await adapter.translateImage(image.data, Language.create('en-US'))).success).toBe(true);
+      expect(outgoing.length - previousCalls).toBe(1);
+      const expectedURL = provider === 'deepseek'
+        ? 'https://api.deepseek.com/chat/completions'
+        : 'https://integrate.api.nvidia.com/v1/chat/completions';
+      for (const request of outgoing) {
+        expect(request.url).toBe(expectedURL);
+        expect(request.authorization).toBe('Bearer fixture-key');
+        expect(request.body.model).toBe(model);
+        const user = request.body.messages.find(message => message.role === 'user');
+        expect(user?.content).toContainEqual(expect.objectContaining({
+          type: 'image_url',
+          image_url: expect.objectContaining({ url: image.data.value }),
+        }));
+        if (provider === 'deepseek') expect(request.body.response_format).toBeUndefined();
+      }
+      const record = [...storage.records.values()][0];
+      expect(record.namespace).toBe(provider);
+      if (provider === 'deepseek') expect(record.facts['feature.structured'].support).toBe('unknown');
+    } finally { fetchSpy.mockRestore(); }
+  });
 });

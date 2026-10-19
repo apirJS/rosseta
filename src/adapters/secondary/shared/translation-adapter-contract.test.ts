@@ -15,7 +15,7 @@ import { FakeTranslationCapabilityStorage } from '../../../../tests/fakes/FakeTr
 import { TARGET_LANGUAGE, VALID_IMAGE, VALID_PAIRED_TRANSLATION_RESPONSE } from '../../../../tests/test-fixtures';
 import { modelScopeKey, providerProtocol } from './translation-capability-key';
 
-const providers = ['google', 'groq', 'xai', 'openai', 'anthropic', 'mistral', 'deepinfra', 'zai', 'openrouter', 'opencode', 'huggingface', 'custom-contract-openai', 'custom-contract-anthropic', 'puter'] as const;
+const providers = ['google', 'groq', 'xai', 'openai', 'anthropic', 'mistral', 'deepinfra', 'deepseek', 'nvidia', 'zai', 'openrouter', 'opencode', 'huggingface', 'custom-contract-openai', 'custom-contract-anthropic', 'puter'] as const;
 function setup(provider: typeof providers[number]) {
   const key = ApiKey.createWithProvider('contract-test-credential', provider as AnyProvider);
   if (!key.success) throw key.error;
@@ -63,6 +63,10 @@ describe('Adapter: all provider translation contracts', () => {
         const options = generateTextMock.mock.calls[0][0] as { model: { modelId: string }; messages: { content: { type: string; data?: { data: string } }[] }[] };
         expect(options.model.modelId).toBe(modelId);
         expect(options.messages[0].content[1].data?.data).toBe(VALID_IMAGE.base64Data);
+        if (provider === 'deepseek') {
+          expect('output' in options).toBe(false);
+          expect(storage.records.get(identity)?.facts['feature.structured'].support).toBe('unknown');
+        }
       }
     } finally { chat?.mockRestore(); token?.mockRestore(); }
   });

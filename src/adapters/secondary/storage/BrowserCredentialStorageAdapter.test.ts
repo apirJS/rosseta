@@ -31,6 +31,20 @@ describe('Adapter: BrowserCredentialStorageAdapter', () => {
 
   beforeEach(() => resetBrowserMock());
 
+  test.each(['deepseek', 'nvidia'] as const)('preserves stored %s credentials and their active selection', async provider => {
+    seedStore({ credentials: {
+      id: 'creds-new-provider', activeCredentialId: 'provider-key',
+      items: [{ id: 'provider-key', type: 'API_KEY', provider, apiKey: 'saved-provider-key' }],
+    } });
+    const result = await adapter.get();
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data?.getByProvider(provider)).toHaveLength(1);
+      expect(result.data?.getActive()?.provider).toBe(provider);
+      expect(result.data?.getActive()?.apiKey.value).toBe('saved-provider-key');
+    }
+  });
+
   test('save() writes credentials to storage', async () => {
     const credentials = createCredentials();
     const result = await adapter.save(credentials);

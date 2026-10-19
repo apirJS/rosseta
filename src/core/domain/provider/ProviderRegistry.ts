@@ -192,3 +192,17 @@ ProviderRegistry.register({
   defaultModelId: '',
   models: [],
 });
+
+ProviderRegistry.register({
+  id: 'deepseek',
+  name: 'DeepSeek',
+  defaultModelId: 'deepseek-flash',
+  models: [],
+});
+
+ProviderRegistry.register({
+  id: 'nvidia',
+  name: 'NVIDIA',
+  defaultModelId: 'meta/llama-3.2-11b-vision-instruct',
+  models: [],
+});

@@ -15,6 +15,8 @@ export class FakeModelFetchService implements IModelFetchService {
     'xai',
     'mistral',
     'deepinfra',
+    'deepseek',
+    'nvidia',
     'anthropic',
     'zai',
     'openrouter',

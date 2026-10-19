@@ -120,6 +120,7 @@ src/
 │       ├── google/ groq/ xai/     # @ai-sdk/* translation adapters (thin)
 │       ├── openai/ anthropic/ ... # one directory per provider
 │       ├── huggingface/ opencode/ # incl. Hugging Face + OpenCode
+│       ├── deepseek/ nvidia/      # native DeepSeek SDK + OpenAI-compatible NVIDIA
 │       ├── puter/                 # Puter SDK translation adapter
 │       ├── openai-compatible/     # custom OpenAI-compatible providers
 │       ├── anthropic-compatible/  # custom Anthropic-compatible providers
@@ -438,6 +439,8 @@ export class YourProviderTranslationAdapter implements ITranslationService {
 ```
 
 The prompt, response schema, capability-state selection, bounded fallback/repair, and domain mapping live in `src/adapters/secondary/shared/`. Keep them shared. Add the provider's actual endpoint/protocol to `translation-capability-key.ts` to preserve stable model/endpoint identity. Translation and the successful-fetch reset path must use the same opaque provider namespace, spanning that provider's model/endpoint scopes.
+
+Declare SDK limitations through the adapter-local transport's `supportedModes`, without changing core contracts or saving those declarations as provider observations. The native `@ai-sdk/deepseek` client preserves image input, but its installed public configuration does not expose provider-enforced JSON Schema, so `DeepSeekTranslationAdapter` starts with plain JSON streaming and can fall back to buffered JSON. `NvidiaTranslationAdapter` uses `@ai-sdk/openai-compatible` with structured output enabled; the shared policy learns model-specific schema or streaming rejections. Both adapters retain complete response validation, bounded repair, and the existing compatibility refresh behavior.
 
 For a separate SDK, implement the adapter-local `ITranslationGenerationTransport` and pass it to the same facade. Normalize its text/partial/error/completion behavior there; do not add provider-specific modes to core contracts or copy the fallback state machine. [PuterTranslationAdapter.ts](src/adapters/secondary/puter/PuterTranslationAdapter.ts) and its transport demonstrate this boundary. Puter authenticates with a token from [Puter account settings](https://puter.com/#account). Its native SDK access is serialized across translation and model fetching because authentication uses a singleton. Logical cancellation stops the app promptly, but the installed SDK cannot abort its submitted network request.
 

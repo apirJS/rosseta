@@ -18,6 +18,7 @@ import { isCustomProviderId } from '../../../core/domain/provider/CustomProvider
 import type { CustomProviderType } from '../../../core/domain/provider/CustomProviderConfig';
 import { buildCustomProviderURL } from '../shared/custom-provider-request';
 import { withPuterSession } from '../puter/PuterSdkSession';
+import { PROVIDER_ENDPOINTS } from '../shared/translation-capability-key';
 
 class HttpError extends Error {
   constructor(
@@ -344,6 +345,10 @@ const MODEL_FETCHERS: Record<string, ModelFetcher> = {
     fetchOpenAICompatibleModels(apiKey, 'https://api.mistral.ai/v1'),
   deepinfra: (apiKey) =>
     fetchOpenAICompatibleModels(apiKey, 'https://api.deepinfra.com/v1/openai'),
+  deepseek: (apiKey) =>
+    fetchOpenAICompatibleModels(apiKey, PROVIDER_ENDPOINTS.deepseek),
+  nvidia: (apiKey) =>
+    fetchOpenAICompatibleModels(apiKey, PROVIDER_ENDPOINTS.nvidia),
   zai: (apiKey) =>
     fetchOpenAICompatibleModels(apiKey, 'https://api.z.ai/api/paas/v4'),
   openrouter: (apiKey) =>

@@ -58,6 +58,15 @@ describe('Domain: ApiKey', () => {
   });
 
   describe('fromRaw', () => {
+    test.each(['deepseek', 'nvidia'] as const)('reconstructs a %s key with its explicit provider', provider => {
+      const result = ApiKey.fromRaw('provider-key', provider);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.provider).toBe(provider);
+        expect(result.data.value).toBe('provider-key');
+      }
+    });
+
     test('reconstructs with the stored provider', () => {
       const result = ApiKey.fromRaw('gsk_' + 'a'.repeat(52), 'groq');
       expect(result.success).toBe(true);

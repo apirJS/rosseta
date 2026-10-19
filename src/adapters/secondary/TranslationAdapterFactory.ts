@@ -18,6 +18,8 @@ import { HuggingFaceTranslationAdapter } from './huggingface/HuggingFaceTranslat
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
 import { AnthropicCompatibleTranslationAdapter } from './anthropic-compatible/AnthropicCompatibleTranslationAdapter';
 import { PuterTranslationAdapter } from './puter/PuterTranslationAdapter';
+import { DeepSeekTranslationAdapter } from './deepseek/DeepSeekTranslationAdapter';
+import { NvidiaTranslationAdapter } from './nvidia/NvidiaTranslationAdapter';
 export function createTranslationAdapter(
   credential: Credential,
   preferences: UserPreferences,
@@ -76,6 +78,10 @@ export function createTranslationAdapter(
         preferences,
         capabilities,
       );
+    case 'deepseek':
+      return new DeepSeekTranslationAdapter(credential, preferences, capabilities);
+    case 'nvidia':
+      return new NvidiaTranslationAdapter(credential, preferences, capabilities);
     case 'zai':
       return new ZaiTranslationAdapter(credential, preferences, capabilities);
     case 'openrouter':

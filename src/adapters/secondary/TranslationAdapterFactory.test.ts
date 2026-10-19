@@ -13,6 +13,8 @@ import { OpenCodeTranslationAdapter } from './opencode/OpenCodeTranslationAdapte
 import { HuggingFaceTranslationAdapter } from './huggingface/HuggingFaceTranslationAdapter';
 import { OpenAICompatibleTranslationAdapter } from './openai-compatible/OpenAICompatibleTranslationAdapter';
 import { PuterTranslationAdapter } from './puter/PuterTranslationAdapter';
+import { DeepSeekTranslationAdapter } from './deepseek/DeepSeekTranslationAdapter';
+import { NvidiaTranslationAdapter } from './nvidia/NvidiaTranslationAdapter';
 import { CustomProviderConfig } from '../../core/domain/provider/CustomProviderConfig';
 import { Credential } from '../../core/domain/credential/Credential';
 import { UserPreferences } from '../../core/domain/preferences/UserPreferences';
@@ -53,6 +55,8 @@ describe('Adapter: TranslationAdapterFactory', () => {
     anthropic: AnthropicTranslationAdapter,
     mistral: MistralTranslationAdapter,
     deepinfra: DeepInfraTranslationAdapter,
+    deepseek: DeepSeekTranslationAdapter,
+    nvidia: NvidiaTranslationAdapter,
     zai: ZaiTranslationAdapter,
     openrouter: OpenRouterTranslationAdapter,
     opencode: OpenCodeTranslationAdapter,

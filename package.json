@@ -45,6 +45,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.53",
     "@ai-sdk/deepinfra": "^3.0.48",
+    "@ai-sdk/deepseek": "3.0.44",
     "@ai-sdk/google": "^4.0.69",
     "@ai-sdk/groq": "^4.0.41",
     "@ai-sdk/huggingface": "^2.0.49",

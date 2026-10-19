@@ -49,13 +49,11 @@ Each translation result can include a brief contextual summary describing what w
 
 The OCR output is segmented by visually distinct blocks, not merged into a single blob. Each heading, label, timestamp, button, and caption is its own segment with its own language tag and translation. Mixed-language text within a single block is split by language.
 
-### 12 built-in AI providers
+### 14 built-in AI providers
 
-Rosseta supports the following providers out of the box: Google, Groq, xAI, OpenAI, Anthropic, Mistral, DeepInfra, Z.ai, OpenRouter, OpenCode, Hugging Face, and PuterJS.
+Rosseta supports the following providers out of the box: Google, Groq, xAI, OpenAI, Anthropic, Mistral, DeepInfra, DeepSeek, NVIDIA, Z.ai, OpenRouter, OpenCode, Hugging Face, and PuterJS.
 
 Model lists are fetched directly from the provider's API at runtime. You can also add models manually.
-
-To use PuterJS, create an auth token in [Puter account settings](https://puter.com/#account), then add it from **Manage API Keys** with PuterJS selected. Puter's popup sign-in flow does not support browser-extension URLs, so Rosseta uses the token as the provider credential.
 
 ### Custom provider endpoints
 
@@ -95,7 +93,6 @@ Runs on both Chrome and Firefox as a Manifest V3 extension.
 ## Tips for free users
 
 - Explore [awesome-free-llm-apis](https://github.com/mnfst/awesome-free-llm-apis) for providers offering free API access or trial quotas. Limits and availability can change, so check each provider's current terms before adding a key.
-- Use **PuterJS** to access its supported models with a Puter account token. Create a token in [Puter account settings](https://puter.com/#account), add it under **Manage API Keys**, then fetch and select a model under **Manage Models**.
 - Choose a model that supports **image or vision input**. Rosseta sends a screenshot of the selected region, so text-only models cannot perform the translation.
 - If a provider's model list is incomplete, add a compatible vision model manually from **Manage Models**.
 

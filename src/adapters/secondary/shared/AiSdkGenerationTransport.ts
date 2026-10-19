@@ -1,6 +1,7 @@
 import { generateText, streamText, Output, NoObjectGeneratedError, type LanguageModel } from 'ai';
 import type {
   GenerationEvent,
+  GenerationMode,
   GenerationRequest,
   GenerationResult,
   ITranslationGenerationTransport,
@@ -21,6 +22,7 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
   constructor(
     private readonly model: LanguageModel,
     private readonly structuredProviderOptions?: SdkProviderOptions,
+    readonly supportedModes?: readonly GenerationMode[],
   ) {
     if (typeof model === 'object') this.legacyModelKey = model.provider + ':' + model.modelId;
   }

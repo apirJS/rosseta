@@ -21,6 +21,13 @@ describe('Domain: ProviderRegistry', () => {
   });
 
   describe('getDefaultModelId', () => {
+    test('new providers use image-capable defaults with runtime model catalogs', () => {
+      expect(ProviderRegistry.getDefaultModelId('deepseek')).toBe('deepseek-flash');
+      expect(ProviderRegistry.getDefaultModelId('nvidia')).toBe('meta/llama-3.2-11b-vision-instruct');
+      expect(ProviderRegistry.getModelsForProvider('deepseek')).toEqual([]);
+      expect(ProviderRegistry.getModelsForProvider('nvidia')).toEqual([]);
+    });
+
     test('google default is gemini-2.5-flash', () => {
       expect(ProviderRegistry.getDefaultModelId('google')).toBe(
         'gemini-2.5-flash',
@@ -106,10 +113,12 @@ describe('Domain: ProviderRegistry', () => {
       expect(providers.map((p) => p.id).toSorted()).toEqual([
         'anthropic',
         'deepinfra',
+        'deepseek',
         'google',
         'groq',
         'huggingface',
         'mistral',
+        'nvidia',
         'openai',
         'opencode',
         'openrouter',

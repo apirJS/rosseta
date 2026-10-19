@@ -30,6 +30,8 @@ describe('Adapter: ModelFetchService', () => {
       'xai',
       'mistral',
       'deepinfra',
+      'deepseek',
+      'nvidia',
       'anthropic',
       'zai',
       'openrouter',
@@ -82,6 +84,79 @@ describe('Adapter: ModelFetchService', () => {
       expect(result.data).toHaveLength(1);
     }
   });
+
+  const newProviderEndpoints = [
+    { provider: 'deepseek', endpoint: 'https://api.deepseek.com/models' },
+    { provider: 'nvidia', endpoint: 'https://integrate.api.nvidia.com/v1/models' },
+  ];
+
+  test.each(newProviderEndpoints)(
+    'fetchModels lists and sorts $provider models with Bearer authentication', async ({ provider, endpoint }) => {
+      fetchSpy.mockResolvedValueOnce(jsonResponse({
+        object: 'list',
+        data: [
+          { id: 'vision/zeta', object: 'model', owned_by: provider },
+          { id: 'vision/alpha', object: 'model', owned_by: provider },
+          { id: 'ignored-object', object: 'embedding' },
+          { id: 'vision/beta' },
+        ],
+      }));
+
+      const apiKey = `${provider}-fixture-key`;
+      const result = await service.fetchModels(provider, apiKey);
+      expect(result.success).toBe(true);
+      if (!result.success) throw result.error;
+      expect(result.data).toEqual([
+        { id: 'vision/alpha', name: 'vision/alpha' },
+        { id: 'vision/beta', name: 'vision/beta' },
+        { id: 'vision/zeta', name: 'vision/zeta' },
+      ]);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe(endpoint);
+      expect(url).not.toContain(apiKey);
+      expect(new Headers(init.headers).get('Authorization')).toBe(`Bearer ${apiKey}`);
+    },
+  );
+
+  test.each(newProviderEndpoints)(
+    '$provider uses its built-in endpoint rather than custom-provider routing arguments', async ({ provider, endpoint }) => {
+      fetchSpy.mockResolvedValueOnce(jsonResponse({ data: [] }));
+      const result = await service.fetchModels(provider, 'fixture-key', 'https://custom.invalid/v1', {
+        Authorization: 'Bearer custom-key',
+      }, { api_key: 'custom-query-secret' });
+      expect(result.success).toBe(true);
+      const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe(endpoint);
+      expect(new Headers(init.headers).get('Authorization')).toBe('Bearer fixture-key');
+    },
+  );
+
+  test.each(newProviderEndpoints.flatMap(provider => [
+    { ...provider, status: 401, code: ErrorCode.AUTH_INVALID_API_KEY },
+    { ...provider, status: 403, code: ErrorCode.AUTH_ACCESS_DENIED },
+    { ...provider, status: 429, code: ErrorCode.NETWORK_RATE_LIMITED },
+    { ...provider, status: 503, code: ErrorCode.NETWORK_PROVIDER_UNAVAILABLE },
+    { ...provider, status: 404, code: ErrorCode.VALIDATION_INVALID_INPUT },
+  ]))('$provider HTTP $status returns a safe typed failure without retrying', async ({ provider, status, code }) => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ error: { message: 'Untrusted response fixture-key' } }, status));
+    const result = await service.fetchModels(provider, 'fixture-key');
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected model fetching to fail');
+    expect(result.error.code).toBe(code);
+    expect(result.error.userMessage).not.toContain('fixture-key');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(newProviderEndpoints)(
+    '$provider rejects invalid JSON with a typed invalid-response error', async ({ provider }) => {
+      fetchSpy.mockResolvedValueOnce(new Response('invalid JSON', { status: 200 }));
+      const result = await service.fetchModels(provider, 'fixture-key');
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.code).toBe(ErrorCode.NETWORK_INVALID_RESPONSE);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    },
+  );
 
   test('fetchModels hits the Z.ai OpenAI-compatible endpoint', async () => {
     fetchSpy.mockResolvedValueOnce(

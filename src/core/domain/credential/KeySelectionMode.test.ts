@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { KeySelectionMode } from './KeySelectionMode';
+import { PROVIDERS } from './Provider';
 import { DomainError } from '../shared/DomainError';
 
 describe('Domain: KeySelectionMode', () => {
@@ -21,15 +22,7 @@ describe('Domain: KeySelectionMode', () => {
     });
 
     test('autoBalance() works for every provider', () => {
-      for (const provider of [
-        'google',
-        'groq',
-        'xai',
-        'openai',
-        'anthropic',
-        'mistral',
-        'deepinfra',
-      ] as const) {
+      for (const provider of PROVIDERS) {
         const mode = KeySelectionMode.autoBalance(provider);
         expect(mode.autoBalanceProvider).toBe(provider);
       }
@@ -49,6 +42,12 @@ describe('Domain: KeySelectionMode', () => {
   });
 
   describe('fromRaw', () => {
+    test.each(['deepseek', 'nvidia'] as const)('restores %s auto-balance selection', provider => {
+      const result = KeySelectionMode.fromRaw(`auto-balance:${provider}`);
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.autoBalanceProvider).toBe(provider);
+    });
+
     test('accepts valid mode strings', () => {
       for (const val of [
         'manual',

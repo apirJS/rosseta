@@ -61,7 +61,12 @@ function createTestContainer() {
 
   const container = {
     getCredentialsUseCase: new GetCredentialsUseCase(credentialStorage),
-    fetchModelsUseCase: new FetchModelsUseCase(modelStorage, fetchService, new FakeUserPreferencesStorage()),
+    fetchModelsUseCase: new FetchModelsUseCase(
+      modelStorage,
+      fetchService,
+      new FakeUserPreferencesStorage(),
+      customProviderStorage,
+    ),
     getCustomProvidersUseCase: new GetCustomProvidersUseCase(
       customProviderStorage,
     ),
@@ -141,6 +146,7 @@ describe('Adapter: FetchModelsHandler', () => {
         new FakeModelStorage(),
         fetchService,
         new FakeUserPreferencesStorage(),
+        customProviderStorage,
       ),
       getCustomProvidersUseCase: new GetCustomProvidersUseCase(
         customProviderStorage,
@@ -172,6 +178,7 @@ describe('Adapter: FetchModelsHandler', () => {
         new FakeModelStorage(),
         fetchService,
         new FakeUserPreferencesStorage(),
+        customProviderStorage,
       ),
       getCustomProvidersUseCase: new GetCustomProvidersUseCase(
         customProviderStorage,

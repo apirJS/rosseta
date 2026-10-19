@@ -60,6 +60,13 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
     return success(undefined);
   }
 
+  async clearLastUsedId(provider: AnyProvider): Promise<Result<void, AppError>> {
+    const error = this.consumeError();
+    if (error) return failure(error);
+    this.lastUsedIdValues.delete(provider);
+    return success(undefined);
+  }
+
   async getAllLastUsedIds(): Promise<
     Result<Record<string, string>, AppError>
   > {

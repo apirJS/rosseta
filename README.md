@@ -59,6 +59,8 @@ Model lists are fetched directly from the provider's API at runtime. You can als
 
 Point Rosseta at any OpenAI-compatible or Anthropic-compatible API by selecting the protocol and providing a base URL, optional custom headers, and optional query parameters. These values are validated when saved and used for both translation and model discovery. Useful for self-hosted models, corporate proxies, or providers not yet built in.
 
+Deleting a custom provider also removes its API keys, models, saved model selection, and key-rotation state. If that provider was selected, the translation provider selector returns to DeepSeek.
+
 ### Multiple API keys per provider
 
 You can store multiple API keys for each provider. The extension supports round-robin key rotation across keys for the same provider, cycling to the next key after each request.
@@ -66,6 +68,8 @@ You can store multiple API keys for each provider. The extension supports round-
 ### Translation history
 
 Every completed, validated translation is automatically saved locally. Partial and failed previews are not saved. History is searchable and can be cleared individually or all at once. If saving fails, the completed result remains available in the modal with a notice.
+
+History older than **90 days** is automatically removed when the extension starts and whenever history is read or changed. Restoring a backup also applies this retention limit.
 
 ### Settings backup
 

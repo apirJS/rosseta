@@ -104,6 +104,7 @@ export function createContainer() {
       modelStorage,
       modelFetchService,
       userPreferencesStorage,
+      customProviderStorage,
     ),
     addCustomModelUseCase: new AddCustomModelUseCase(modelStorage),
     removeCustomModelUseCase: new RemoveCustomModelUseCase(modelStorage),
@@ -120,6 +121,8 @@ export function createContainer() {
       customProviderStorage,
       credentialStorage,
       modelStorage,
+      userPreferencesStorage,
+      keySelectionStorage,
     ),
 
     getShortcutUseCase: new GetShortcutUseCase(commandStorage),

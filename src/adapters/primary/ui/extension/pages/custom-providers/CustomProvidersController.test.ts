@@ -46,6 +46,7 @@ function createDeps(overrides: Partial<CustomProvidersDeps> = {}) {
       success(makeConfig({ ...props, id: props.id || 'custom-saved' })),
     ),
     remove: vi.fn().mockResolvedValue(success(undefined)),
+    refresh: vi.fn().mockResolvedValue(undefined),
     toast,
     ...overrides,
   };
@@ -186,6 +187,7 @@ describe('UI Controller: CustomProvidersController', () => {
     await controller.remove('custom-test-1');
 
     expect(deps.remove).toHaveBeenCalledWith('custom-test-1');
+    expect(deps.refresh).toHaveBeenCalledOnce();
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'success', message: 'Provider removed' }),
     );
@@ -199,5 +201,24 @@ describe('UI Controller: CustomProvidersController', () => {
     await controller.remove('custom-test-1');
 
     expect(controller.state.view).toBe('list');
+  });
+
+  test('refreshes potentially changed snapshots without reporting success when provider removal fails', async () => {
+    const { deps, show } = createDeps({
+      remove: vi.fn().mockResolvedValue(
+        failure(StorageError.writeFailed('customProviders')),
+      ),
+    });
+    const controller = createCustomProvidersController(deps);
+
+    await controller.remove('custom-test-1');
+
+    expect(deps.refresh).toHaveBeenCalledOnce();
+    expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error' }),
+    );
+    expect(show).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success' }),
+    );
   });
 });

@@ -19,7 +19,7 @@ export function useAuth() {
 
   async function checkAuth() {
     const result = await useCases.getCredentials.execute();
-    if (result.success && result.data) {
+    if (result.success) {
       state.credentials = result.data;
     }
     await loadKeySelectionMode();

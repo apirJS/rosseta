@@ -3,22 +3,52 @@ import { FetchModelsUseCase } from './FetchModelsUseCase';
 import { FakeModelStorage } from '../../../../tests/fakes/FakeModelStorage';
 import { FakeModelFetchService } from '../../../../tests/fakes/FakeModelFetchService';
 import { FakeUserPreferencesStorage } from '../../../../tests/fakes/FakeUserPreferencesStorage';
+import {
+  FakeCustomProviderStorage,
+  makeCustomProviderConfig,
+} from '../../../../tests/fakes/FakeCustomProviderStorage';
 import { ProviderRegistry } from '../../domain/provider/ProviderRegistry';
 import { UserPreferences } from '../../domain/preferences/UserPreferences';
-import { StorageError, NetworkError, AuthError, ErrorCode } from '../../../shared/errors';
+import { StorageError, NetworkError, AuthError, ErrorCode, type AppError } from '../../../shared/errors';
+import { success, type Result } from '../../../shared/types/Result';
+import type { ModelInfo } from '../../ports/outbound/IModelFetchService';
 import { v4 as uuidv4 } from 'uuid';
+
+class DeferredModelFetchService extends FakeModelFetchService {
+  private complete!: (models: Result<ModelInfo[], AppError>) => void;
+  private markStarted!: () => void;
+  private readonly response = new Promise<Result<ModelInfo[], AppError>>((resolve) => {
+    this.complete = resolve;
+  });
+  readonly started = new Promise<void>((resolve) => { this.markStarted = resolve; });
+
+  override async fetchModels(): Promise<Result<ModelInfo[], AppError>> {
+    this.markStarted();
+    return this.response;
+  }
+
+  resolveModels(models: ModelInfo[]): void {
+    this.complete(success(models));
+  }
+}
 
 describe('Application: FetchModelsUseCase', () => {
   let storage: FakeModelStorage;
   let fetchService: FakeModelFetchService;
   let preferencesStorage: FakeUserPreferencesStorage;
+  let customProviderStorage: FakeCustomProviderStorage;
 
   beforeEach(() => {
     storage = new FakeModelStorage();
     fetchService = new FakeModelFetchService();
     preferencesStorage = new FakeUserPreferencesStorage();
+    customProviderStorage = new FakeCustomProviderStorage();
     ProviderRegistry.setModels('google', []);
   });
+
+  function createUseCase(service: FakeModelFetchService = fetchService) {
+    return new FetchModelsUseCase(storage, service, preferencesStorage, customProviderStorage);
+  }
 
   function seedPreferences(selectedModels: Record<string, string>) {
     const result = UserPreferences.fromRaw({
@@ -37,7 +67,7 @@ describe('Application: FetchModelsUseCase', () => {
       { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
     ]);
 
-    const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+    const useCase = createUseCase();
     const result = await useCase.execute('google', 'AIzaKey');
 
     expect(result.success).toBe(true);
@@ -58,7 +88,7 @@ describe('Application: FetchModelsUseCase', () => {
       { id: 'new-model', name: 'New Model' },
     ]);
 
-    const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+    const useCase = createUseCase();
     const result = await useCase.execute('google', 'AIzaKey');
 
     expect(result.success).toBe(true);
@@ -73,7 +103,7 @@ describe('Application: FetchModelsUseCase', () => {
   test('returns failure when the fetch service fails', async () => {
     fetchService.seedError('google', AuthError.invalidApiKey());
 
-    const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+    const useCase = createUseCase();
     const result = await useCase.execute('google', 'bad-key');
 
     expect(result.success).toBe(false);
@@ -86,7 +116,7 @@ describe('Application: FetchModelsUseCase', () => {
   test('returns failure for providers without a fetcher', async () => {
     fetchService.setFetchable([]);
 
-    const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+    const useCase = createUseCase();
     const result = await useCase.execute('google', 'AIzaKey');
 
     expect(result.success).toBe(false);
@@ -99,7 +129,7 @@ describe('Application: FetchModelsUseCase', () => {
     fetchService.seedModels('google', [{ id: 'm1', name: 'M1' }]);
     storage.failNextCallWith(StorageError.writeFailed('models:google'));
 
-    const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+    const useCase = createUseCase();
     const result = await useCase.execute('google', 'AIzaKey');
 
     expect(result.success).toBe(false);
@@ -114,13 +144,76 @@ describe('Application: FetchModelsUseCase', () => {
       NetworkError.serverError(503, 'https://api.test'),
     );
 
-    const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+    const useCase = createUseCase();
     const result = await useCase.execute('google', 'AIzaKey');
 
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBeInstanceOf(NetworkError);
     }
+  });
+
+  test('saves models for a custom provider that still exists after fetching', async () => {
+    await customProviderStorage.save(makeCustomProviderConfig({ id: 'custom-endpoint' }));
+    seedPreferences({ google: 'unchanged' });
+    fetchService.seedModels('custom-endpoint', [{ id: 'vision-model', name: 'Vision Model' }]);
+
+    const result = await createUseCase().execute('custom-endpoint', 'key');
+
+    expect(result.success).toBe(true);
+    expect(storage.getStoredModels('custom-endpoint').map((model) => model.id)).toEqual(['vision-model']);
+    expect(preferencesStorage.stored?.selectedModels).toEqual({
+      google: 'unchanged',
+      'custom-endpoint': 'vision-model',
+    });
+  });
+
+  test('does not recreate models or selected-model preferences when deletion finishes during the fetch', async () => {
+    const provider = 'custom-deleted-during-fetch';
+    await customProviderStorage.save(makeCustomProviderConfig({ id: provider }));
+    storage.seedModels(provider, [{ id: 'old-model', name: 'Old Model', source: 'manual' }]);
+    seedPreferences({ [provider]: 'old-model', google: 'unchanged' });
+    const deferredFetch = new DeferredModelFetchService();
+
+    const pending = createUseCase(deferredFetch).execute(provider, 'key');
+    await deferredFetch.started;
+    await storage.clearModels(provider);
+    await preferencesStorage.set({ selectedModels: { google: 'unchanged' } });
+    await customProviderStorage.remove(provider);
+    const preferenceWritesAfterDeletion = preferencesStorage.setCalls.length;
+    deferredFetch.resolveModels([{ id: 'late-model', name: 'Late Model' }]);
+    const result = await pending;
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe(ErrorCode.VALIDATION_INVALID_INPUT);
+    const models = await storage.getAllModels();
+    expect(models.success && models.data).toEqual({});
+    expect(preferencesStorage.stored?.selectedModels).toEqual({ google: 'unchanged' });
+    expect(preferencesStorage.setCalls).toHaveLength(preferenceWritesAfterDeletion);
+  });
+
+  test('propagates a post-fetch custom-provider read failure without saving models or preferences', async () => {
+    customProviderStorage.failNext(StorageError.readFailed('customProviders'));
+    fetchService.seedModels('custom-endpoint', [{ id: 'model', name: 'Model' }]);
+    seedPreferences({ google: 'unchanged' });
+
+    const result = await createUseCase().execute('custom-endpoint', 'key');
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe(ErrorCode.STORAGE_READ_FAILED);
+    expect(storage.getStoredModels('custom-endpoint')).toEqual([]);
+    expect(preferencesStorage.setCalls).toHaveLength(0);
+  });
+
+  test('built-in fetching does not depend on custom-provider storage availability', async () => {
+    customProviderStorage.failNext(StorageError.readFailed('customProviders'));
+    fetchService.seedModels('google', [{ id: 'vision-model', name: 'Vision Model' }]);
+
+    const result = await createUseCase().execute('google', 'key');
+
+    expect(result.success).toBe(true);
+    expect(storage.getStoredModels('google')).toHaveLength(1);
+    expect((await customProviderStorage.load()).success).toBe(false);
   });
 
   describe('selected model repair', () => {
@@ -131,7 +224,7 @@ describe('Application: FetchModelsUseCase', () => {
         { id: 'm2', name: 'Model 2' },
       ]);
 
-      const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+      const useCase = createUseCase();
       const result = await useCase.execute('google', 'AIzaKey');
 
       expect(result.success).toBe(true);
@@ -145,7 +238,7 @@ describe('Application: FetchModelsUseCase', () => {
         { id: 'm1', name: 'Model 1' },
       ]);
 
-      const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+      const useCase = createUseCase();
       const result = await useCase.execute('google', 'AIzaKey');
 
       expect(result.success).toBe(true);
@@ -161,7 +254,7 @@ describe('Application: FetchModelsUseCase', () => {
         { id: 'm2', name: 'Model 2' },
       ]);
 
-      const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+      const useCase = createUseCase();
       const result = await useCase.execute('google', 'AIzaKey');
 
       expect(result.success).toBe(true);
@@ -173,7 +266,7 @@ describe('Application: FetchModelsUseCase', () => {
       seedPreferences({ google: 'dead-model' });
       fetchService.seedModels('google', []);
 
-      const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+      const useCase = createUseCase();
       const result = await useCase.execute('google', 'AIzaKey');
 
       expect(result.success).toBe(true);
@@ -185,7 +278,7 @@ describe('Application: FetchModelsUseCase', () => {
     test('does not touch preferences when none are stored', async () => {
       fetchService.seedModels('google', [{ id: 'm1', name: 'Model 1' }]);
 
-      const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+      const useCase = createUseCase();
       const result = await useCase.execute('google', 'AIzaKey');
 
       expect(result.success).toBe(true);
@@ -199,7 +292,7 @@ describe('Application: FetchModelsUseCase', () => {
         StorageError.writeFailed('userPreferences'),
       );
 
-      const useCase = new FetchModelsUseCase(storage, fetchService, preferencesStorage);
+      const useCase = createUseCase();
       const result = await useCase.execute('google', 'AIzaKey');
 
       expect(result.success).toBe(true);

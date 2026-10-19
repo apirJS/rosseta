@@ -1,6 +1,8 @@
 <script lang="ts">
   import {
+    getAuthStateContext,
     getCustomProvidersStateContext,
+    getModelsStateContext,
     getPreferencesStateContext,
     getPopupToastContext,
   } from '../../../shared/context';
@@ -19,6 +21,8 @@
   const { onback }: Props = $props();
 
   const customProviders = getCustomProvidersStateContext();
+  const auth = getAuthStateContext();
+  const models = getModelsStateContext();
   const preferences = getPreferencesStateContext();
   const toast = getPopupToastContext();
 
@@ -26,6 +30,13 @@
     providers: () => customProviders.state.providers,
     save: (props) => customProviders.save(props),
     remove: (id) => customProviders.remove(id),
+    refresh: async () => {
+      await Promise.all([
+        auth.hydrate(),
+        preferences.hydrate(),
+        models.hydrate(),
+      ]);
+    },
     toast,
   };
 

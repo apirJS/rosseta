@@ -6,6 +6,8 @@ import {
 } from './MainPageController.svelte';
 import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
 import { ProviderRegistry } from '../../../../../../core/domain/provider/ProviderRegistry';
+import { CustomProviderConfig } from '../../../../../../core/domain/provider/CustomProviderConfig';
+import { CustomProvidersState } from '../../../shared/hooks/useCustomProviders.svelte';
 import type { Credential } from '../../../../../../core/domain/credential/Credential';
 import type { Credentials } from '../../../../../../core/domain/credential/Credentials';
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
@@ -51,8 +53,13 @@ function createDeps() {
     modelsFor: vi.fn().mockReturnValue([] as StoredModel[]),
   };
 
+  const customProviderState = new CustomProvidersState();
+  customProviderState.hydrated = true;
   const customProviders = {
-    getProvider: vi.fn().mockReturnValue(null),
+    state: customProviderState,
+    getProvider: vi.fn().mockImplementation((id: string) =>
+      customProviderState.providers.find((provider) => provider.id === id) ?? null,
+    ),
   };
 
   const toast = { show: vi.fn() };
@@ -314,14 +321,93 @@ describe('UI Controller: MainPageController', () => {
     cleanup();
   });
 
-  test('resets a selected custom provider that no longer exists', () => {
+  test('snaps a deleted custom selection to DeepSeek even with a stale active custom key', () => {
     const { deps } = createDeps();
+    deps.auth.state.credentials = makeCredentials(
+      [makeCredential('custom-gone', 'orphan')],
+      'orphan',
+    );
     const { controller, cleanup } = createController(deps);
 
     controller.state.selectedProvider = 'custom-gone';
     flushSync();
 
-    expect(controller.state.selectedProvider).toBeNull();
+    expect(controller.state.selectedProvider).toBe('deepseek');
+    expect(controller.effectiveProvider).toBe('deepseek');
+    expect(controller.canTranslate).toBe(false);
+
+    cleanup();
+  });
+
+  test('recovers a missing active custom provider when the popup reopens', () => {
+    const { deps } = createDeps();
+    deps.auth.state.credentials = makeCredentials(
+      [makeCredential('custom-gone', 'orphan')],
+      'orphan',
+    );
+    const { controller, cleanup } = createController(deps);
+
+    expect(controller.effectiveProvider).toBe('deepseek');
+    expect(controller.state.selectedProvider).toBe('deepseek');
+
+    cleanup();
+  });
+
+  test('keeps a custom selection while providers are still hydrating', () => {
+    const { deps, customProviders } = createDeps();
+    customProviders.state.hydrated = false;
+    const { controller, cleanup } = createController(deps);
+
+    controller.state.selectedProvider = 'custom-pending';
+    flushSync();
+
+    expect(controller.effectiveProvider).toBe('custom-pending');
+    expect(controller.state.selectedProvider).toBe('custom-pending');
+
+    customProviders.state.hydrated = true;
+    flushSync();
+
+    expect(controller.effectiveProvider).toBe('deepseek');
+    expect(controller.state.selectedProvider).toBe('deepseek');
+
+    cleanup();
+  });
+
+  test('snaps to DeepSeek when the selected provider disappears from the loaded catalog', () => {
+    const { deps, customProviders } = createDeps();
+    const provider = CustomProviderConfig.create({
+      id: 'custom-deepseek',
+      name: 'Old DeepSeek',
+      baseURL: 'https://api.deepseek.com',
+    });
+    if (!provider.success) throw new Error('Invalid test provider');
+    customProviders.state.providers = [provider.data];
+    const { controller, cleanup } = createController(deps);
+    controller.state.selectedProvider = 'custom-deepseek';
+    flushSync();
+    expect(controller.effectiveProvider).toBe('custom-deepseek');
+
+    customProviders.state.providers = [];
+    flushSync();
+
+    expect(controller.effectiveProvider).toBe('deepseek');
+    expect(controller.state.selectedProvider).toBe('deepseek');
+
+    cleanup();
+  });
+
+  test('keeps another selected provider when an active custom provider is gone', () => {
+    const { deps } = createDeps();
+    deps.auth.state.credentials = makeCredentials(
+      [makeCredential('custom-gone', 'orphan')],
+      'orphan',
+    );
+    const { controller, cleanup } = createController(deps);
+    controller.state.selectedProvider = 'groq';
+    flushSync();
+
+    expect(controller.effectiveProvider).toBe('groq');
+    expect(controller.state.selectedProvider).toBe('groq');
 
     cleanup();
   });

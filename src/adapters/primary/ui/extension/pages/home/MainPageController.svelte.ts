@@ -13,11 +13,12 @@ import type { PopupToastController } from '../../../shared/toast/PopupToastContr
 
 export interface MainPageDeps {
   auth: {
-    state: { credentials: Credentials | null; keySelectionMode: KeySelectionMode };
+    state: {
+      credentials: Credentials | null;
+      keySelectionMode: KeySelectionMode;
+    };
     setActiveKey: (credentialId: string) => Promise<string | null>;
-    setKeySelectionMode: (
-      mode: KeySelectionMode,
-    ) => Promise<string | null>;
+    setKeySelectionMode: (mode: KeySelectionMode) => Promise<string | null>;
   };
   preferences: {
     state: { selectedModels: Record<string, string> };
@@ -25,6 +26,7 @@ export interface MainPageDeps {
   };
   models: { modelsFor: (provider: string) => StoredModel[] };
   customProviders: {
+    state: { hydrated: boolean };
     getProvider: (id: string) => { id: string } | null;
   };
   toast: Pick<PopupToastController, 'show'>;
@@ -71,8 +73,22 @@ export function createMainPageController(deps: MainPageDeps) {
       DEFAULT_PROVIDER,
   );
 
-  const effectiveProvider = $derived(
+  function isMissingCustomProvider(provider: AnyProvider): boolean {
+    return (
+      deps.customProviders.state.hydrated &&
+      isCustomProviderId(provider) &&
+      !deps.customProviders.getProvider(provider)
+    );
+  }
+
+  const selectedOrActiveProvider = $derived(
     providerSelection.selectedProvider ?? activeProvider,
+  );
+
+  const effectiveProvider = $derived(
+    isMissingCustomProvider(selectedOrActiveProvider)
+      ? 'deepseek'
+      : selectedOrActiveProvider,
   );
 
   const providerKeys = $derived(
@@ -126,12 +142,8 @@ export function createMainPageController(deps: MainPageDeps) {
     void deps.auth.setActiveKey(keys[0].id);
   });
   $effect(() => {
-    if (
-      providerSelection.selectedProvider !== null &&
-      isCustomProviderId(providerSelection.selectedProvider) &&
-      !deps.customProviders.getProvider(providerSelection.selectedProvider)
-    ) {
-      providerSelection.selectedProvider = null;
+    if (isMissingCustomProvider(selectedOrActiveProvider)) {
+      providerSelection.selectedProvider = 'deepseek';
     }
   });
 

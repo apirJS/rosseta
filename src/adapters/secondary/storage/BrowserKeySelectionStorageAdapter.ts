@@ -83,9 +83,24 @@ export class BrowserKeySelectionStorageAdapter implements IKeySelectionStorage {
     }
   }
 
-  async getAllLastUsedIds(): Promise<
-    Result<Record<string, string>, AppError>
-  > {
+  async clearLastUsedId(
+    provider: AnyProvider,
+  ): Promise<Result<void, AppError>> {
+    const key = `${LAST_USED_PREFIX}${provider}`;
+    try {
+      await browser.storage.local.remove(key);
+      return success(undefined);
+    } catch (error) {
+      return failure(
+        StorageError.writeFailed(
+          key,
+          error instanceof Error ? error : undefined,
+        ),
+      );
+    }
+  }
+
+  async getAllLastUsedIds(): Promise<Result<Record<string, string>, AppError>> {
     try {
       const all = (await browser.storage.local.get(null)) as Record<
         string,

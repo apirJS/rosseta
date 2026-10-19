@@ -183,6 +183,21 @@ describe('Adapter: BrowserKeySelectionStorageAdapter', () => {
     if (groqResult.success) expect(groqResult.data).toBe('groq-id');
   });
 
+  test('clearLastUsedId() removes only the deleted provider rotation cursor', async () => {
+    seedStore({ 'lastUsedKeyId:custom-a': 'deleted-key', 'lastUsedKeyId:deepseek': 'retained-key' });
+    expect((await adapter.clearLastUsedId('custom-a')).success).toBe(true);
+    expect(storage.remove).toHaveBeenCalledWith('lastUsedKeyId:custom-a');
+    expect(await adapter.getLastUsedId('custom-a')).toEqual({ success: true, data: null });
+    expect(await adapter.getLastUsedId('deepseek')).toEqual({ success: true, data: 'retained-key' });
+  });
+
+  test('clearLastUsedId() reports failure without claiming cleanup', async () => {
+    storage.remove.mockImplementationOnce(async () => { throw new Error('remove failed'); });
+    const result = await adapter.clearLastUsedId('custom-a');
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe(ErrorCode.STORAGE_WRITE_FAILED);
+  });
+
   test('getLastUsedId() returns StorageError on read failure', async () => {
     storage.get.mockImplementationOnce(async () => {
       throw new Error('read failed');

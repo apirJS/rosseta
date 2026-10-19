@@ -55,10 +55,7 @@ export function useCustomProviders() {
   async function remove(id: string): Promise<Result<void, AppError>> {
     const result = await useCases.removeCustomProvider.execute(id);
     if (result.success) {
-      const refreshed = await useCases.getCustomProviders.execute();
-      if (refreshed.success) {
-        applySnapshot(refreshed.data);
-      }
+      applySnapshot(state.providers.filter((provider) => provider.id !== id));
     }
     return result;
   }

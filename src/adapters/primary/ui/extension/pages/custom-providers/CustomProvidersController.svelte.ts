@@ -27,6 +27,7 @@ export interface CustomProvidersDeps {
     props: CustomProviderConfigProps,
   ) => Promise<Result<CustomProviderConfig, AppError>>;
   remove: (id: string) => Promise<Result<void, AppError>>;
+  refresh: () => Promise<void>;
   toast: PopupToastController;
 }
 
@@ -138,6 +139,7 @@ export function createCustomProvidersController(
 
   async function remove(id: string) {
     const result = await deps.remove(id);
+    await deps.refresh();
     if (!result.success) {
       deps.toast.show({
         type: 'error',

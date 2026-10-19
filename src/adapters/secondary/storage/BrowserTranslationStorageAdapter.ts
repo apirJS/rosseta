@@ -5,6 +5,8 @@ import {
 } from '../../../core/domain/translation/Translation';
 import { TextSegment } from '../../../core/domain/translation/TextSegment';
 import { Language } from '../../../core/domain/translation/Language';
+import { isWithinHistoryRetention } from '../../../core/domain/translation/translation-history-retention';
+import { serializeHistoryStorage } from './translation-history-lock';
 
 import { success, failure, type Result } from '../../../shared/types/Result';
 import { StorageError, type AppError } from '../../../shared/errors';
@@ -13,14 +15,19 @@ import { z } from 'zod';
 
 const STORAGE_KEY = 'translations';
 
-// Concurrent jobs can commit in the same worker. Serialize the whole mutation,
-// including its read, across instances so one completion cannot erase another.
-let historyMutation: Promise<void> = Promise.resolve();
-
-function serializeMutation<T>(work: () => Promise<T>): Promise<T> {
-  const operation = historyMutation.then(work, work);
-  historyMutation = operation.then(() => undefined, () => undefined);
-  return operation;
+async function serializeMutation<T>(
+  work: () => Promise<Result<T, AppError>>,
+): Promise<Result<T, AppError>> {
+  try {
+    return await serializeHistoryStorage(work);
+  } catch (error) {
+    return failure(
+      StorageError.writeFailed(
+        STORAGE_KEY,
+        error instanceof Error ? error : undefined,
+      ),
+    );
+  }
 }
 
 const TextSegmentSchema = z.object({
@@ -40,6 +47,8 @@ const TranslationPropsSchema = z.object({
 });
 
 export class BrowserTranslationStorageAdapter implements ITranslationStorage {
+  constructor(private readonly now: () => number = Date.now) {}
+
   async save(translation: Translation): Promise<Result<void, AppError>> {
     return serializeMutation(async () => {
       try {
@@ -56,7 +65,9 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
           items.unshift(props);
         }
 
-        await browser.storage.local.set({ [STORAGE_KEY]: items });
+        await browser.storage.local.set({
+          [STORAGE_KEY]: this.retainRecentHistory(items),
+        });
         return success(undefined);
       } catch (error) {
         return failure(
@@ -70,22 +81,20 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
   }
 
   async getById(id: string): Promise<Result<Translation | null, AppError>> {
-    try {
-      const allResult = await this.getAllRaw();
+    return serializeMutation(async () => {
+      const allResult = await this.readRetainedHistory();
       if (!allResult.success) return failure(allResult.error);
 
       const raw = allResult.data.find((i) => i.id === id);
       if (!raw) return success(null);
 
       return this.toDomain(raw);
-    } catch {
-      return failure(StorageError.readFailed(STORAGE_KEY));
-    }
+    });
   }
 
   async getAll(): Promise<Result<Translation[], AppError>> {
-    try {
-      const allResult = await this.getAllRaw();
+    return serializeMutation(async () => {
+      const allResult = await this.readRetainedHistory();
       if (!allResult.success) return failure(allResult.error);
 
       const translations: Translation[] = [];
@@ -97,9 +106,7 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
       }
 
       return success(translations);
-    } catch {
-      return failure(StorageError.readFailed(STORAGE_KEY));
-    }
+    });
   }
 
   async replaceAll(
@@ -108,8 +115,8 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
     return serializeMutation(async () => {
       try {
         await browser.storage.local.set({
-          [STORAGE_KEY]: translations.map((translation) =>
-            translation.toProps(),
+          [STORAGE_KEY]: this.retainRecentHistory(
+            translations.map((translation) => translation.toProps()),
           ),
         });
         return success(undefined);
@@ -130,7 +137,9 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
         const allResult = await this.getAllRaw();
         if (!allResult.success) return failure(allResult.error);
 
-        const filtered = allResult.data.filter((i) => i.id !== id);
+        const filtered = this.retainRecentHistory(allResult.data).filter(
+          (i) => i.id !== id,
+        );
         await browser.storage.local.set({ [STORAGE_KEY]: filtered });
         return success(undefined);
       } catch (error) {
@@ -180,6 +189,35 @@ export class BrowserTranslationStorageAdapter implements ITranslationStorage {
       return success(validated);
     } catch {
       return failure(StorageError.readFailed(STORAGE_KEY));
+    }
+  }
+
+  private retainRecentHistory(items: TranslationProps[]): TranslationProps[] {
+    const now = this.now();
+    return items.filter((item) =>
+      isWithinHistoryRetention(new Date(item.createdAt), now),
+    );
+  }
+
+  private async readRetainedHistory(): Promise<
+    Result<TranslationProps[], AppError>
+  > {
+    const result = await this.getAllRaw();
+    if (!result.success) return result;
+
+    const retained = this.retainRecentHistory(result.data);
+    if (retained.length === result.data.length) return success(retained);
+
+    try {
+      await browser.storage.local.set({ [STORAGE_KEY]: retained });
+      return success(retained);
+    } catch (error) {
+      return failure(
+        StorageError.writeFailed(
+          STORAGE_KEY,
+          error instanceof Error ? error : undefined,
+        ),
+      );
     }
   }
 

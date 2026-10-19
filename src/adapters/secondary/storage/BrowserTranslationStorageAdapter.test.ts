@@ -8,6 +8,13 @@ import { TextSegment } from '../../../core/domain/translation/TextSegment';
 import { Language } from '../../../core/domain/translation/Language';
 import { ErrorCode } from '../../../shared/errors/ErrorCode';
 
+const NOW = Date.parse('2026-10-20T12:00:00.000Z');
+const RETENTION_CUTOFF = NOW - 90 * 24 * 60 * 60 * 1000;
+
+function createAdapter() {
+  return new BrowserTranslationStorageAdapter(() => NOW);
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function createTranslation(
@@ -25,11 +32,14 @@ function createTranslation(
     [origSeg.data],
     [transSeg.data],
     'greeting',
-    new Date('2026-01-01'),
+    new Date(NOW),
   );
 }
 
-function validTranslationProps(id: string = 'trans-1') {
+function validTranslationProps(
+  id: string = 'trans-1',
+  createdAt: Date = new Date(NOW),
+) {
   return {
     id,
     original: [
@@ -51,7 +61,7 @@ function validTranslationProps(id: string = 'trans-1') {
       },
     ],
     description: 'greeting',
-    createdAt: '2026-01-01T00:00:00.000Z',
+    createdAt: createdAt.toISOString(),
   };
 }
 
@@ -65,7 +75,7 @@ const storage = browser.storage.local as unknown as {
 // ── Tests ────────────────────────────────────────────────────────────
 
 describe('Adapter: BrowserTranslationStorageAdapter', () => {
-  const adapter = new BrowserTranslationStorageAdapter();
+  const adapter = createAdapter();
 
   beforeEach(() => resetBrowserMock());
 
@@ -112,7 +122,7 @@ describe('Adapter: BrowserTranslationStorageAdapter', () => {
     seedStore({ translations: [validTranslationProps('existing')] });
     const results = await Promise.all([
       adapter.save(createTranslation('first')),
-      new BrowserTranslationStorageAdapter().save(createTranslation('second')),
+      createAdapter().save(createTranslation('second')),
     ]);
     expect(results.every((result) => result.success)).toBe(true);
     const all = await adapter.getAll();
@@ -125,7 +135,7 @@ describe('Adapter: BrowserTranslationStorageAdapter', () => {
     storage.set.mockRejectedValueOnce(new Error('quota'));
     const [failed, succeeded] = await Promise.all([
       adapter.save(createTranslation('failed')),
-      new BrowserTranslationStorageAdapter().save(createTranslation('saved')),
+      createAdapter().save(createTranslation('saved')),
     ]);
     expect(failed.success).toBe(false);
     expect(succeeded.success).toBe(true);
@@ -139,7 +149,7 @@ describe('Adapter: BrowserTranslationStorageAdapter', () => {
     seedStore({ translations: [validTranslationProps('remove')] });
     const results = await Promise.all([
       adapter.delete('remove'),
-      new BrowserTranslationStorageAdapter().save(createTranslation('new')),
+      createAdapter().save(createTranslation('new')),
     ]);
     expect(results.every((result) => result.success)).toBe(true);
     const all = await adapter.getAll();
@@ -153,7 +163,7 @@ describe('Adapter: BrowserTranslationStorageAdapter', () => {
     expect((await adapter.replaceAll([translation])).success).toBe(true);
     const raw = await browser.storage.local.get('translations');
     expect(raw.translations).toEqual([translation.toProps()]);
-    const loaded = await new BrowserTranslationStorageAdapter().getById(
+    const loaded = await createAdapter().getById(
       'restored',
     );
     expect(loaded.success && loaded.data?.toProps()).toEqual(
@@ -258,5 +268,200 @@ describe('Adapter: BrowserTranslationStorageAdapter', () => {
     expect(result.success).toBe(false);
     if (!result.success)
       expect(result.error.code).toBe(ErrorCode.STORAGE_READ_FAILED);
+  });
+
+  test('getAll() physically deletes expired records and retains the exact 90-day boundary', async () => {
+    const boundary = validTranslationProps('boundary', new Date(RETENTION_CUTOFF));
+    const recent = validTranslationProps('recent');
+    seedStore({
+      translations: [
+        validTranslationProps('expired', new Date(RETENTION_CUTOFF - 1)),
+        boundary,
+        recent,
+      ],
+    });
+
+    const result = await adapter.getAll();
+
+    expect(result.success && result.data.map((item) => item.id)).toEqual([
+      'boundary',
+      'recent',
+    ]);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([
+      boundary,
+      recent,
+    ]);
+  });
+
+  test('getById() expires records and returns null instead of exposing old history', async () => {
+    seedStore({
+      translations: [
+        validTranslationProps('expired', new Date(RETENTION_CUTOFF - 1)),
+      ],
+    });
+
+    const result = await adapter.getById('expired');
+
+    expect(result.success && result.data).toBeNull();
+    expect((await browser.storage.local.get('translations')).translations).toEqual([]);
+  });
+
+  test('reading recent or empty history does not rewrite storage', async () => {
+    await adapter.getAll();
+    seedStore({ translations: [validTranslationProps()] });
+    await adapter.getAll();
+    await adapter.getById('trans-1');
+
+    expect(storage.set).not.toHaveBeenCalled();
+  });
+
+  test('save() removes old history in the same commit as the new translation', async () => {
+    const recent = validTranslationProps('recent');
+    seedStore({
+      translations: [
+        validTranslationProps('expired', new Date(RETENTION_CUTOFF - 1)),
+        recent,
+      ],
+    });
+    const current = createTranslation('current');
+
+    expect((await adapter.save(current)).success).toBe(true);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([
+      current.toProps(),
+      recent,
+    ]);
+    expect(storage.set).toHaveBeenCalledTimes(1);
+  });
+
+  test('save() does not persist a translation that is already older than 90 days', async () => {
+    const expired = Translation.create(
+      'expired', [], [], '', new Date(RETENTION_CUTOFF - 1),
+    );
+
+    expect((await adapter.save(expired)).success).toBe(true);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([]);
+  });
+
+  test('backup replacement drops expired history immediately', async () => {
+    const expired = Translation.create(
+      'expired', [], [], '', new Date(RETENTION_CUTOFF - 1),
+    );
+    const recent = createTranslation('recent');
+
+    expect((await adapter.replaceAll([expired, recent])).success).toBe(true);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([
+      recent.toProps(),
+    ]);
+  });
+
+  test('delete() also prunes expired records when removing a different item', async () => {
+    seedStore({
+      translations: [
+        validTranslationProps('expired', new Date(RETENTION_CUTOFF - 1)),
+        validTranslationProps('remove'),
+        validTranslationProps('keep'),
+      ],
+    });
+
+    expect((await adapter.delete('remove')).success).toBe(true);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([
+      validTranslationProps('keep'),
+    ]);
+  });
+
+  test('invalid dates are discarded during retention cleanup', async () => {
+    seedStore({
+      translations: [{ ...validTranslationProps('invalid'), createdAt: 'not a date' }],
+    });
+
+    const result = await adapter.getAll();
+
+    expect(result.success && result.data).toEqual([]);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([]);
+  });
+
+  test('cleanup reports a write failure and retries on the next access', async () => {
+    const expired = validTranslationProps('expired', new Date(RETENTION_CUTOFF - 1));
+    seedStore({ translations: [expired] });
+    storage.set.mockRejectedValueOnce(new Error('quota'));
+
+    const failed = await adapter.getAll();
+
+    expect(failed.success).toBe(false);
+    if (!failed.success) expect(failed.error.code).toBe(ErrorCode.STORAGE_WRITE_FAILED);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([expired]);
+
+    const retried = await adapter.getAll();
+    expect(retried.success && retried.data).toEqual([]);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([]);
+  });
+
+  test('cleanup and concurrent final saves preserve every recent translation', async () => {
+    seedStore({
+      translations: [
+        validTranslationProps('expired', new Date(RETENTION_CUTOFF - 1)),
+        validTranslationProps('existing'),
+      ],
+    });
+
+    const results = await Promise.all([
+      adapter.getAll(),
+      createAdapter().save(createTranslation('first')),
+      createAdapter().getById('existing'),
+      createAdapter().save(createTranslation('second')),
+    ]);
+
+    expect(results.every((result) => result.success)).toBe(true);
+    const result = await adapter.getAll();
+    expect(result.success && result.data.map((item) => item.id)).toEqual([
+      'second', 'first', 'existing',
+    ]);
+  });
+
+  test('a failed cleanup does not prevent the next save from pruning and committing', async () => {
+    seedStore({
+      translations: [validTranslationProps('expired', new Date(RETENTION_CUTOFF - 1))],
+    });
+    storage.set.mockRejectedValueOnce(new Error('quota'));
+
+    const [cleanup, save] = await Promise.all([
+      adapter.getAll(),
+      createAdapter().save(createTranslation('saved')),
+    ]);
+
+    expect(cleanup.success).toBe(false);
+    expect(save.success).toBe(true);
+    expect((await browser.storage.local.get('translations')).translations).toEqual([
+      createTranslation('saved').toProps(),
+    ]);
+  });
+
+  test('lock acquisition failure returns a StorageError without reading or rewriting history', async () => {
+    const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: {
+        locks: {
+          request: async () => { throw new Error('lock unavailable'); },
+        },
+      },
+    });
+
+    try {
+      const result = await adapter.getAll();
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.code).toBe(ErrorCode.STORAGE_WRITE_FAILED);
+      }
+      expect(storage.get).not.toHaveBeenCalled();
+      expect(storage.set).not.toHaveBeenCalled();
+    } finally {
+      if (navigatorDescriptor) {
+        Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);
+      } else {
+        Reflect.deleteProperty(globalThis, 'navigator');
+      }
+    }
   });
 });

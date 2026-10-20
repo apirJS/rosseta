@@ -26,18 +26,6 @@ Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone). Su
 
 Select any area of a page by drawing a rectangle over it. This works on regular text, embedded images, video subtitles, UI labels, buttons, or anything else visible on screen. The extension screenshots the selected region, runs OCR through a vision model, segments the text by language, and displays both the original and translated text in an in-page modal.
 
-### Progressive translation results
-
-The result modal opens as soon as your selection is captured. Models that stream responses display source text and translations while generation is still running, including unfinished words. The same modal updates without resetting its position or size. Copy becomes available after the complete response is validated; only completed results enter history.
-
-If translation fails, the modal shows a compact error title, explanation, and **Select area again** button. Unfinished output and Copy controls are hidden.
-
-Rosseta automatically falls back when a model cannot stream or enforce structured JSON. It remembers successful modes and unsupported capabilities for each model and endpoint, so later requests use a known working fallback directly. Compatibility is refreshed every **7 days**, when that model is next used. **Fetch Models** also resets compatibility for that provider after its models are successfully fetched. The next translation discovers current support and falls back as needed; no background test requests are sent.
-
-Rosseta disables thinking with verified native controls where available, or requests the documented minimum effort. Models and endpoints without either control keep their defaults. Unsupported settings fall back automatically; working and rejected settings are remembered for 7 days and reset by a successful Fetch Models refresh.
-
-Closing a running modal cancels the app's request and discards late output. Puter's installed SDK cannot abort an already submitted network request, so that request may continue at Puter after the modal closes. Closing after the final history write starts hides the modal but does not undo that write.
-
 ### Romanization
 
 For non-Latin scripts (Japanese, Chinese, Korean, Arabic, Thai, etc.), the translation result includes romanization alongside the original text. For example, Japanese text shows its reading in romaji.

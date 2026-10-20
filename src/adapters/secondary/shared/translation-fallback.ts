@@ -3,7 +3,8 @@ import type { GenerationFailure } from './generation-errors';
 
 type ModeSupport = 'unknown' | 'supported' | 'unsupported';
 type SupportLookup = (mode: GenerationMode) => ModeSupport;
-const MAX_GENERATION_CALLS = 6;
+// The initial request and all fallback/repair calls share this budget.
+const MAX_GENERATION_CALLS = 3;
 
 export const isStructured = (mode: GenerationMode) => mode.startsWith('structured');
 export const isStreamed = (mode: GenerationMode) => mode.endsWith('stream');

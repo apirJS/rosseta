@@ -69,9 +69,6 @@ describe('Integration: streaming translation lifecycle', () => {
           },
         ],
         wait: continueStream.promise,
-        error: new TypeError('network disconnected'),
-      },
-      {
         result: {
           text: 'malformed',
           finishReason: 'stop',
@@ -164,9 +161,9 @@ describe('Integration: streaming translation lifecycle', () => {
       'structured-stream',
       'plain-stream',
       'plain-buffered',
-      'plain-buffered',
     ]);
-    expect(views.get('first')?.reset).toHaveBeenCalledTimes(4);
+    expect(views.get('first')?.reset).toHaveBeenCalledTimes(3);
+    expect(transport.requests[2].userText).toContain('untrusted_previous_response');
     expect(views.get('first')?.completed).toHaveBeenCalledTimes(1);
     expect(fixture.storage.storedCount).toBe(1);
     const second = register('second');
@@ -179,7 +176,7 @@ describe('Integration: streaming translation lifecycle', () => {
       ).success,
     ).toBe(true);
     expect(transport.requests.at(-1)?.mode).toBe('plain-buffered');
-    expect(transport.requests).toHaveLength(5);
+    expect(transport.requests).toHaveLength(4);
     expect(fixture.storage.storedCount).toBe(2);
     expect(views.get('second')?.completed).toHaveBeenCalledTimes(1);
   });

@@ -359,35 +359,32 @@ describe('Adapter: translation configuration compatibility fallback', () => {
     expect(transport.requests[2].image).toBe(VALID_IMAGE);
   });
 
-  test('counts configuration and mode discovery against the same six-call budget', async () => {
-    const extraConfigurations = [
-      ...DEFAULT_CONFIGURATIONS.slice(0, 2),
-      {
-        id: 'thinking.fixture-third.v1',
-        rejectionFields: ['reasoning_effort'],
-      },
-      {
-        id: 'thinking.fixture-fourth.v1',
-        rejectionFields: ['reasoning_effort'],
-      },
-      DEFAULT_CONFIGURATIONS[2],
-    ];
-    const transport = new ConfiguredGeneration(
-      [
-        { error: rejectedThinking() },
-        { error: rejectedThinking() },
-        { error: rejectedThinking() },
-        { error: rejectedThinking() },
-        { error: api('response_format is unsupported') },
-        { error: api('streaming is unsupported') },
-        { result: plain },
-      ],
-      extraConfigurations,
-    );
-    expect((await run(transport)).success).toBe(false);
-    expect(transport.requests).toHaveLength(6);
+  test('shares three calls across configuration and mode discovery and retains facts at exhaustion', async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+    const transport = new ConfiguredGeneration([
+      { error: rejectedThinking() },
+      { error: api('response_format is unsupported') },
+      { error: api('streaming is unsupported') },
+      { result: plain },
+    ]);
+    expect((await run(transport, storage)).success).toBe(false);
+    expect(transport.requests).toHaveLength(3);
     expect(transport.scripts).toHaveLength(1);
-    expect(transport.requests.at(-1)?.mode).toBe('plain-stream');
+    expect(transport.requests.map(request => request.mode)).toEqual([
+      'structured-stream', 'structured-stream', 'plain-stream',
+    ]);
+    expect(profileIds(transport)).toEqual([OFF, MINIMUM, MINIMUM]);
+    const stored = await facts(storage);
+    expect(stored[`configuration.${OFF}`].support).toBe('unsupported');
+    expect(stored['feature.structured'].support).toBe('unsupported');
+    expect(stored['feature.stream'].support).toBe('unsupported');
+
+    // A later real translation skips the failed settings/modes without probing.
+    expect((await run(transport, storage)).success).toBe(true);
+    expect(transport.requests).toHaveLength(4);
+    expect(transport.scripts).toHaveLength(0);
+    expect(transport.requests[3].mode).toBe('plain-buffered');
+    expect(transport.requests[3].configurationId).toBe(MINIMUM);
   });
 
   test('cancellation before start prevents configuration discovery requests', async () => {

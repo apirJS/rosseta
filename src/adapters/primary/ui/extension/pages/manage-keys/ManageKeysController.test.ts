@@ -10,6 +10,7 @@ import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySe
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import { success } from '../../../../../../shared/types/Result';
 import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import { AuthState } from '../../../shared/hooks/useAuth.svelte';
 
 function makeCredential(id: string, rawKey: string, provider: 'google' | 'groq') {
   const apiKey = ApiKey.createWithProvider(rawKey, provider);
@@ -60,6 +61,12 @@ function createDeps(overrides: Partial<ManageKeysDeps> = {}) {
 
 function flush(): Promise<unknown> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(release => { resolve = release; });
+  return { promise, resolve };
 }
 
 describe('UI Controller: ManageKeysController', () => {
@@ -236,18 +243,130 @@ describe('UI Controller: ManageKeysController', () => {
       expect(controller.visibleKeys.map((c) => c.id)).toEqual(['g1']);
     });
 
-    test('requestDelete while pending cancels the previous timer', async () => {
+    test('requesting another deletion commits the previous key and gives the latest key its undo window', async () => {
       const { deps } = createDeps();
       const controller = createManageKeysController(deps);
 
       controller.requestDelete('g1');
       controller.requestDelete('q1');
 
-      vi.advanceTimersByTime(5000);
-      await vi.runAllTicks();
+      expect(controller.state.pendingDeleteId).toBe('q1');
+      await vi.advanceTimersByTimeAsync(5000);
 
-      expect(deps.removeApiKey).not.toHaveBeenCalledWith('g1');
-      expect(deps.removeApiKey).toHaveBeenCalledWith('q1');
+      expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([['g1'], ['q1']]);
+      expect(controller.state.pendingDeleteId).toBeNull();
+    });
+
+    test('undo restores only the latest key while the previous deletion remains hidden until saved', async () => {
+      const state = new AuthState();
+      state.credentials = Credentials.createEmpty('creds-1')
+        .add(makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'))
+        .add(makeCredential('g2', 'AIzaSecondGoogleKey123', 'google'));
+      const saving = deferred();
+      const { deps } = createDeps({
+        credentials: () => state.credentials,
+        removeApiKey: vi.fn().mockImplementation(async id => {
+          await saving.promise;
+          state.credentials = state.credentials!.remove(id);
+          return null;
+        }),
+      });
+      const controller = createManageKeysController(deps);
+      controller.requestDelete('g1');
+      controller.requestDelete('g2');
+      expect(controller.visibleKeys).toHaveLength(0);
+
+      // A duplicate event for an already committing key cannot replace Undo.
+      controller.requestDelete('g1');
+      expect(controller.state.pendingDeleteId).toBe('g2');
+      controller.cancelPendingDelete();
+      expect(controller.visibleKeys.map(key => key.id)).toEqual(['g2']);
+      saving.resolve();
+      await controller.commitPendingDelete();
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([['g1']]);
+      expect(controller.visibleKeys.map(key => key.id)).toEqual(['g2']);
+    });
+
+    test('serializes three rapid deletions and drains queued work once when leaving the page', async () => {
+      const state = new AuthState();
+      state.credentials = Credentials.createEmpty('creds-1')
+        .add(makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'))
+        .add(makeCredential('g2', 'AIzaSecondGoogleKey123', 'google'))
+        .add(makeCredential('g3', 'AIzaThirdGoogleKey123', 'google'));
+      const release = new Map<string, () => void>();
+      const { deps } = createDeps({
+        credentials: () => state.credentials,
+        removeApiKey: vi.fn().mockImplementation(async id => {
+          const snapshot = state.credentials!;
+          await new Promise<void>(resolve => { release.set(id, resolve); });
+          state.credentials = snapshot.remove(id);
+          return null;
+        }),
+      });
+      const controller = createManageKeysController(deps);
+      controller.requestDelete('g1');
+      controller.requestDelete('g2');
+      controller.requestDelete('g3');
+      const saved = controller.commitPendingDelete();
+      controller.destroy();
+      expect(controller.visibleKeys).toHaveLength(0);
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([['g1']]);
+      release.get('g1')!();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([['g1'], ['g2']]);
+      expect(controller.visibleKeys).toHaveLength(0);
+      release.get('g2')!();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([['g1'], ['g2'], ['g3']]);
+      release.get('g3')!();
+      await saved;
+
+      expect(state.credentials.items).toHaveLength(0);
+      expect(controller.visibleKeys).toHaveLength(0);
+      expect(deps.clearAllModels).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    test.each(['returned', 'thrown'])('restores a failed deletion and keeps later deletions working after a %s error', async kind => {
+      const state = new AuthState();
+      state.credentials = Credentials.createEmpty('creds-1')
+        .add(makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'))
+        .add(makeCredential('g2', 'AIzaSecondGoogleKey123', 'google'));
+      const removeApiKey = vi.fn().mockImplementation(async id => {
+        state.credentials = state.credentials!.remove(id);
+        return null;
+      });
+      if (kind === 'returned') removeApiKey.mockResolvedValueOnce('Storage is full');
+      else removeApiKey.mockRejectedValueOnce(new Error('Storage is full'));
+      const { deps, show } = createDeps({ credentials: () => state.credentials, removeApiKey });
+      const controller = createManageKeysController(deps);
+      controller.requestDelete('g1');
+      controller.requestDelete('g2');
+      await controller.commitPendingDelete();
+
+      expect(removeApiKey.mock.calls).toEqual([['g1'], ['g2']]);
+      expect(controller.visibleKeys.map(key => key.id)).toEqual(['g1']);
+      expect(show).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'error', message: 'Could not delete key', description: 'Storage is full',
+      }));
+      controller.requestDelete('g1');
+      await controller.commitPendingDelete();
+      expect(state.credentials.items).toHaveLength(0);
+    });
+
+    test('a duplicate pending deletion keeps the original undo window and only removes once', async () => {
+      const { deps } = createDeps();
+      const controller = createManageKeysController(deps);
+      controller.requestDelete('g1');
+      await vi.advanceTimersByTimeAsync(3000);
+      controller.requestDelete('g1');
+      expect(deps.removeApiKey).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([['g1']]);
     });
 
     test('destroy commits the pending delete', async () => {

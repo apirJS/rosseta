@@ -90,7 +90,7 @@
 
   <AddItemBar
     class="mb-3"
-    type="password"
+    type="text"
     bind:value={controller.state.keyInput}
     placeholder="Search or add key…"
     addLabel="Add API key"

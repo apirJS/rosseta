@@ -14,6 +14,7 @@ async function updateManifest(): Promise<void> {
     console.error(
       '❌ [update-manifest] Fatal Error: No version argument provided to script.',
     );
+
     process.exit(1);
   }
 
@@ -26,10 +27,12 @@ async function updateManifest(): Promise<void> {
     console.error(
       `❌ [update-manifest] Fatal Error: manifest.json not found at ${manifestPath}`,
     );
+
     process.exit(1);
   }
 
   const manifest: ExtensionManifest = await file.json();
+
   console.log(
     `[update-manifest] Syncing manifest.json: ${manifest.version} -> ${cleanVersion} (Raw: ${rawVersion})`,
   );

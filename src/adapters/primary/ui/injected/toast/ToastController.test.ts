@@ -141,6 +141,7 @@ describe('UI Controller: ToastController', () => {
 
   test('update() resets dismissing state', () => {
     const id = controller.show({ type: 'info', message: 'Old', duration: 0 });
+
     controller.dismiss(id);
     expect(controller.toasts[0].dismissing).toBe(true);
 

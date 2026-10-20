@@ -28,11 +28,15 @@
 
   function handleTextContentPointer(e: PointerEvent) {
     if (isResizing) return;
+
     const target = (e.target as HTMLElement).closest<HTMLElement>(
       '[data-seg-index]',
     );
+
     if (!target) return;
+
     const i = Number(target.dataset.segIndex);
+
     onSegmentIndexHover?.(i);
   }
 
@@ -43,11 +47,15 @@
 
   function handleRomPointer(e: PointerEvent) {
     if (isResizing) return;
+
     const target = (e.target as HTMLElement).closest<HTMLElement>(
       '[data-seg-index]',
     );
+
     if (!target) return;
+
     const i = Number(target.dataset.segIndex);
+
     onSegmentIndexHover?.(i);
   }
 

@@ -7,5 +7,6 @@ export function cn(...inputs: ClassValue[]) {
 
 export function maskApiKey(value: string, visibleChars = 8): string {
   if (value.length <= visibleChars) return value;
+
   return `${value.slice(0, visibleChars)}••••`;
 }

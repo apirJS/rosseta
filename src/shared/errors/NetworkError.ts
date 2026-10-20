@@ -7,6 +7,7 @@ export class NetworkError extends AppError {
       ...options,
       code: options.code ?? ErrorCode.NETWORK_SERVER_ERROR,
     });
+
     this.name = 'NetworkError';
   }
 
@@ -38,7 +39,10 @@ export class NetworkError extends AppError {
     });
   }
 
-  public static providerUnavailable(status?: number, url?: string): NetworkError {
+  public static providerUnavailable(
+    status?: number,
+    url?: string,
+  ): NetworkError {
     return new NetworkError({
       code: ErrorCode.NETWORK_PROVIDER_UNAVAILABLE,
       context: { status, url },

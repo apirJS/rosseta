@@ -25,19 +25,21 @@ export function mapDraftSegments(
 ): { original: SegmentPayload[]; translated: SegmentPayload[] } {
   const original: SegmentPayload[] = [];
   const translated: SegmentPayload[] = [];
+
   for (const segment of draft.segments) {
     const row = {
       blockIndex: segment.index,
       index: segment.index,
       rowKey: revision + ':' + segment.index,
     };
-    
+
     original.push({
       ...row,
       language: sourceLanguage(segment.sourceLanguageCode),
       text: segment.originalText,
       romanization: segment.romanization,
     });
+
     translated.push({
       ...row,
       language: targetLanguage,
@@ -45,6 +47,7 @@ export function mapDraftSegments(
       romanization: null,
     });
   }
+
   return { original, translated };
 }
 
@@ -52,15 +55,18 @@ export function groupSegmentsIntoBlocks(
   segments: SegmentPayload[],
 ): IndexedSegmentPayload[][] {
   const blocks: IndexedSegmentPayload[][] = [];
+
   for (const [index, segment] of segments.entries()) {
     const indexed = { ...segment, index: segment.index ?? index };
     const previousBlock = blocks[blocks.length - 1];
+
     if (previousBlock?.[0].blockIndex === segment.blockIndex) {
       previousBlock.push(indexed);
     } else {
       blocks.push([indexed]);
     }
   }
+
   return blocks;
 }
 

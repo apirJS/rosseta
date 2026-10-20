@@ -11,7 +11,8 @@ const FRAME_COLOR = 'oklch(54.6% 0.245 262.881)';
 const FRAME_WIDTH = '1.5px';
 const FRAME_LENGTH = 20;
 
-export class SelectionBox {  private readonly element: HTMLDivElement;
+export class SelectionBox {
+  private readonly element: HTMLDivElement;
   private readonly winWidth: number;
   private readonly winHeight: number;
   private readonly frameGradient: string;
@@ -45,8 +46,10 @@ export class SelectionBox {  private readonly element: HTMLDivElement;
     box.style.borderColor = 'rgba(0, 0, 0, 0.4)';
     box.style.cursor = 'crosshair';
     box.style.zIndex = CSS_MAX_Z_INDEX;
+
     box.style.backgroundPosition =
       'top left, top left, top right, top right, bottom left, bottom left, bottom right, bottom right';
+
     box.style.backgroundRepeat = 'no-repeat';
 
     return box;
@@ -60,6 +63,7 @@ export class SelectionBox {  private readonly element: HTMLDivElement;
 
     const rightBorder = this.winWidth - (left + width);
     const bottomBorder = this.winHeight - (top + height);
+
     this.element.style.borderWidth = `${top}px ${rightBorder}px ${bottomBorder}px ${left}px`;
 
     this.updateCameraFrame(width, height);

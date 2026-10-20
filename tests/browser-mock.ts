@@ -6,11 +6,14 @@ let store: Record<string, unknown> = {};
 const storageMock = {
   get: mock(async (keys: string | string[] | null) => {
     if (keys === null) return { ...store };
+
     const keyList = Array.isArray(keys) ? keys : [keys];
     const result: Record<string, unknown> = {};
+
     for (const k of keyList) {
       if (k in store) result[k] = store[k];
     }
+
     return result;
   }),
   set: mock(async (items: Record<string, unknown>) => {
@@ -18,6 +21,7 @@ const storageMock = {
   }),
   remove: mock(async (keys: string | string[]) => {
     const keyList = Array.isArray(keys) ? keys : [keys];
+
     for (const k of keyList) delete store[k];
   }),
   clear: mock(async () => {
@@ -64,9 +68,11 @@ mock.module(
   '../src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css?inline',
   () => ({ default: '' }),
 );
+
 mock.module('../src/adapters/primary/ui/styles/app.css?inline', () => ({
   default: '',
 }));
+
 mock.module(
   '../src/adapters/primary/ui/injected/toast/toast.css?inline',
   () => ({ default: '' }),
@@ -92,13 +98,17 @@ function defaultStreamText(options: unknown) {
         finishReason?: string;
       },
   );
+
   const text = generated.then(
     (value) => value.text ?? JSON.stringify(value.output ?? ''),
   );
+
   const output = generated.then((value) => value.output);
+
   // The SDK exposes eagerly observable promises; consumers attach their own handling.
   void output.catch(() => {});
   void text.catch(() => {});
+
   return {
     text,
     output,
@@ -109,12 +119,14 @@ function defaultStreamText(options: unknown) {
     stream: (async function* () {
       try {
         const value = await text;
+
         yield { type: 'text-delta', id: 'text-1', text: value };
         yield { type: 'finish', finishReason: 'stop' };
       } catch (error) {
         const callback = (
           options as { onError?: (event: { error: unknown }) => void }
         ).onError;
+
         callback?.({ error });
         yield { type: 'error', error };
       }
@@ -122,6 +134,7 @@ function defaultStreamText(options: unknown) {
     partialOutputStream: (async function* () {
       try {
         const value = await output;
+
         if (value !== undefined) yield value;
       } catch {
         /* error branch carries the original cause */

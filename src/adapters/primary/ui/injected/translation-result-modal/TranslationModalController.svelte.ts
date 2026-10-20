@@ -1,6 +1,6 @@
 import type { TranslationDraft } from '../../../../../core/ports/outbound/TranslationExecutionOptions';
 import type { TranslationModalPayload } from '../../../../../shared/types/TranslationModalPayload';
-import type { SafeTranslationError } from '../../../../../shared/validation/MessageSchema';
+import type { SafeTranslationError } from '../../../../../shared/messaging/MessageSchema';
 import {
   groupSegmentsIntoBlocks,
   joinSegmentBlocks,
@@ -10,7 +10,9 @@ import {
 import { writeToClipboard } from './write-to-clipboard';
 
 type CopyState = 'idle' | 'copied';
+
 type CopyTarget = 'original' | 'translated' | 'description';
+
 const COPY_FEEDBACK_DURATION_MS = 2_000;
 
 export class TranslationModalController {
@@ -91,11 +93,13 @@ export class TranslationModalController {
   public readonly langColorMap = $derived.by(() => {
     const map = new Map<string, number>();
     let idx = 0;
+
     for (const seg of this.original) {
       if (!map.has(seg.language.code)) {
         map.set(seg.language.code, idx++ % 8);
       }
     }
+
     return map;
   });
 
@@ -117,16 +121,21 @@ export class TranslationModalController {
 
   public readonly detectedLanguageLabel = $derived.by(() => {
     if (this.realLangCodes.length > 1) return 'Mixed';
+
     const first = this.original.find(
       (s) => !TranslationModalController.NON_LANG_CODES.has(s.language.code),
     );
+
     if (!first) return '';
+
     return `${first.language.name} (${first.language.code})`;
   });
 
   public readonly targetLanguageLabel = $derived.by(() => {
     const first = this.translated[0];
+
     if (!first) return '';
+
     return `${first.language.name} (${first.language.code})`;
   });
 
@@ -138,6 +147,7 @@ export class TranslationModalController {
       const segment = this.original.find(
         (value, index) => (value.index ?? index) === this.hoveredSegmentIndex,
       );
+
       if (
         segment &&
         !TranslationModalController.NON_LANG_CODES.has(segment.language.code)
@@ -145,6 +155,7 @@ export class TranslationModalController {
         return `${segment.language.name} (${segment.language.code})`;
       }
     }
+
     return this.detectedLanguageLabel;
   });
 
@@ -173,6 +184,7 @@ export class TranslationModalController {
     this.description = props.description;
     this.detachModal = props.detachModal;
     this.onretry = props.onretry;
+
     if (props.live) {
       this.phase = 'preparing';
       this.status = 'Preparing...';
@@ -198,11 +210,13 @@ export class TranslationModalController {
 
   public snapshot = (draft: TranslationDraft) => {
     if (this.disposed || this.phase !== 'generating') return;
+
     const segments = mapDraftSegments(
       draft,
       this.targetLanguage,
       this.revision,
     );
+
     this.original = segments.original;
     this.translated = segments.translated;
     this.description = draft.description ?? '';
@@ -231,6 +245,7 @@ export class TranslationModalController {
 
   public failed = (error: SafeTranslationError) => {
     if (this.disposed) return;
+
     if (
       error.code === 'TRANSLATION_NO_TEXT_FOUND' ||
       error.code === 'TRANSLATION_CONTENT_BLOCKED' ||
@@ -238,6 +253,7 @@ export class TranslationModalController {
     ) {
       this.clearContent();
     }
+
     this.phase = 'failed';
     this.status = error.title;
     this.errorMessage = error.userMessage;
@@ -248,7 +264,7 @@ export class TranslationModalController {
     this.phase = 'cancelled';
     this.status = 'Translation cancelled';
   };
-  
+
   public retry = () => {
     if (!this.disposed) this.onretry?.();
   };
@@ -309,19 +325,24 @@ export class TranslationModalController {
     target: CopyTarget,
   ): Promise<void> {
     if (!this.canCopy || this.disposed) return;
+
     const copied = await writeToClipboard(text);
+
     if (copied && !this.disposed) this.showCopyFeedback(target);
   }
 
   private showCopyFeedback(target: CopyTarget): void {
     this.setCopyState(target, 'copied');
+
     const existingTimer = this.copyTimers.get(target);
+
     if (existingTimer) clearTimeout(existingTimer);
 
     const timer = setTimeout(() => {
       this.setCopyState(target, 'idle');
       this.copyTimers.delete(target);
     }, COPY_FEEDBACK_DURATION_MS);
+
     this.copyTimers.set(target, timer);
   }
 

@@ -1,7 +1,7 @@
 import { getContext, setContext } from 'svelte';
 import type { IGetPreferencesUseCase } from '../../../../../core/ports/inbound/preferences/IGetPreferencesUseCase';
 import type { IUpdatePreferencesUseCase } from '../../../../../core/ports/inbound/preferences/IUpdatePreferencesUseCase';
-import type { IGetShortcutUseCase } from '../../../../../core/ports/inbound/command/IGetShortcutUseCase';
+import type { IGetShortcutUseCase } from '../../../../../core/ports/inbound/shortcuts/IGetShortcutUseCase';
 
 const PREFERENCES_CONTEXT_KEY = Symbol('preferences');
 const PREFERENCES_STATE_KEY = Symbol('preferencesState');
@@ -23,11 +23,13 @@ export function setPreferencesContext(useCases: PreferencesUseCases): void {
 
 export function getPreferencesContext(): PreferencesUseCases {
   const context = getContext<PreferencesUseCases>(PREFERENCES_CONTEXT_KEY);
+
   if (!context) {
     throw new Error(
       'Preferences context not found. Did you forget to call setPreferencesContext?',
     );
   }
+
   return context;
 }
 
@@ -39,10 +41,12 @@ export function setPreferencesStateContext(
 
 export function getPreferencesStateContext(): PreferencesStateContext {
   const context = getContext<PreferencesStateContext>(PREFERENCES_STATE_KEY);
+
   if (!context) {
     throw new Error(
       'Preferences state context not found. Did you forget to call setPreferencesStateContext?',
     );
   }
+
   return context;
 }

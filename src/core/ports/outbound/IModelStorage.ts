@@ -9,9 +9,7 @@ export interface StoredModel {
 
 export interface IModelStorage {
   getModels(provider: string): Promise<Result<StoredModel[], AppError>>;
-  getAllModels(): Promise<
-    Result<Record<string, StoredModel[]>, AppError>
-  >;
+  getAllModels(): Promise<Result<Record<string, StoredModel[]>, AppError>>;
   setModels(
     provider: string,
     models: StoredModel[],

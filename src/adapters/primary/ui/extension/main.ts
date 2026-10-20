@@ -2,9 +2,12 @@ import { mount } from 'svelte';
 import { ExtensionThemeBroadcaster } from './services/ExtensionThemeBroadcaster';
 import appStyles from '../styles/app.css?inline';
 import App from './App.svelte';
-import { uiContainer } from './di-container';
+import { createPopupDependencies } from '../../../../composition/popup';
+
+const uiContainer = createPopupDependencies();
 
 const style = document.createElement('style');
+
 style.textContent = appStyles;
 document.head.appendChild(style);
 

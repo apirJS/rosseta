@@ -14,7 +14,9 @@ function seg(
   romanization: string | null = null,
 ) {
   const result = TextSegment.create(text, Language.create(lang), romanization);
+
   if (!result.success) throw result.error;
+
   return result.data;
 }
 
@@ -35,6 +37,7 @@ describe('serializeForModal', () => {
     expect(payload.createdAt).toEqual(new Date('2026-01-01T00:00:00Z'));
 
     expect(payload.original).toHaveLength(1);
+
     expect(payload.original[0]).toEqual({
       language: { code: 'ja-JP', name: 'Japanese' },
       text: 'ã“ã‚“ã«ã¡ã¯',
@@ -43,6 +46,7 @@ describe('serializeForModal', () => {
     });
 
     expect(payload.translated).toHaveLength(1);
+
     expect(payload.translated[0]).toEqual({
       language: { code: 'en-US', name: 'English' },
       text: 'Hello',

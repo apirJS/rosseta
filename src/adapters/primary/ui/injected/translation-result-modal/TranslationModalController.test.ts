@@ -273,6 +273,7 @@ describe('UI Controller: TranslationModalController', () => {
 
   test('copyOriginal sets originalCopy to "copied", resets after 2s', async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
+
     Object.assign(navigator, {
       clipboard: { writeText: writeTextMock },
     });
@@ -289,6 +290,7 @@ describe('UI Controller: TranslationModalController', () => {
 
   test('copyTranslated sets translatedCopy to "copied"', async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
+
     Object.assign(navigator, {
       clipboard: { writeText: writeTextMock },
     });
@@ -302,6 +304,7 @@ describe('UI Controller: TranslationModalController', () => {
 
   test('copyDescription sets descriptionCopy to "copied"', async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
+
     Object.assign(navigator, {
       clipboard: { writeText: writeTextMock },
     });
@@ -321,8 +324,11 @@ describe('UI Controller: TranslationModalController', () => {
           .mockRejectedValue(new Error('Clipboard unavailable')),
       },
     });
+
     const execCommand = vi.fn().mockReturnValue(true);
+
     Object.assign(document, { execCommand });
+
     const ctrl = createController();
 
     await ctrl.copyTranslated();
@@ -341,11 +347,13 @@ describe('UI Controller: TranslationModalController', () => {
           .mockRejectedValue(new Error('Clipboard unavailable')),
       },
     });
+
     Object.assign(document, {
       execCommand: vi.fn(() => {
         throw new Error('Copy denied');
       }),
     });
+
     const ctrl = createController();
 
     await ctrl.copyTranslated();
@@ -357,6 +365,7 @@ describe('UI Controller: TranslationModalController', () => {
 
   test('a clipboard operation settling after disposal cannot start feedback', async () => {
     let resolveCopy: (() => void) | undefined;
+
     Object.assign(navigator, {
       clipboard: {
         writeText: vi.fn(
@@ -367,8 +376,10 @@ describe('UI Controller: TranslationModalController', () => {
         ),
       },
     });
+
     const ctrl = createController();
     const copying = ctrl.copyTranslated();
+
     ctrl.dispose();
     resolveCopy?.();
     await copying;
@@ -379,21 +390,26 @@ describe('UI Controller: TranslationModalController', () => {
 
   test('disposing during a drag stops further position updates', () => {
     const ctrl = createController();
+
     ctrl.handleDragStart({
       button: 0,
       clientX: 10,
       clientY: 20,
     } as PointerEvent);
+
     window.dispatchEvent(
       new MouseEvent('pointermove', { clientX: 35, clientY: 47 }),
     );
+
     expect(ctrl.posX).toBe(25);
     expect(ctrl.posY).toBe(27);
 
     ctrl.dispose();
+
     window.dispatchEvent(
       new MouseEvent('pointermove', { clientX: 70, clientY: 80 }),
     );
+
     expect(ctrl.posX).toBe(25);
     expect(ctrl.posY).toBe(27);
   });
@@ -433,8 +449,10 @@ describe('UI Controller: TranslationModalController', () => {
       live: true,
       detachModal: vi.fn(),
     });
+
     ctrl.started({ code: 'en-US', name: 'English' });
     ctrl.reset();
+
     ctrl.snapshot({
       segments: [
         {
@@ -456,12 +474,16 @@ describe('UI Controller: TranslationModalController', () => {
       ],
       description: null,
     });
+
     expect(ctrl.original.map((row) => row.index)).toEqual([0, 1]);
     expect(ctrl.translated.map((row) => row.index)).toEqual([0, 1]);
     expect(ctrl.original[1].text).toBe('');
     expect(ctrl.original[1].language).toEqual({ code: 'unknown', name: '' });
+
     const originalKey = ctrl.original[1].rowKey;
+
     ctrl.hoverOriginalSegment(1);
+
     ctrl.snapshot({
       segments: [
         {
@@ -483,6 +505,7 @@ describe('UI Controller: TranslationModalController', () => {
       ],
       description: null,
     });
+
     expect(ctrl.original[1].rowKey).toBe(originalKey);
     expect(ctrl.originalBlocks).toHaveLength(2);
     expect(ctrl.displayedLangLabel).toBe('Korean (ko-KR)');
@@ -501,7 +524,9 @@ describe('UI Controller: TranslationModalController', () => {
     'clears provisional content for %s and keeps Copy unavailable',
     async (code) => {
       const writeText = vi.fn().mockResolvedValue(undefined);
+
       Object.assign(navigator, { clipboard: { writeText } });
+
       const ctrl = new TranslationModalController({
         original: [],
         translated: [],
@@ -509,8 +534,10 @@ describe('UI Controller: TranslationModalController', () => {
         live: true,
         detachModal: vi.fn(),
       });
+
       ctrl.started({ code: 'en-US', name: 'English' });
       ctrl.reset();
+
       ctrl.snapshot({
         segments: [
           {
@@ -524,14 +551,17 @@ describe('UI Controller: TranslationModalController', () => {
         ],
         description: 'Draft',
       });
+
       await ctrl.copyOriginal();
       ctrl.committing();
       await ctrl.copyTranslated();
+
       ctrl.failed({
         code,
         title: 'Cannot translate',
         userMessage: 'Try another area.',
       });
+
       await ctrl.copyDescription();
       expect(ctrl.original).toEqual([]);
       expect(ctrl.translated).toEqual([]);
@@ -550,8 +580,10 @@ describe('UI Controller: TranslationModalController', () => {
       live: true,
       detachModal: vi.fn(),
     });
+
     ctrl.started({ code: 'en-US', name: 'English' });
     ctrl.reset();
+
     ctrl.snapshot({
       segments: [
         {
@@ -565,11 +597,13 @@ describe('UI Controller: TranslationModalController', () => {
       ],
       description: null,
     });
+
     ctrl.failed({
       code: 'NETWORK_CONNECTION_FAILED',
       title: 'Disconnected',
       userMessage: 'Try again.',
     });
+
     expect(ctrl.translated[0].text).toBe('partial');
     expect(ctrl.canCopy).toBe(false);
     expect(ctrl.isBusy).toBe(false);
@@ -579,6 +613,7 @@ describe('UI Controller: TranslationModalController', () => {
   test('disposed controllers ignore queued lifecycle updates and close only once', () => {
     const detach = vi.fn();
     const retry = vi.fn();
+
     const ctrl = new TranslationModalController({
       original: [],
       translated: [],
@@ -587,16 +622,19 @@ describe('UI Controller: TranslationModalController', () => {
       detachModal: detach,
       onretry: retry,
     });
+
     ctrl.close();
     ctrl.started({ code: 'en-US', name: 'English' });
     ctrl.reset();
     ctrl.committing();
     ctrl.cancelled();
+
     ctrl.failed({
       code: 'NETWORK_TIMEOUT',
       title: 'Timeout',
       userMessage: 'Try again.',
     });
+
     ctrl.retry();
     ctrl.close();
     expect(ctrl.phase).toBe('preparing');

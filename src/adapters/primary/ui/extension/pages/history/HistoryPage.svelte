@@ -21,6 +21,7 @@
 
   $effect(() => {
     controller.load();
+
     return () => controller.destroy();
   });
 </script>
@@ -66,10 +67,7 @@
 
   {#snippet footer()}
     {#if controller.state.pendingDelete}
-      <UndoBar
-        message="Translation deleted"
-        onundo={controller.undoDelete}
-      />
+      <UndoBar message="Translation deleted" onundo={controller.undoDelete} />
     {/if}
   {/snippet}
 </PageShell>

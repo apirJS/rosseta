@@ -34,16 +34,20 @@ export function createManageModelsController(
   initialProvider: AnyProvider = 'google',
 ) {
   const state = new ManageModelsState();
+
   state.selectedProvider = initialProvider;
 
   const models = $derived(deps.modelsFor(state.selectedProvider));
+
   const selectedModelId = $derived(
     deps.selectedModelFor(state.selectedProvider),
   );
 
   const filteredModels = $derived.by(() => {
     const query = state.modelInput.trim().toLowerCase();
+
     if (!query) return models;
+
     return models.filter(
       (m) =>
         m.id.toLowerCase().includes(query) ||
@@ -53,6 +57,7 @@ export function createManageModelsController(
 
   const canAddModel = $derived.by(() => {
     const id = state.modelInput.trim();
+
     return id !== '' && !models.some((m) => m.id === id);
   });
 
@@ -63,9 +68,11 @@ export function createManageModelsController(
 
   async function addModel() {
     const id = state.modelInput.trim();
+
     if (!id || !canAddModel) return;
 
     const result = await deps.addModel(state.selectedProvider, id);
+
     if (result.success) {
       state.modelInput = '';
     } else {
@@ -79,6 +86,7 @@ export function createManageModelsController(
 
   async function removeModel(modelId: string) {
     const result = await deps.removeModel(state.selectedProvider, modelId);
+
     if (!result.success) {
       deps.toast.show({
         type: 'error',
@@ -95,11 +103,14 @@ export function createManageModelsController(
         message: 'No API key for this provider',
         description: 'Add a key under Manage API Keys first.',
       });
+
       return;
     }
 
     state.isFetching = true;
+
     const result = await deps.fetchModels(state.selectedProvider);
+
     state.isFetching = false;
 
     if (result.success) {
@@ -118,6 +129,7 @@ export function createManageModelsController(
 
   async function resetModels() {
     const result = await deps.clearModels(state.selectedProvider);
+
     if (!result.success) {
       deps.toast.show({
         type: 'error',

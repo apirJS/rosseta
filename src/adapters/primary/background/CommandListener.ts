@@ -1,6 +1,6 @@
 import * as browser from 'webextension-polyfill';
-import { COMMAND } from '../../../shared/validation/MessageSchema';
-import type { OverlayService } from './services/OverlayService';
+import { COMMAND } from '../../../shared/messaging/MessageSchema';
+import type { OverlayService } from './capture/OverlayService';
 
 export class CommandListener {
   constructor(private readonly overlayService: OverlayService) {}
@@ -10,6 +10,7 @@ export class CommandListener {
       switch (command) {
         case COMMAND.START_EXTENSION:
           await this.overlayService.triggerOverlayOnActiveTab();
+
           break;
 
         default:

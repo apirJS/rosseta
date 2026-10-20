@@ -1,8 +1,8 @@
 import { getContext, setContext } from 'svelte';
-import type { IAddCustomModelUseCase } from '../../../../../core/ports/inbound/models/IAddCustomModelUseCase';
-import type { IRemoveCustomModelUseCase } from '../../../../../core/ports/inbound/models/IRemoveCustomModelUseCase';
-import type { IClearModelsUseCase } from '../../../../../core/ports/inbound/models/IClearModelsUseCase';
-import type { ILoadModelsUseCase } from '../../../../../core/ports/inbound/models/ILoadModelsUseCase';
+import type { IAddCustomModelUseCase } from '../../../../../core/ports/inbound/providers/IAddCustomModelUseCase';
+import type { IRemoveCustomModelUseCase } from '../../../../../core/ports/inbound/providers/IRemoveCustomModelUseCase';
+import type { IClearModelsUseCase } from '../../../../../core/ports/inbound/providers/IClearModelsUseCase';
+import type { ILoadModelsUseCase } from '../../../../../core/ports/inbound/providers/ILoadModelsUseCase';
 
 const MODELS_CONTEXT_KEY = Symbol('models');
 const MODELS_STATE_KEY = Symbol('modelsState');
@@ -24,11 +24,13 @@ export function setModelsContext(useCases: ModelUseCases): void {
 
 export function getModelsContext(): ModelUseCases {
   const context = getContext<ModelUseCases>(MODELS_CONTEXT_KEY);
+
   if (!context) {
     throw new Error(
       'Models context not found. Did you forget to call setModelsContext?',
     );
   }
+
   return context;
 }
 
@@ -38,10 +40,12 @@ export function setModelsStateContext(modelsState: ModelsStateContext): void {
 
 export function getModelsStateContext(): ModelsStateContext {
   const context = getContext<ModelsStateContext>(MODELS_STATE_KEY);
+
   if (!context) {
     throw new Error(
       'Models state context not found. Did you forget to call setModelsStateContext?',
     );
   }
+
   return context;
 }

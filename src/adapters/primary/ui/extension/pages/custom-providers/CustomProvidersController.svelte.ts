@@ -35,25 +35,31 @@ function parseStringRecordJson(
   value: string,
 ): Record<string, string> | undefined | 'invalid' {
   const trimmed = value.trim();
+
   if (!trimmed) return undefined;
 
   try {
     const parsed: unknown = JSON.parse(trimmed);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       return 'invalid';
     }
+
     for (const entryValue of Object.values(parsed)) {
       if (typeof entryValue !== 'string') return 'invalid';
     }
+
     return parsed as Record<string, string>;
   } catch {
     return 'invalid';
   }
 }
 
-export function createCustomProvidersController(
-  deps: CustomProvidersDeps,
-) {
+export function createCustomProvidersController(deps: CustomProvidersDeps) {
   const state = new CustomProvidersState();
 
   const providers = $derived(deps.providers());
@@ -81,12 +87,15 @@ export function createCustomProvidersController(
     state.name = provider.name;
     state.type = provider.type;
     state.baseURL = provider.baseURL;
+
     state.headers = provider.headers
       ? JSON.stringify(provider.headers, null, 2)
       : '';
+
     state.queryParams = provider.queryParams
       ? JSON.stringify(provider.queryParams, null, 2)
       : '';
+
     state.error = null;
   }
 
@@ -94,14 +103,18 @@ export function createCustomProvidersController(
     state.error = null;
 
     const headers = parseStringRecordJson(state.headers);
+
     if (headers === 'invalid') {
       state.error = 'Headers must be a JSON object of strings.';
+
       return;
     }
 
     const queryParams = parseStringRecordJson(state.queryParams);
+
     if (queryParams === 'invalid') {
       state.error = 'Query params must be a JSON object of strings.';
+
       return;
     }
 
@@ -115,16 +128,20 @@ export function createCustomProvidersController(
     };
 
     state.isSaving = true;
+
     const result = await deps.save(props);
+
     state.isSaving = false;
 
     if (!result.success) {
       state.error = result.error.message;
+
       deps.toast.show({
         type: 'error',
         message: ERROR_TITLES[result.error.code],
         description: result.error.userMessage,
       });
+
       return;
     }
 
@@ -134,22 +151,27 @@ export function createCustomProvidersController(
         ? 'Provider updated'
         : `Provider "${result.data.name}" added`,
     });
+
     showList();
   }
 
   async function remove(id: string) {
     const result = await deps.remove(id);
+
     await deps.refresh();
+
     if (!result.success) {
       deps.toast.show({
         type: 'error',
         message: ERROR_TITLES[result.error.code],
         description: result.error.userMessage,
       });
+
       return;
     }
 
     deps.toast.show({ type: 'success', message: 'Provider removed' });
+
     if (state.editingId === id) {
       showList();
     }

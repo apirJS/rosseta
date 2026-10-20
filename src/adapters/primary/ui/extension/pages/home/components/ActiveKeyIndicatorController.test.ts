@@ -69,7 +69,9 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('detects a single credential for the provider', () => {
     const { deps, first } = createDeps();
+
     deps.auth.state.credentials = makeCredentials([first]);
+
     const controller = createActiveKeyIndicatorController(deps);
 
     expect(controller.hasMultiple).toBe(false);
@@ -85,17 +87,21 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('the active credential is scoped to the provider', () => {
     const { deps, first } = createDeps();
+
     deps.getCredential = () =>
       makeCredential('groq', 'other', 'sk-cccccccccccccccc');
+
     const otherProvider = createActiveKeyIndicatorController(deps);
 
     expect(otherProvider.providerActive).toBeNull();
     expect(otherProvider.getTriggerLabel()).toBe('—');
 
     deps.getCredential = () => first;
+
     const sameProvider = createActiveKeyIndicatorController(deps);
 
     expect(sameProvider.providerActive).toBe(first);
+
     expect(sameProvider.getTriggerLabel()).toBe(
       maskApiKey('sk-aaaaaaaaaaaaaaaa'),
     );
@@ -103,7 +109,9 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('the trigger label shows Auto when auto-balance targets the provider', () => {
     const { deps } = createDeps();
+
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
+
     const controller = createActiveKeyIndicatorController(deps);
 
     expect(controller.getTriggerLabel()).toBe('Auto ⟳');
@@ -111,13 +119,17 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('the trigger label ignores a stale auto-balance mode with one key left', () => {
     const { deps, first } = createDeps();
+
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
     deps.auth.state.credentials = makeCredentials([first]);
+
     const controller = createActiveKeyIndicatorController(deps);
 
     // ResolveActiveCredentialUseCase already falls back to manual below two
     // keys, so advertising "Auto ⟳" here would misreport what actually runs.
-    expect(controller.getTriggerLabel()).toBe(maskApiKey('sk-aaaaaaaaaaaaaaaa'));
+    expect(controller.getTriggerLabel()).toBe(
+      maskApiKey('sk-aaaaaaaaaaaaaaaa'),
+    );
   });
 
   test('toggle and close manage the dropdown state', () => {
@@ -135,8 +147,11 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('selectKey switches to manual mode first when not manual', async () => {
     const { deps, auth, second } = createDeps();
+
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
+
     const controller = createActiveKeyIndicatorController(deps);
+
     controller.toggle();
 
     await controller.selectKey(second);
@@ -144,6 +159,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
     expect(auth.setKeySelectionMode).toHaveBeenCalledWith(
       KeySelectionMode.manual(),
     );
+
     expect(auth.setActiveKey).toHaveBeenCalledWith('k2');
     expect(controller.state.isOpen).toBe(false);
   });
@@ -161,6 +177,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
   test('selectAutoBalance updates the key selection mode', async () => {
     const { deps, auth } = createDeps();
     const controller = createActiveKeyIndicatorController(deps);
+
     controller.toggle();
 
     await controller.selectAutoBalance('google');
@@ -168,12 +185,15 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
     expect(auth.setKeySelectionMode).toHaveBeenCalledWith(
       KeySelectionMode.autoBalance('google'),
     );
+
     expect(controller.state.isOpen).toBe(false);
   });
 
   test('selectAutoBalance toasts when the mode cannot be saved', async () => {
     const { deps, auth, toast } = createDeps();
+
     auth.setKeySelectionMode = vi.fn().mockResolvedValue('Mode broken');
+
     const controller = createActiveKeyIndicatorController(deps);
 
     await controller.selectAutoBalance('google');
@@ -183,13 +203,17 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
       message: 'Could not enable auto-balance',
       description: 'Mode broken',
     });
+
     expect(controller.state.isOpen).toBe(false);
   });
 
   test('selectKey toasts and keeps the dropdown open when the key cannot be saved', async () => {
     const { deps, auth, toast, second } = createDeps();
+
     auth.setActiveKey = vi.fn().mockResolvedValue('Storage broken');
+
     const controller = createActiveKeyIndicatorController(deps);
+
     controller.toggle();
 
     await controller.selectKey(second);
@@ -199,14 +223,18 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
       message: 'Could not switch API key',
       description: 'Storage broken',
     });
+
     expect(controller.state.isOpen).toBe(true);
   });
 
   test('selectKey does not switch the active key when leaving auto-balance fails', async () => {
     const { deps, auth, toast, second } = createDeps();
+
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
     auth.setKeySelectionMode = vi.fn().mockResolvedValue('Mode broken');
+
     const controller = createActiveKeyIndicatorController(deps);
+
     controller.toggle();
 
     await controller.selectKey(second);
@@ -214,11 +242,13 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
     // Persisting the key while the mode is still auto-balance would leave the
     // round-robin resolver overriding the choice the user just made.
     expect(auth.setActiveKey).not.toHaveBeenCalled();
+
     expect(toast.show).toHaveBeenCalledWith({
       type: 'error',
       message: 'Could not switch to manual key selection',
       description: 'Mode broken',
     });
+
     expect(controller.state.isOpen).toBe(true);
   });
 });

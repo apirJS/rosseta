@@ -27,6 +27,7 @@ describe('UI Controller: HomeController', () => {
 
   test('showManageApiKeys switches to "manage-api-keys" and closes menu', () => {
     const controller = createHomeController();
+
     controller.toggleMenu();
     expect(controller.state.isMenuOpen).toBe(true);
 
@@ -38,6 +39,7 @@ describe('UI Controller: HomeController', () => {
 
   test('showHistory switches to "history" and closes menu', () => {
     const controller = createHomeController();
+
     controller.toggleMenu();
 
     controller.showHistory();
@@ -48,6 +50,7 @@ describe('UI Controller: HomeController', () => {
 
   test('showManageModels switches to "manage-models" and closes menu', () => {
     const controller = createHomeController();
+
     controller.toggleMenu();
 
     controller.showManageModels();
@@ -58,6 +61,7 @@ describe('UI Controller: HomeController', () => {
 
   test('showMain resets to "main" with back direction', () => {
     const controller = createHomeController();
+
     controller.showHistory();
 
     controller.showMain();
@@ -78,6 +82,7 @@ describe('UI Controller: HomeController', () => {
 
   test('closeMenu sets isMenuOpen to false', () => {
     const controller = createHomeController();
+
     controller.toggleMenu();
     expect(controller.state.isMenuOpen).toBe(true);
 
@@ -87,6 +92,7 @@ describe('UI Controller: HomeController', () => {
 
   test('closeMenu is idempotent when already closed', () => {
     const controller = createHomeController();
+
     expect(controller.state.isMenuOpen).toBe(false);
 
     controller.closeMenu();
@@ -103,6 +109,7 @@ describe('UI Controller: HomeController', () => {
     expect(sendMessageToRuntime).toHaveBeenCalledWith({
       action: 'START_OVERLAY',
     });
+
     expect(closeSpy).toHaveBeenCalled();
 
     closeSpy.mockRestore();
@@ -110,24 +117,37 @@ describe('UI Controller: HomeController', () => {
 
   test('opens shortcut settings independently of translation', async () => {
     const controller = createHomeController();
+
     await controller.openShortcutSettings();
     expect(openShortcutSettings).toHaveBeenCalledOnce();
-    expect(controller.shortcutSettingsUrl).toBe('chrome://extensions/shortcuts');
+
+    expect(controller.shortcutSettingsUrl).toBe(
+      'chrome://extensions/shortcuts',
+    );
+
     expect(sendMessageToRuntime).not.toHaveBeenCalled();
   });
 
   test('reports navigation failure with a manual settings destination', async () => {
-    vi.mocked(openShortcutSettings).mockRejectedValueOnce(new Error('Navigation blocked'));
+    vi.mocked(openShortcutSettings).mockRejectedValueOnce(
+      new Error('Navigation blocked'),
+    );
+
     const toast = { show: vi.fn() };
+
     await createHomeController({ toast }).openShortcutSettings();
+
     expect(toast.show).toHaveBeenCalledWith({
-      type: 'error', message: 'Could not open shortcut settings',
-      description: 'Open chrome://extensions/shortcuts to configure the translation shortcut.',
+      type: 'error',
+      message: 'Could not open shortcut settings',
+      description:
+        'Open chrome://extensions/shortcuts to configure the translation shortcut.',
     });
   });
 
   test('navigateTo switches to any view and closes the menu', () => {
     const controller = createHomeController();
+
     controller.toggleMenu();
 
     controller.navigateTo('manage-models');
@@ -139,6 +159,7 @@ describe('UI Controller: HomeController', () => {
 
   test('navigateTo returns to main with back direction', () => {
     const controller = createHomeController();
+
     controller.navigateTo('history');
 
     controller.navigateTo('main');

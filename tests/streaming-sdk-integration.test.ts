@@ -1,3 +1,4 @@
+import { createTranslationAdapter } from './create-translation-service';
 import { describe, expect, test, vi } from 'vitest';
 import {
   streamText,
@@ -8,14 +9,11 @@ import {
 import { MockLanguageModelV4 } from 'ai/test';
 import { z } from 'zod';
 import type { LanguageModelV4StreamPart } from '@ai-sdk/provider';
-import { AiSdkGenerationTransport } from '../src/adapters/secondary/shared/AiSdkGenerationTransport';
+import { AiSdkGenerationTransport } from '../src/adapters/secondary/translation/transports/ai-sdk/AiSdkGenerationTransport';
 import { EncodedImage } from '../src/core/domain/image/EncodedImage';
-import { createTranslationDataSchema } from '../src/adapters/secondary/shared/translation-schema';
+import { createTranslationDataSchema } from '../src/adapters/secondary/translation/output/translation-schema';
 import { createTranslationFixture } from './fixtures/translation-provider-server';
-import { OpenAICompatibleTranslationAdapter } from '../src/adapters/secondary/openai-compatible/OpenAICompatibleTranslationAdapter';
-import { AnthropicCompatibleTranslationAdapter } from '../src/adapters/secondary/anthropic-compatible/AnthropicCompatibleTranslationAdapter';
-import { DeepSeekTranslationAdapter } from '../src/adapters/secondary/deepseek/DeepSeekTranslationAdapter';
-import { NvidiaTranslationAdapter } from '../src/adapters/secondary/nvidia/NvidiaTranslationAdapter';
+
 import { ApiKey } from '../src/core/domain/credential/ApiKey';
 import { Credential } from '../src/core/domain/credential/Credential';
 import { UserPreferences } from '../src/core/domain/preferences/UserPreferences';
@@ -26,7 +24,6 @@ import { success } from '../src/shared/types/Result';
 import type { TranslationProgress } from '../src/core/ports/outbound/TranslationExecutionOptions';
 import type { ITranslationService } from '../src/core/ports/outbound/ITranslationService';
 import type { AnyProvider } from '../src/core/domain/credential/Provider';
-import { createTranslationAdapter } from '../src/adapters/secondary/TranslationAdapterFactory';
 
 const usage = {
   inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
@@ -60,23 +57,30 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
       { type: 'text-end', id: 't' },
       finish,
     ]);
+
     const result = streamText({
       model,
       output: Output.object({ schema: z.object({ value: z.string() }) }),
       prompt: 'test',
       maxRetries: 0,
     });
+
     let finished = false;
+
     const final = Promise.resolve(result.output).then((value) => {
       finished = true;
+
       return value;
     });
+
     const values: unknown[] = [];
+
     for await (const partial of result.partialOutputStream) {
       values.push(partial);
       if ((partial as { value?: string }).value === 'Hel')
         expect(finished).toBe(false);
     }
+
     expect(await final).toEqual({ value: 'Hello' });
     expect(values).toContainEqual({ value: 'Hel' });
     expect(model.doStreamCalls.length).toBe(1);
@@ -94,19 +98,23 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
       prompt: 'test',
       maxRetries: 0,
     });
+
     const final = Promise.resolve(result.output).then(
       () => null,
       (error) => error,
     );
+
     for await (const partial of result.partialOutputStream) {
       void partial;
     }
+
     expect(NoObjectGeneratedError.isInstance(await final)).toBe(true);
   });
 
   test('in-band errors are visible through result.stream and onError', async () => {
     const observed: unknown[] = [];
     const source = new Error('provider interrupted');
+
     const result = streamText({
       model: modelFor([
         { type: 'text-start', id: 't' },
@@ -119,7 +127,9 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
         observed.push(error);
       },
     });
+
     const parts = [];
+
     for await (const part of result.stream) parts.push(part.type);
     expect(parts).toContain('error');
     expect(observed).toContain(source);
@@ -127,7 +137,9 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
 
   test('production transport returns actual schema errors with raw text for bounded manual recovery', async () => {
     const image = EncodedImage.create('data:image/png;base64,AQ==');
+
     if (!image.success) throw image.error;
+
     const transport = new AiSdkGenerationTransport(
       modelFor([
         { type: 'text-start', id: 't' },
@@ -136,6 +148,7 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
         finish,
       ]),
     );
+
     const result = await transport.generate(
       {
         mode: 'structured-stream',
@@ -147,15 +160,20 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
       },
       async () => {},
     );
+
     expect(result.schemaValidated).toBe(false);
     expect(result.text).toBe('{"unexpected":true}');
+
     expect(NoObjectGeneratedError.isInstance(result.validationError)).toBe(
       true,
     );
   });
+
   test('production transport rejects in-band interruption even after receiving balanced JSON', async () => {
     const image = EncodedImage.create('data:image/png;base64,AQ==');
+
     if (!image.success) throw image.error;
+
     const transport = new AiSdkGenerationTransport(
       modelFor([
         { type: 'text-start', id: 't' },
@@ -163,6 +181,7 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
         { type: 'error', error: new TypeError('network interrupted') },
       ]),
     );
+
     await expect(
       transport.generate(
         {
@@ -177,10 +196,61 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
       ),
     ).rejects.toThrow('network interrupted');
   });
+
+  test.each(['structured-stream', 'plain-stream'] as const)(
+    '%s rejects cleanly in a browser runtime without leaking SDK telemetry promises',
+    async (mode) => {
+      const nodeProcess = process;
+      const unhandled: unknown[] = [];
+      const recordUnhandled = (error: unknown) => unhandled.push(error);
+      const source = new Error('provider rejected streaming configuration');
+      const image = EncodedImage.create('data:image/png;base64,AQ==');
+
+      if (!image.success) throw image.error;
+
+      const model = new MockLanguageModelV4({
+        doStream: async () => {
+          throw source;
+        },
+      });
+
+      // The SDK's Node tracing path observes completion rejections. Its browser
+      // path differs, so normal Node-only SDK fixtures cannot cover this leak.
+      nodeProcess.on('unhandledRejection', recordUnhandled);
+
+      vi.stubGlobal('process', {
+        ...nodeProcess,
+        release: { ...nodeProcess.release, name: 'browser-fixture' },
+      });
+
+      try {
+        await expect(
+          new AiSdkGenerationTransport(model).generate(
+            {
+              mode,
+              image: image.data,
+              instructions: 'Return JSON',
+              userText: 'test',
+              schema: createTranslationDataSchema(),
+              signal: new AbortController().signal,
+            },
+            async () => {},
+          ),
+        ).rejects.toBe(source);
+
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(unhandled).toEqual([]);
+      } finally {
+        vi.unstubAllGlobals();
+        nodeProcess.off('unhandledRejection', recordUnhandled);
+      }
+    },
+  );
 });
 
 describe('Production custom adapters against deterministic provider HTTP streams', () => {
   const protocols = ['openai', 'anthropic'] as const;
+
   const scenarios = [
     'success',
     'no-structured',
@@ -192,6 +262,7 @@ describe('Production custom adapters against deterministic provider HTTP streams
     'in-band-error',
     'interruption',
   ] as const;
+
   test.each(
     protocols.flatMap((protocol) =>
       scenarios.map((scenario) => ({ protocol, scenario })),
@@ -200,11 +271,13 @@ describe('Production custom adapters against deterministic provider HTTP streams
     '$protocol/$scenario completes through real SDKs and reuses durable fallback',
     async ({ protocol, scenario }) => {
       const fixture = createTranslationFixture({ delayMs: 1 });
+
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')
         .mockImplementation(async (input, init) =>
           fixture.fetch(new Request(input, init)),
         );
+
       try {
         const config = CustomProviderConfig.create({
           id: 'custom-sdk-fixture',
@@ -221,6 +294,7 @@ describe('Production custom adapters against deterministic provider HTTP streams
         );
 
         const image = EncodedImage.create('data:image/png;base64,AQ==');
+
         if (!config.success || !key.success || !image.success)
           throw new Error('Invalid fixture setup');
 
@@ -231,22 +305,22 @@ describe('Production custom adapters against deterministic provider HTTP streams
         );
 
         if (!credential.success) throw credential.error;
+
         const preferences = UserPreferences.createDefault(
           crypto.randomUUID(),
         ).withSelectedModel('custom-sdk-fixture', 'fixture-vision');
 
         const storage = new FakeTranslationCapabilityStorage();
-        const Adapter =
-          protocol === 'anthropic'
-            ? AnthropicCompatibleTranslationAdapter
-            : OpenAICompatibleTranslationAdapter;
-        const adapter = new Adapter(
+
+        const adapter = createTranslationAdapter(
           credential.data,
           preferences,
           config.data,
           storage,
         );
+
         const progress: TranslationProgress[] = [];
+
         const result = await adapter.translateImage(
           image.data,
           Language.create('en-US'),
@@ -254,6 +328,7 @@ describe('Production custom adapters against deterministic provider HTTP streams
             progress: {
               report: async (event) => {
                 progress.push(event);
+
                 return success(undefined);
               },
             },
@@ -266,6 +341,7 @@ describe('Production custom adapters against deterministic provider HTTP streams
 
         if (result.success)
           expect(result.data.translated[0].text).toBe('Hello');
+
         expect(
           fixture.requests.every(
             (request) =>
@@ -317,15 +393,19 @@ describe('Production custom adapters against deterministic provider HTTP streams
 
         if (scenario !== 'malformed-repair') {
           const previousCalls = fixture.requests.length;
+
           const repeated = await adapter.translateImage(
             image.data,
             Language.create('en-US'),
           );
+
           expect(repeated.success).toBe(true);
           expect(fixture.requests.length - previousCalls).toBe(1);
+
           expect(fixture.requests.at(-1)?.streamed).toBe(
             fixture.requests[previousCalls - 1].streamed,
           );
+
           expect(fixture.requests.at(-1)?.structured).toBe(
             fixture.requests[previousCalls - 1].structured,
           );
@@ -357,6 +437,7 @@ describe('Native DeepSeek and NVIDIA provider HTTP contracts', () => {
     '$provider/$scenario preserves vision input and reuses its working mode',
     async ({ provider, scenario, model }) => {
       const fixture = createTranslationFixture({ delayMs: 1 });
+
       const outgoing: {
         url: string;
         authorization: string | null;
@@ -373,12 +454,15 @@ describe('Native DeepSeek and NVIDIA provider HTTP contracts', () => {
         .spyOn(globalThis, 'fetch')
         .mockImplementation(async (input, init) => {
           const request = new Request(input, init);
+
           outgoing.push({
             url: request.url,
             authorization: request.headers.get('authorization'),
             body: await request.clone().json(),
           });
+
           const target = `http://fixture.invalid/openai/${scenario}/v1/chat/completions`;
+
           return fixture.fetch(new Request(target, request));
         });
 
@@ -402,16 +486,19 @@ describe('Native DeepSeek and NVIDIA provider HTTP contracts', () => {
         ).withSelectedModel(provider, model);
 
         const storage = new FakeTranslationCapabilityStorage();
+
         const adapter: ITranslationService =
           provider === 'deepseek'
-            ? new DeepSeekTranslationAdapter(
+            ? createTranslationAdapter(
                 credential.data,
                 preferences,
+                undefined,
                 storage,
               )
-            : new NvidiaTranslationAdapter(
+            : createTranslationAdapter(
                 credential.data,
                 preferences,
+                undefined,
                 storage,
               );
 
@@ -446,6 +533,7 @@ describe('Native DeepSeek and NVIDIA provider HTTP contracts', () => {
           (await adapter.translateImage(image.data, Language.create('en-US')))
             .success,
         ).toBe(true);
+
         expect(outgoing.length - previousCalls).toBe(1);
 
         const expectedURL =
@@ -476,7 +564,9 @@ describe('Native DeepSeek and NVIDIA provider HTTP contracts', () => {
             expect(request.body.reasoning_effort).toBeUndefined();
           }
         }
+
         const record = [...storage.records.values()][0];
+
         expect(record.namespace).toBe(provider);
 
         if (provider === 'deepseek')
@@ -497,6 +587,7 @@ describe('Production adapters serialize verified thinking controls', () => {
     baseURL?: string;
     type?: 'anthropic';
   }
+
   const cases: Case[] = [
     {
       provider: 'google',
@@ -691,10 +782,12 @@ describe('Production adapters serialize verified thinking controls', () => {
     '$provider/$model sends only the verified provider settings',
     async ({ provider, model, baseURL, type, expected, absent }) => {
       const bodies: unknown[] = [];
+
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')
         .mockImplementation(async (input, init) => {
           bodies.push(await new Request(input, init).json());
+
           // Capture the real SDK's HTTP body, without using live credentials or accounts.
           return new Response(
             JSON.stringify({
@@ -711,6 +804,7 @@ describe('Production adapters serialize verified thinking controls', () => {
       try {
         const key = ApiKey.createWithProvider('fixture-key', provider);
         const image = EncodedImage.create('data:image/png;base64,AQ==');
+
         if (!key.success || !image.success)
           throw new Error('Invalid test setup');
 
@@ -721,6 +815,7 @@ describe('Production adapters serialize verified thinking controls', () => {
         );
 
         if (!credential.success) throw credential.error;
+
         const config = baseURL
           ? CustomProviderConfig.create({
               id: provider,
@@ -731,6 +826,7 @@ describe('Production adapters serialize verified thinking controls', () => {
           : undefined;
 
         if (config && !config.success) throw config.error;
+
         const adapter = createTranslationAdapter(
           credential.data,
           UserPreferences.createDefault(crypto.randomUUID()).withSelectedModel(
@@ -745,6 +841,7 @@ describe('Production adapters serialize verified thinking controls', () => {
           (await adapter.translateImage(image.data, Language.create('en-US')))
             .success,
         ).toBe(false);
+
         expect(bodies).toHaveLength(1);
         expect(bodies[0]).toMatchObject(expected);
 

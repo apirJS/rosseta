@@ -1,33 +1,53 @@
 import * as browser from 'webextension-polyfill';
-import { MessageSchema } from '../../../../shared/validation/MessageSchema';
-import { OverlayHandler } from '../handlers/OverlayHandler';
-import { TranslationModalHandler } from '../handlers/TranslationModalHandler';
-import { ToastHandler } from '../handlers/ToastHandler';
+import { MessageSchema } from '../../../../shared/messaging/MessageSchema';
+import type { OverlayHandler } from '../capture/OverlayHandler';
+import type { TranslationModalHandler } from '../translation/TranslationModalHandler';
+import type { ToastHandler } from './ToastHandler';
 import type { ThemeManager } from '../hosts/ThemeManager';
-import { sendMessageToRuntime } from '../../../../shared/messaging';
+import { sendMessageToRuntime } from '../../../../shared/messaging/index';
+
+export interface ContentHandlers {
+  translation: Pick<
+    TranslationModalHandler,
+    | 'register'
+    | 'runtimeSettled'
+    | 'runtimeFailed'
+    | 'dispose'
+    | 'resetDocument'
+    | 'checkDeadlines'
+    | 'handle'
+    | 'receive'
+  >;
+  toast: Pick<ToastHandler, 'show' | 'dismiss'>;
+  createOverlay(
+    start: (requestId: string, imageBase64: string) => Promise<void>,
+  ): Pick<OverlayHandler, 'handle'>;
+}
 
 export class ContentMessageRouter {
-  private readonly overlayHandler: OverlayHandler;
-  private readonly translationModalHandler: TranslationModalHandler;
-  private readonly toastHandler: ToastHandler;
+  private readonly overlayHandler: Pick<OverlayHandler, 'handle'>;
 
-  constructor(private readonly themeManager: ThemeManager) {
-    this.translationModalHandler = new TranslationModalHandler(themeManager);
-    this.overlayHandler = new OverlayHandler((requestId, imageBase64) =>
+  constructor(
+    private readonly themeManager: ThemeManager,
+    private readonly handlers: ContentHandlers,
+  ) {
+    this.overlayHandler = handlers.createOverlay((requestId, imageBase64) =>
       this.startTranslation(requestId, imageBase64),
     );
-    this.toastHandler = new ToastHandler(themeManager);
   }
 
   register(): void {
     this.registerDocumentLifecycle();
+
     browser.runtime.onMessage.addListener(async (message: unknown) => {
       const result = MessageSchema.safeParse(message);
+
       if (!result.success) {
         console.error(
           '[ContentMessageRouter] Message validation failed:',
           result.error,
         );
+
         return;
       }
 
@@ -39,30 +59,34 @@ export class ContentMessageRouter {
     requestId: string,
     imageBase64: string,
   ): Promise<void> {
-    const identity = this.translationModalHandler.register(requestId);
+    const identity = this.handlers.translation.register(requestId);
+
     try {
       await sendMessageToRuntime({
         action: 'TRANSLATE_IMAGE',
         payload: { ...identity, imageBase64 },
       });
-      this.translationModalHandler.runtimeSettled(requestId);
+
+      this.handlers.translation.runtimeSettled(requestId);
     } catch {
-      this.translationModalHandler.runtimeFailed(requestId);
+      this.handlers.translation.runtimeFailed(requestId);
     }
   }
 
   private registerDocumentLifecycle(): void {
     if (typeof window !== 'undefined') {
       window.addEventListener?.('pagehide', () =>
-        this.translationModalHandler.dispose(),
+        this.handlers.translation.dispose(),
       );
+
       window.addEventListener?.('pageshow', (event) => {
-        if (event.persisted) this.translationModalHandler.resetDocument();
+        if (event.persisted) this.handlers.translation.resetDocument();
       });
     }
+
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) this.translationModalHandler.checkDeadlines();
+        if (!document.hidden) this.handlers.translation.checkDeadlines();
       });
     }
   }
@@ -71,25 +95,30 @@ export class ContentMessageRouter {
     switch (message.action) {
       case 'MOUNT_OVERLAY':
         this.overlayHandler.handle(message.payload.rawImage);
+
         break;
 
       case 'MOUNT_TRANSLATION_MODAL':
-        this.translationModalHandler.handle(message.payload);
+        this.handlers.translation.handle(message.payload);
+
         break;
 
       case 'TRANSLATION_EVENT':
-        return this.translationModalHandler.receive(message.payload);
+        return this.handlers.translation.receive(message.payload);
 
       case 'THEME_CHANGED':
         this.themeManager.setTheme(message.payload.theme);
+
         break;
 
       case 'SHOW_TOAST':
-        this.toastHandler.show(message.payload);
+        this.handlers.toast.show(message.payload);
+
         break;
 
       case 'DISMISS_TOAST':
-        this.toastHandler.dismiss(message.payload.id);
+        this.handlers.toast.dismiss(message.payload.id);
+
         break;
 
       case 'PING':

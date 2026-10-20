@@ -1,7 +1,7 @@
 import { getContext, setContext } from 'svelte';
-import type { IGetAllTranslationsUseCase } from '../../../../../core/ports/inbound/translation/IGetAllTranslationsUseCase';
-import type { IDeleteTranslationUseCase } from '../../../../../core/ports/inbound/translation/IDeleteTranslationUseCase';
-import type { IClearAllTranslationsUseCase } from '../../../../../core/ports/inbound/translation/IClearAllTranslationsUseCase';
+import type { IGetAllTranslationsUseCase } from '../../../../../core/ports/inbound/history/IGetAllTranslationsUseCase';
+import type { IDeleteTranslationUseCase } from '../../../../../core/ports/inbound/history/IDeleteTranslationUseCase';
+import type { IClearAllTranslationsUseCase } from '../../../../../core/ports/inbound/history/IClearAllTranslationsUseCase';
 
 const TRANSLATION_CONTEXT_KEY = Symbol('translation');
 
@@ -17,10 +17,12 @@ export function setTranslationContext(useCases: TranslationUseCases): void {
 
 export function getTranslationContext(): TranslationUseCases {
   const context = getContext<TranslationUseCases>(TRANSLATION_CONTEXT_KEY);
+
   if (!context) {
     throw new Error(
       'Translation context not found. Did you forget to call setTranslationContext?',
     );
   }
+
   return context;
 }

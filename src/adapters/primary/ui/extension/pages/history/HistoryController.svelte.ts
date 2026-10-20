@@ -38,15 +38,18 @@ export function createHistoryController() {
 
     if (state.timeFilter !== 'all') {
       const now = Date.now();
+
       const cutoff =
         state.timeFilter === '24h'
           ? now - 24 * 60 * 60 * 1000
           : now - 7 * 24 * 60 * 60 * 1000;
+
       items = items.filter((t) => t.createdAt.getTime() >= cutoff);
     }
 
     if (state.searchQuery.trim()) {
       const query = state.searchQuery.toLowerCase();
+
       items = items.filter((t) => {
         const matchOriginal = t.original.some(
           (seg) =>
@@ -56,6 +59,7 @@ export function createHistoryController() {
             (seg.romanization &&
               seg.romanization.toLowerCase().includes(query)),
         );
+
         const matchTranslated = t.translated.some(
           (seg) =>
             seg.text.toLowerCase().includes(query) ||
@@ -64,7 +68,9 @@ export function createHistoryController() {
             (seg.romanization &&
               seg.romanization.toLowerCase().includes(query)),
         );
+
         const matchDescription = t.description.toLowerCase().includes(query);
+
         return matchOriginal || matchTranslated || matchDescription;
       });
     }
@@ -75,12 +81,15 @@ export function createHistoryController() {
   async function load() {
     state.loading = true;
     state.error = null;
+
     const result = await ctx.getAllTranslations.execute();
+
     if (result.success) {
       state.translations = result.data;
     } else {
       state.error = 'Failed to load history';
     }
+
     state.loading = false;
   }
 
@@ -103,9 +112,11 @@ export function createHistoryController() {
     commitPendingDelete();
 
     const idx = state.translations.findIndex((t) => t.id === id);
+
     if (idx === -1) return;
 
     const removed = state.translations[idx];
+
     state.translations = state.translations.filter((t) => t.id !== id);
 
     const timer = setTimeout(() => {
@@ -119,8 +130,10 @@ export function createHistoryController() {
   function undoDelete() {
     if (!state.pendingDelete) return;
     clearTimeout(state.pendingDelete.timer);
+
     const { translation, index } = state.pendingDelete;
     const copy = [...state.translations];
+
     copy.splice(Math.min(index, copy.length), 0, translation);
     state.translations = copy;
     state.pendingDelete = null;

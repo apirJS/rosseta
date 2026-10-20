@@ -2,6 +2,7 @@
 export async function writeToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
+
     return true;
   } catch {
     return copyWithTextarea(text);
@@ -10,6 +11,7 @@ export async function writeToClipboard(text: string): Promise<boolean> {
 
 function copyWithTextarea(text: string): boolean {
   let textarea: HTMLTextAreaElement | undefined;
+
   try {
     textarea = document.createElement('textarea');
     textarea.value = text;
@@ -17,6 +19,7 @@ function copyWithTextarea(text: string): boolean {
     textarea.style.opacity = '0';
     document.body.appendChild(textarea);
     textarea.select();
+
     return document.execCommand('copy');
   } catch {
     return false;

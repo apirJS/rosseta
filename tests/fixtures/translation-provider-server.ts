@@ -1,8 +1,11 @@
 /* eslint-disable no-await-in-loop -- Fixture stream chunks are intentionally paced and ordered. */
 /** Deterministic, credential-free OpenAI/Anthropic fixture. Run with Bun; import its handler in SDK tests. */
 import { UNAVAILABLE_RESPONSE_FORMAT_ERROR } from './captured-provider-errors';
+
 type Protocol = 'openai' | 'anthropic';
+
 type JsonRecord = Record<string, unknown>;
+
 export interface FixtureRequest {
   protocol: Protocol;
   scenario: string;
@@ -112,6 +115,7 @@ function streaming(
 ): Response {
   const encoder = new TextEncoder();
   let cancelled = false;
+
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (event: string, value: unknown) => {
@@ -122,6 +126,7 @@ function streaming(
             ),
           );
       };
+
       try {
         if (protocol === 'anthropic') {
           send('message_start', {
@@ -136,17 +141,21 @@ function streaming(
               usage: { input_tokens: 1, output_tokens: 0 },
             },
           });
+
           send('content_block_start', {
             type: 'content_block_start',
             index: 0,
             content_block: { type: 'text', text: '' },
           });
         }
+
         for (let index = 0; index < text.length; index += 12) {
           if (cancelled) return;
           if (delayMs > 0)
             await new Promise((resolve) => setTimeout(resolve, delayMs));
+
           const chunk = text.slice(index, index + 12);
+
           send(
             'content_block_delta',
             protocol === 'anthropic'
@@ -169,14 +178,17 @@ function streaming(
                   ],
                 },
           );
+
           if (
             (scenario === 'in-band-error' || scenario === 'interruption') &&
             index > text.length / 2
           ) {
             if (scenario === 'interruption') {
               controller.error(new TypeError('network interrupted by fixture'));
+
               return;
             }
+
             send(
               'error',
               protocol === 'anthropic'
@@ -195,18 +207,24 @@ function streaming(
                     },
                   },
             );
+
             controller.close();
+
             return;
           }
         }
+
         if (cancelled) return;
+
         if (protocol === 'anthropic') {
           send('content_block_stop', { type: 'content_block_stop', index: 0 });
+
           send('message_delta', {
             type: 'message_delta',
             delta: { stop_reason: 'end_turn', stop_sequence: null },
             usage: { output_tokens: 1 },
           });
+
           send('message_stop', { type: 'message_stop' });
         } else {
           send('finish', {
@@ -216,8 +234,10 @@ function streaming(
             model,
             choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
           });
+
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         }
+
         controller.close();
       } catch (error) {
         if (!cancelled) controller.error(error);
@@ -227,6 +247,7 @@ function streaming(
       cancelled = true;
     },
   });
+
   return new Response(body, {
     headers: { ...cors, 'Content-Type': 'text/event-stream' },
   });
@@ -234,10 +255,12 @@ function streaming(
 
 export function createTranslationFixture(options: { delayMs?: number } = {}) {
   const requests: FixtureRequest[] = [];
+
   return {
     requests,
     async fetch(request: Request): Promise<Response> {
       const url = new URL(request.url);
+
       if (request.method === 'OPTIONS')
         return new Response(null, {
           status: 204,
@@ -248,14 +271,18 @@ export function createTranslationFixture(options: { delayMs?: number } = {}) {
           },
         });
       if (url.pathname === '/__requests') return json(requests);
+
       if (url.pathname === '/__reset' && request.method === 'POST') {
         requests.length = 0;
+
         return json({ success: true });
       }
+
       const match =
         /^\/(openai|anthropic)\/([a-z-]+)\/v1\/(models|chat\/completions|messages)$/.exec(
           url.pathname,
         );
+
       if (!match)
         return json(
           {
@@ -264,8 +291,10 @@ export function createTranslationFixture(options: { delayMs?: number } = {}) {
           },
           404,
         );
+
       const protocol = match[1] as Protocol;
       const scenario = match[2];
+
       if (match[3] === 'models')
         return json({
           data: [
@@ -280,20 +309,27 @@ export function createTranslationFixture(options: { delayMs?: number } = {}) {
           first_id: 'fixture-vision',
           last_id: 'fixture-vision',
         });
+
       let body: JsonRecord;
+
       try {
         body = object(await request.json());
       } catch {
         return json({ error: 'Invalid JSON request' }, 400);
       }
+
       const serialized = JSON.stringify(body);
       const streamed = body.stream === true;
+
       const structured =
         object(body.response_format).type === 'json_schema' ||
         object(object(body.output_config).format).type === 'json_schema';
+
       const repair = serialized.includes('untrusted_previous_response');
+
       const model =
         typeof body.model === 'string' ? body.model : 'fixture-vision';
+
       // Never retain headers, credentials, images or generated request text.
       requests.push({
         protocol,
@@ -305,6 +341,7 @@ export function createTranslationFixture(options: { delayMs?: number } = {}) {
         routingHeaderPresent: request.headers.has('x-fixture-route'),
         routingQueryPresent: url.searchParams.has('fixture-route'),
       });
+
       if (scenario === 'no-vision')
         return unsupported(protocol, 'This model does not support image input');
       if (scenario === 'unavailable-response-format' && structured)
@@ -329,15 +366,18 @@ export function createTranslationFixture(options: { delayMs?: number } = {}) {
         return unsupported(protocol, 'Structured streaming is not supported');
       if (scenario === 'slow-headers')
         await new Promise((resolve) => setTimeout(resolve, 65000));
+
       const includeDescription = !serialized.includes(
         'Omit the description field entirely.',
       );
+
       const text =
         scenario === 'no-text'
           ? '{"success":false,"error":"NO_TEXT_FOUND","data":null}'
           : scenario === 'malformed-repair' && !repair
             ? '{"success":true,"data":{"segments":['
             : JSON.stringify(paired(includeDescription));
+
       return streamed
         ? streaming(
             protocol,
@@ -353,12 +393,14 @@ export function createTranslationFixture(options: { delayMs?: number } = {}) {
 
 if (import.meta.main) {
   const fixture = createTranslationFixture();
+
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: Number(Bun.env.PORT ?? 8787),
     idleTimeout: 120,
     fetch: (request) => fixture.fetch(request),
   });
+
   console.info(
     `Translation fixtures ready at ${server.url}. Request metadata: /__requests`,
   );

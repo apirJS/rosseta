@@ -7,6 +7,7 @@ export class AuthError extends AppError {
       ...options,
       code: options.code ?? ErrorCode.AUTH_NOT_AUTHENTICATED,
     });
+
     this.name = 'AuthError';
   }
 

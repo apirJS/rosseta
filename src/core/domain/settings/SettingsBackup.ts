@@ -1,10 +1,7 @@
 import type { ThemeValue } from '../preferences/Theme';
 import type { LanguageCode } from '../translation/Language';
 import { Language } from '../translation/Language';
-import {
-  Translation,
-  type TranslationProps,
-} from '../translation/Translation';
+import { Translation, type TranslationProps } from '../translation/Translation';
 import { TextSegment } from '../translation/TextSegment';
 import { UserPreferences } from '../preferences/UserPreferences';
 import {
@@ -76,6 +73,7 @@ function asRecord(
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return failure(new DomainError(`${label} must be an object`));
   }
+
   return success(value as Record<string, unknown>);
 }
 
@@ -84,15 +82,19 @@ function asStringRecord(
   label: string,
 ): Result<Record<string, string>, DomainError> {
   const recordResult = asRecord(value, label);
+
   if (!recordResult.success) return recordResult;
 
   const output: Record<string, string> = {};
+
   for (const [key, entry] of Object.entries(recordResult.data)) {
     if (typeof entry !== 'string') {
       return failure(new DomainError(`${label}.${key} must be a string`));
     }
+
     output[key] = entry;
   }
+
   return success(output);
 }
 
@@ -101,6 +103,7 @@ function optionalStringRecord(
   label: string,
 ): Result<Record<string, string> | undefined, DomainError> {
   if (value === undefined) return success(undefined);
+
   return asStringRecord(value, label);
 }
 
@@ -113,10 +116,14 @@ function parseSegments(
   }
 
   const segments: TextSegment[] = [];
+
   for (const [index, entry] of value.entries()) {
     const recordResult = asRecord(entry, `${label}[${index}]`);
+
     if (!recordResult.success) return recordResult;
+
     const record = recordResult.data;
+
     if (
       typeof record.text !== 'string' ||
       typeof record.languageCode !== 'string' ||
@@ -131,13 +138,16 @@ function parseSegments(
     }
 
     const languageResult = Language.fromRaw(record.languageCode);
+
     if (!languageResult.success) return failure(languageResult.error);
+
     const segmentResult = TextSegment.create(
       record.text,
       languageResult.data,
       record.romanization,
       record.blockIndex,
     );
+
     if (!segmentResult.success) return failure(segmentResult.error);
     segments.push(segmentResult.data);
   }
@@ -149,7 +159,9 @@ export function parseSettingsBackup(
   raw: unknown,
 ): Result<ValidatedSettingsBackup, DomainError> {
   const rootResult = asRecord(raw, 'Settings file');
+
   if (!rootResult.success) return rootResult;
+
   const root = rootResult.data;
 
   if (root.format !== 'rosseta-settings' || root.version !== 1) {
@@ -159,18 +171,25 @@ export function parseSettingsBackup(
   }
 
   const settingsResult = asRecord(root.settings, 'settings');
+
   if (!settingsResult.success) return settingsResult;
+
   const settings = settingsResult.data;
 
   if (!Array.isArray(settings.customProviders)) {
     return failure(new DomainError('customProviders must be an array'));
   }
+
   const customProviders: CustomProviderConfig[] = [];
   const customProviderIds = new Set<string>();
+
   for (const [index, entry] of settings.customProviders.entries()) {
     const recordResult = asRecord(entry, `customProviders[${index}]`);
+
     if (!recordResult.success) return recordResult;
+
     const record = recordResult.data;
+
     if (
       typeof record.id !== 'string' ||
       typeof record.name !== 'string' ||
@@ -185,6 +204,7 @@ export function parseSettingsBackup(
 
     const customProviderType =
       record.type === undefined ? undefined : record.type;
+
     if (
       customProviderType !== undefined &&
       customProviderType !== 'openai-compatible' &&
@@ -199,11 +219,14 @@ export function parseSettingsBackup(
       record.headers,
       `customProviders[${index}].headers`,
     );
+
     if (!headersResult.success) return headersResult;
+
     const queryParamsResult = optionalStringRecord(
       record.queryParams,
       `customProviders[${index}].queryParams`,
     );
+
     if (!queryParamsResult.success) return queryParamsResult;
 
     const configResult = CustomProviderConfig.create({
@@ -214,12 +237,15 @@ export function parseSettingsBackup(
       headers: headersResult.data,
       queryParams: queryParamsResult.data,
     });
+
     if (!configResult.success) return failure(configResult.error);
+
     if (customProviderIds.has(configResult.data.id)) {
       return failure(
         new DomainError(`Duplicate custom provider: ${configResult.data.id}`),
       );
     }
+
     customProviderIds.add(configResult.data.id);
     customProviders.push(configResult.data);
   }
@@ -229,17 +255,23 @@ export function parseSettingsBackup(
   if (!Array.isArray(settings.apiKeys)) {
     return failure(new DomainError('apiKeys must be an array'));
   }
+
   const credentialItems: Array<{
     id: string;
     type: 'API_KEY';
     provider: AnyProvider;
     apiKey: string;
   }> = [];
+
   const credentialIds = new Set<string>();
+
   for (const [index, entry] of settings.apiKeys.entries()) {
     const recordResult = asRecord(entry, `apiKeys[${index}]`);
+
     if (!recordResult.success) return recordResult;
+
     const record = recordResult.data;
+
     if (
       typeof record.id !== 'string' ||
       typeof record.provider !== 'string' ||
@@ -251,13 +283,17 @@ export function parseSettingsBackup(
         ),
       );
     }
+
     if (!providerIds.has(record.provider) || !isAnyProvider(record.provider)) {
       continue;
     }
+
     if (credentialIds.has(record.id)) {
       return failure(new DomainError(`Duplicate API key id: ${record.id}`));
     }
+
     credentialIds.add(record.id);
+
     credentialItems.push({
       id: record.id,
       type: 'API_KEY',
@@ -272,31 +308,40 @@ export function parseSettingsBackup(
   ) {
     return failure(new DomainError('activeKeyId must be a string or null'));
   }
+
   const activeKeyId =
     typeof settings.activeKeyId === 'string' &&
     credentialIds.has(settings.activeKeyId)
       ? settings.activeKeyId
       : null;
+
   const credentialsResult = Credentials.fromProps({
     id: 'settings-import',
     activeCredentialId: activeKeyId,
     items: credentialItems,
   });
+
   if (!credentialsResult.success) return failure(credentialsResult.error);
 
   const preferencesResult = asRecord(settings.preferences, 'preferences');
+
   if (!preferencesResult.success) return preferencesResult;
+
   const preferencesRaw = preferencesResult.data;
+
   const selectedModelsResult = asStringRecord(
     preferencesRaw.selectedModels,
     'preferences.selectedModels',
   );
+
   if (!selectedModelsResult.success) return selectedModelsResult;
+
   const selectedModels = Object.fromEntries(
     Object.entries(selectedModelsResult.data).filter(([provider]) =>
       providerIds.has(provider),
     ),
   );
+
   if (
     typeof preferencesRaw.theme !== 'string' ||
     typeof preferencesRaw.targetLanguage !== 'string' ||
@@ -308,6 +353,7 @@ export function parseSettingsBackup(
       ),
     );
   }
+
   const userPreferencesResult = UserPreferences.fromRaw({
     id: 'settings-import',
     theme: preferencesRaw.theme,
@@ -315,10 +361,13 @@ export function parseSettingsBackup(
     selectedModels,
     includeDescription: preferencesRaw.includeDescription,
   });
+
   if (!userPreferencesResult.success) {
     return failure(userPreferencesResult.error);
   }
+
   const preferencesProps = userPreferencesResult.data.toProps();
+
   const preferences: SettingsPreferences = {
     theme: preferencesProps.theme,
     targetLanguage: preferencesProps.targetLanguage,
@@ -327,20 +376,29 @@ export function parseSettingsBackup(
   };
 
   const modelsResult = asRecord(settings.models, 'models');
+
   if (!modelsResult.success) return modelsResult;
+
   const models: Record<string, SettingsModel[]> = {};
+
   for (const [provider, entries] of Object.entries(modelsResult.data)) {
     if (!providerIds.has(provider)) {
       continue;
     }
+
     if (!Array.isArray(entries)) {
       return failure(new DomainError(`models.${provider} must be an array`));
     }
+
     models[provider] = [];
+
     for (const [index, entry] of entries.entries()) {
       const recordResult = asRecord(entry, `models.${provider}[${index}]`);
+
       if (!recordResult.success) return recordResult;
+
       const record = recordResult.data;
+
       if (
         typeof record.id !== 'string' ||
         !record.id.trim() ||
@@ -352,6 +410,7 @@ export function parseSettingsBackup(
           new DomainError(`Invalid model at models.${provider}[${index}]`),
         );
       }
+
       models[provider].push({
         id: record.id.trim(),
         name: record.name.trim(),
@@ -361,23 +420,32 @@ export function parseSettingsBackup(
   }
 
   const historyRaw = settings.history ?? [];
+
   if (!Array.isArray(historyRaw)) {
     return failure(new DomainError('history must be an array'));
   }
+
   const history: Translation[] = [];
   const historyIds = new Set<string>();
+
   for (const [index, entry] of historyRaw.entries()) {
     const recordResult = asRecord(entry, `history[${index}]`);
+
     if (!recordResult.success) return recordResult;
+
     const record = recordResult.data;
+
     if (
       typeof record.id !== 'string' ||
       !record.id.trim() ||
       typeof record.description !== 'string' ||
       typeof record.createdAt !== 'string'
     ) {
-      return failure(new DomainError(`Invalid translation at history[${index}]`));
+      return failure(
+        new DomainError(`Invalid translation at history[${index}]`),
+      );
     }
+
     if (historyIds.has(record.id)) {
       return failure(new DomainError(`Duplicate translation id: ${record.id}`));
     }
@@ -386,20 +454,24 @@ export function parseSettingsBackup(
       record.original,
       `history[${index}].original`,
     );
+
     if (!originalResult.success) return originalResult;
+
     const translatedResult = parseSegments(
       record.translated,
       `history[${index}].translated`,
     );
+
     if (!translatedResult.success) return translatedResult;
+
     const createdAt = new Date(record.createdAt);
+
     if (Number.isNaN(createdAt.getTime())) {
-      return failure(
-        new DomainError(`Invalid createdAt at history[${index}]`),
-      );
+      return failure(new DomainError(`Invalid createdAt at history[${index}]`));
     }
 
     historyIds.add(record.id);
+
     history.push(
       Translation.create(
         record.id,
@@ -411,17 +483,20 @@ export function parseSettingsBackup(
     );
   }
 
-  const keySelectionResult = asRecord(
-    settings.keySelection,
-    'keySelection',
-  );
+  const keySelectionResult = asRecord(settings.keySelection, 'keySelection');
+
   if (!keySelectionResult.success) return keySelectionResult;
+
   if (typeof keySelectionResult.data.mode !== 'string') {
     return failure(new DomainError('keySelection.mode must be a string'));
   }
+
   const modeResult = KeySelectionMode.fromRaw(keySelectionResult.data.mode);
+
   if (!modeResult.success) return failure(modeResult.error);
+
   const autoProvider = modeResult.data.autoBalanceProvider;
+
   const keySelectionMode =
     autoProvider &&
     providerIds.has(autoProvider) &&
@@ -433,13 +508,18 @@ export function parseSettingsBackup(
     keySelectionResult.data.lastUsedKeyIds,
     'keySelection.lastUsedKeyIds',
   );
+
   if (!lastUsedResult.success) return lastUsedResult;
+
   const lastUsedKeyIds: Record<string, string> = {};
+
   for (const [provider, credentialId] of Object.entries(lastUsedResult.data)) {
     if (!providerIds.has(provider)) continue;
+
     const credential = credentialsResult.data.items.find(
       (candidate) => candidate.id === credentialId,
     );
+
     if (!credential || credential.provider !== provider) continue;
     lastUsedKeyIds[provider] = credentialId;
   }
@@ -459,5 +539,6 @@ function toAnyProvider(value: string): AnyProvider {
   if (!isAnyProvider(value)) {
     throw new Error(`Unknown provider: ${value}`);
   }
+
   return value;
 }

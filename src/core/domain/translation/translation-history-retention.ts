@@ -6,5 +6,8 @@ export function isWithinHistoryRetention(
   now: number,
 ): boolean {
   const createdAtMs = createdAt.getTime();
-  return Number.isFinite(createdAtMs) && createdAtMs >= now - HISTORY_RETENTION_MS;
+
+  return (
+    Number.isFinite(createdAtMs) && createdAtMs >= now - HISTORY_RETENTION_MS
+  );
 }

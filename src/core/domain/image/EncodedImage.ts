@@ -15,13 +15,19 @@ export class EncodedImage extends ValueObject {
   }
 
   public get mimeType(): string {
-    const match = this.encodedValue.match(/^data:(image\/[a-zA-Z0-9+-]+);base64,/);
+    const match = this.encodedValue.match(
+      /^data:(image\/[a-zA-Z0-9+-]+);base64,/,
+    );
+
     return match?.[1] ?? 'image/png';
   }
 
   public get base64Data(): string {
     const commaIndex = this.encodedValue.indexOf(',');
-    return commaIndex >= 0 ? this.encodedValue.slice(commaIndex + 1) : this.encodedValue;
+
+    return commaIndex >= 0
+      ? this.encodedValue.slice(commaIndex + 1)
+      : this.encodedValue;
   }
 
   public static create(value: string): Result<EncodedImage, DomainError> {

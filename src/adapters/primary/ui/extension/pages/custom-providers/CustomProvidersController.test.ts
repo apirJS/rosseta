@@ -21,18 +21,22 @@ function makeConfig(
     headers: overrides.headers,
     queryParams: overrides.queryParams,
   });
+
   if (!result.success) throw new Error('bad config');
+
   return result.data;
 }
 
 function createToastFake() {
   const show = vi.fn();
+
   const toast = {
     show,
     dismiss: vi.fn(),
     update: vi.fn(),
     toasts: [],
   } as unknown as PopupToastController;
+
   return { toast, show };
 }
 
@@ -42,9 +46,11 @@ function createDeps(overrides: Partial<CustomProvidersDeps> = {}) {
 
   const deps: CustomProvidersDeps = {
     providers: () => providers,
-    save: vi.fn().mockImplementation(async (props) =>
-      success(makeConfig({ ...props, id: props.id || 'custom-saved' })),
-    ),
+    save: vi
+      .fn()
+      .mockImplementation(async (props) =>
+        success(makeConfig({ ...props, id: props.id || 'custom-saved' })),
+      ),
     remove: vi.fn().mockResolvedValue(success(undefined)),
     refresh: vi.fn().mockResolvedValue(undefined),
     toast,
@@ -83,6 +89,7 @@ describe('UI Controller: CustomProvidersController', () => {
   test('showEdit populates the form from the provider', () => {
     const { deps } = createDeps();
     const controller = createCustomProvidersController(deps);
+
     const provider = makeConfig({
       headers: { 'X-Test': 'value' },
     });
@@ -112,12 +119,14 @@ describe('UI Controller: CustomProvidersController', () => {
         baseURL: 'https://api.example.com/v1',
       }),
     );
+
     expect(controller.state.view).toBe('list');
   });
 
   test('save keeps the editing id when updating', async () => {
     const { deps } = createDeps();
     const controller = createCustomProvidersController(deps);
+
     controller.showEdit(makeConfig());
 
     controller.state.name = 'Renamed';
@@ -159,10 +168,13 @@ describe('UI Controller: CustomProvidersController', () => {
 
   test('save shows an error toast and stays on the form on failure', async () => {
     const { deps, show } = createDeps({
-      save: vi.fn().mockResolvedValue(
-        failure(StorageError.writeFailed('customProviders')),
-      ),
+      save: vi
+        .fn()
+        .mockResolvedValue(
+          failure(StorageError.writeFailed('customProviders')),
+        ),
     });
+
     const controller = createCustomProvidersController(deps);
 
     controller.showCreate();
@@ -177,6 +189,7 @@ describe('UI Controller: CustomProvidersController', () => {
         description: 'Could not save data.',
       }),
     );
+
     expect(controller.state.view).toBe('form');
   });
 
@@ -188,6 +201,7 @@ describe('UI Controller: CustomProvidersController', () => {
 
     expect(deps.remove).toHaveBeenCalledWith('custom-test-1');
     expect(deps.refresh).toHaveBeenCalledOnce();
+
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'success', message: 'Provider removed' }),
     );
@@ -196,6 +210,7 @@ describe('UI Controller: CustomProvidersController', () => {
   test('remove returns to the list when removing the edited provider', async () => {
     const { deps } = createDeps();
     const controller = createCustomProvidersController(deps);
+
     controller.showEdit(makeConfig());
 
     await controller.remove('custom-test-1');
@@ -205,18 +220,23 @@ describe('UI Controller: CustomProvidersController', () => {
 
   test('refreshes potentially changed snapshots without reporting success when provider removal fails', async () => {
     const { deps, show } = createDeps({
-      remove: vi.fn().mockResolvedValue(
-        failure(StorageError.writeFailed('customProviders')),
-      ),
+      remove: vi
+        .fn()
+        .mockResolvedValue(
+          failure(StorageError.writeFailed('customProviders')),
+        ),
     });
+
     const controller = createCustomProvidersController(deps);
 
     await controller.remove('custom-test-1');
 
     expect(deps.refresh).toHaveBeenCalledOnce();
+
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'error' }),
     );
+
     expect(show).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'success' }),
     );

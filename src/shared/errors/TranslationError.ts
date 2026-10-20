@@ -7,6 +7,7 @@ export class TranslationError extends AppError {
       ...options,
       code: options.code ?? ErrorCode.TRANSLATION_FAILED,
     });
+
     this.name = 'TranslationError';
   }
 
@@ -58,10 +59,12 @@ export class TranslationError extends AppError {
 
   public static aiRejected(reason: string): TranslationError {
     const noText = /NO_TEXT_FOUND/i.test(reason);
+
     const blocked =
       /(?:content|safety|moderation).{0,30}(?:blocked|policy|filter)/i.test(
         reason,
       );
+
     return new TranslationError({
       code: ErrorCode.TRANSLATION_AI_REJECTED,
       userMessage: noText

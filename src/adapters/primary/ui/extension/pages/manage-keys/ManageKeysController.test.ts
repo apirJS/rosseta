@@ -12,22 +12,32 @@ import { success } from '../../../../../../shared/types/Result';
 import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
 import { AuthState } from '../../../shared/hooks/useAuth.svelte';
 
-function makeCredential(id: string, rawKey: string, provider: 'google' | 'groq') {
+function makeCredential(
+  id: string,
+  rawKey: string,
+  provider: 'google' | 'groq',
+) {
   const apiKey = ApiKey.createWithProvider(rawKey, provider);
+
   if (!apiKey.success) throw new Error('bad key');
+
   const cred = Credential.create(id, apiKey.data, provider);
+
   if (!cred.success) throw new Error('bad cred');
+
   return cred.data;
 }
 
 function createToastFake() {
   const show = vi.fn();
+
   const toast = {
     show,
     dismiss: vi.fn(),
     update: vi.fn(),
     toasts: [],
   } as unknown as PopupToastController;
+
   return { toast, show };
 }
 
@@ -46,11 +56,13 @@ function createDeps(overrides: Partial<ManageKeysDeps> = {}) {
     currentKeySelectionMode: () => KeySelectionMode.manual(),
     setKeySelectionMode: vi.fn().mockResolvedValue(null),
     modelsFor: vi.fn().mockReturnValue([]),
-    fetchModels: vi.fn().mockResolvedValue(
-      success<StoredModel[]>([
-        { id: 'm1', name: 'Model 1', source: 'fetched' },
-      ]),
-    ),
+    fetchModels: vi
+      .fn()
+      .mockResolvedValue(
+        success<StoredModel[]>([
+          { id: 'm1', name: 'Model 1', source: 'fetched' },
+        ]),
+      ),
     clearAllModels: vi.fn().mockResolvedValue(undefined),
     toast,
     ...overrides,
@@ -65,7 +77,11 @@ function flush(): Promise<unknown> {
 
 function deferred() {
   let resolve!: () => void;
-  const promise = new Promise<void>(release => { resolve = release; });
+
+  const promise = new Promise<void>((release) => {
+    resolve = release;
+  });
+
   return { promise, resolve };
 }
 
@@ -90,6 +106,7 @@ describe('UI Controller: ManageKeysController', () => {
   test('setProvider resets the key input', () => {
     const { deps } = createDeps();
     const controller = createManageKeysController(deps);
+
     controller.state.keyInput = 'pending-key';
 
     controller.setProvider('groq');
@@ -110,11 +127,13 @@ describe('UI Controller: ManageKeysController', () => {
   test('addApiKey duplicate shows an error toast', async () => {
     const { deps, show } = createDeps();
     const controller = createManageKeysController(deps);
+
     controller.state.keyInput = 'AIzaGoogleKeyValue123';
 
     await controller.addApiKey();
 
     expect(deps.addApiKey).not.toHaveBeenCalled();
+
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'error', message: 'Key already added' }),
     );
@@ -123,6 +142,7 @@ describe('UI Controller: ManageKeysController', () => {
   test('addApiKey success clears the input and toasts', async () => {
     const { deps, show } = createDeps();
     const controller = createManageKeysController(deps);
+
     controller.state.selectedProvider = 'groq';
     controller.state.keyInput = 'gsk_new_key_value';
 
@@ -130,6 +150,7 @@ describe('UI Controller: ManageKeysController', () => {
 
     expect(deps.addApiKey).toHaveBeenCalledWith('gsk_new_key_value', 'groq');
     expect(controller.state.keyInput).toBe('');
+
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'success', message: 'API key added' }),
     );
@@ -139,7 +160,9 @@ describe('UI Controller: ManageKeysController', () => {
     const { deps, show } = createDeps({
       addApiKey: vi.fn().mockResolvedValue('Storage is full'),
     });
+
     const controller = createManageKeysController(deps);
+
     controller.state.keyInput = 'gsk_new_key_value';
 
     await controller.addApiKey();
@@ -151,12 +174,14 @@ describe('UI Controller: ManageKeysController', () => {
         description: 'Storage is full',
       }),
     );
+
     expect(controller.state.keyInput).toBe('gsk_new_key_value');
   });
 
   test('addApiKey auto-fetches models when the provider has none stored', async () => {
     const { deps } = createDeps();
     const controller = createManageKeysController(deps);
+
     controller.state.selectedProvider = 'groq';
     controller.state.keyInput = 'gsk_new_key_value';
 
@@ -167,11 +192,13 @@ describe('UI Controller: ManageKeysController', () => {
 
   test('addApiKey skips auto-fetch when models are already stored', async () => {
     const { deps } = createDeps({
-      modelsFor: vi.fn().mockReturnValue([
-        { id: 'm1', name: 'Model 1', source: 'fetched' },
-      ]),
+      modelsFor: vi
+        .fn()
+        .mockReturnValue([{ id: 'm1', name: 'Model 1', source: 'fetched' }]),
     });
+
     const controller = createManageKeysController(deps);
+
     controller.state.keyInput = 'gsk_new_key_value';
 
     await controller.addApiKey();
@@ -259,19 +286,25 @@ describe('UI Controller: ManageKeysController', () => {
 
     test('undo restores only the latest key while the previous deletion remains hidden until saved', async () => {
       const state = new AuthState();
+
       state.credentials = Credentials.createEmpty('creds-1')
         .add(makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'))
         .add(makeCredential('g2', 'AIzaSecondGoogleKey123', 'google'));
+
       const saving = deferred();
+
       const { deps } = createDeps({
         credentials: () => state.credentials,
-        removeApiKey: vi.fn().mockImplementation(async id => {
+        removeApiKey: vi.fn().mockImplementation(async (id) => {
           await saving.promise;
           state.credentials = state.credentials!.remove(id);
+
           return null;
         }),
       });
+
       const controller = createManageKeysController(deps);
+
       controller.requestDelete('g1');
       controller.requestDelete('g2');
       expect(controller.visibleKeys).toHaveLength(0);
@@ -280,36 +313,48 @@ describe('UI Controller: ManageKeysController', () => {
       controller.requestDelete('g1');
       expect(controller.state.pendingDeleteId).toBe('g2');
       controller.cancelPendingDelete();
-      expect(controller.visibleKeys.map(key => key.id)).toEqual(['g2']);
+      expect(controller.visibleKeys.map((key) => key.id)).toEqual(['g2']);
       saving.resolve();
       await controller.commitPendingDelete();
       await vi.advanceTimersByTimeAsync(6000);
 
       expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([['g1']]);
-      expect(controller.visibleKeys.map(key => key.id)).toEqual(['g2']);
+      expect(controller.visibleKeys.map((key) => key.id)).toEqual(['g2']);
     });
 
     test('serializes three rapid deletions and drains queued work once when leaving the page', async () => {
       const state = new AuthState();
+
       state.credentials = Credentials.createEmpty('creds-1')
         .add(makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'))
         .add(makeCredential('g2', 'AIzaSecondGoogleKey123', 'google'))
         .add(makeCredential('g3', 'AIzaThirdGoogleKey123', 'google'));
+
       const release = new Map<string, () => void>();
+
       const { deps } = createDeps({
         credentials: () => state.credentials,
-        removeApiKey: vi.fn().mockImplementation(async id => {
+        removeApiKey: vi.fn().mockImplementation(async (id) => {
           const snapshot = state.credentials!;
-          await new Promise<void>(resolve => { release.set(id, resolve); });
+
+          await new Promise<void>((resolve) => {
+            release.set(id, resolve);
+          });
+
           state.credentials = snapshot.remove(id);
+
           return null;
         }),
       });
+
       const controller = createManageKeysController(deps);
+
       controller.requestDelete('g1');
       controller.requestDelete('g2');
       controller.requestDelete('g3');
+
       const saved = controller.commitPendingDelete();
+
       controller.destroy();
       expect(controller.visibleKeys).toHaveLength(0);
 
@@ -321,7 +366,13 @@ describe('UI Controller: ManageKeysController', () => {
       expect(controller.visibleKeys).toHaveLength(0);
       release.get('g2')!();
       await vi.advanceTimersByTimeAsync(0);
-      expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([['g1'], ['g2'], ['g3']]);
+
+      expect(vi.mocked(deps.removeApiKey).mock.calls).toEqual([
+        ['g1'],
+        ['g2'],
+        ['g3'],
+      ]);
+
       release.get('g3')!();
       await saved;
 
@@ -331,36 +382,57 @@ describe('UI Controller: ManageKeysController', () => {
       expect(vi.getTimerCount()).toBe(0);
     });
 
-    test.each(['returned', 'thrown'])('restores a failed deletion and keeps later deletions working after a %s error', async kind => {
-      const state = new AuthState();
-      state.credentials = Credentials.createEmpty('creds-1')
-        .add(makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'))
-        .add(makeCredential('g2', 'AIzaSecondGoogleKey123', 'google'));
-      const removeApiKey = vi.fn().mockImplementation(async id => {
-        state.credentials = state.credentials!.remove(id);
-        return null;
-      });
-      if (kind === 'returned') removeApiKey.mockResolvedValueOnce('Storage is full');
-      else removeApiKey.mockRejectedValueOnce(new Error('Storage is full'));
-      const { deps, show } = createDeps({ credentials: () => state.credentials, removeApiKey });
-      const controller = createManageKeysController(deps);
-      controller.requestDelete('g1');
-      controller.requestDelete('g2');
-      await controller.commitPendingDelete();
+    test.each(['returned', 'thrown'])(
+      'restores a failed deletion and keeps later deletions working after a %s error',
+      async (kind) => {
+        const state = new AuthState();
 
-      expect(removeApiKey.mock.calls).toEqual([['g1'], ['g2']]);
-      expect(controller.visibleKeys.map(key => key.id)).toEqual(['g1']);
-      expect(show).toHaveBeenCalledWith(expect.objectContaining({
-        type: 'error', message: 'Could not delete key', description: 'Storage is full',
-      }));
-      controller.requestDelete('g1');
-      await controller.commitPendingDelete();
-      expect(state.credentials.items).toHaveLength(0);
-    });
+        state.credentials = Credentials.createEmpty('creds-1')
+          .add(makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'))
+          .add(makeCredential('g2', 'AIzaSecondGoogleKey123', 'google'));
+
+        const removeApiKey = vi.fn().mockImplementation(async (id) => {
+          state.credentials = state.credentials!.remove(id);
+
+          return null;
+        });
+
+        if (kind === 'returned')
+          removeApiKey.mockResolvedValueOnce('Storage is full');
+        else removeApiKey.mockRejectedValueOnce(new Error('Storage is full'));
+
+        const { deps, show } = createDeps({
+          credentials: () => state.credentials,
+          removeApiKey,
+        });
+
+        const controller = createManageKeysController(deps);
+
+        controller.requestDelete('g1');
+        controller.requestDelete('g2');
+        await controller.commitPendingDelete();
+
+        expect(removeApiKey.mock.calls).toEqual([['g1'], ['g2']]);
+        expect(controller.visibleKeys.map((key) => key.id)).toEqual(['g1']);
+
+        expect(show).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'error',
+            message: 'Could not delete key',
+            description: 'Storage is full',
+          }),
+        );
+
+        controller.requestDelete('g1');
+        await controller.commitPendingDelete();
+        expect(state.credentials.items).toHaveLength(0);
+      },
+    );
 
     test('a duplicate pending deletion keeps the original undo window and only removes once', async () => {
       const { deps } = createDeps();
       const controller = createManageKeysController(deps);
+
       controller.requestDelete('g1');
       await vi.advanceTimersByTimeAsync(3000);
       controller.requestDelete('g1');
@@ -385,13 +457,16 @@ describe('UI Controller: ManageKeysController', () => {
       let live = Credentials.createEmpty('creds-1').add(
         makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'),
       );
+
       const { deps } = createDeps({
         credentials: () => live,
         removeApiKey: vi.fn().mockImplementation(async () => {
           live = Credentials.createEmpty('creds-1');
+
           return null;
         }),
       });
+
       const controller = createManageKeysController(deps);
 
       controller.requestDelete('g1');
@@ -428,16 +503,19 @@ describe('UI Controller: ManageKeysController', () => {
       const { deps } = createDeps({
         currentKeySelectionMode: () => KeySelectionMode.autoBalance('groq'),
       });
+
       const controller = createManageKeysController(deps);
 
       controller.setActiveKey(
         makeCredential('q1', 'gsk_groqKeyValue123', 'groq'),
       );
+
       await flush();
 
       expect(deps.setKeySelectionMode).toHaveBeenCalledWith(
         KeySelectionMode.manual(),
       );
+
       expect(deps.setActiveKey).toHaveBeenCalledWith('q1');
     });
 
@@ -448,6 +526,7 @@ describe('UI Controller: ManageKeysController', () => {
       controller.setActiveKey(
         makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'),
       );
+
       await flush();
 
       expect(deps.setKeySelectionMode).not.toHaveBeenCalled();
@@ -459,14 +538,17 @@ describe('UI Controller: ManageKeysController', () => {
         currentKeySelectionMode: () => KeySelectionMode.autoBalance('groq'),
         setKeySelectionMode: vi.fn().mockResolvedValue('Storage is full'),
       });
+
       const controller = createManageKeysController(deps);
 
       controller.setActiveKey(
         makeCredential('q1', 'gsk_groqKeyValue123', 'groq'),
       );
+
       await flush();
 
       expect(deps.setActiveKey).not.toHaveBeenCalled();
+
       expect(show).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'error',
@@ -479,11 +561,13 @@ describe('UI Controller: ManageKeysController', () => {
       const { deps, show } = createDeps({
         setActiveKey: vi.fn().mockResolvedValue('Credential not found'),
       });
+
       const controller = createManageKeysController(deps);
 
       controller.setActiveKey(
         makeCredential('g1', 'AIzaGoogleKeyValue123', 'google'),
       );
+
       await flush();
 
       expect(show).toHaveBeenCalledWith(

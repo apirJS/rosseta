@@ -7,6 +7,7 @@ export class ValidationError extends AppError {
       ...options,
       code: options.code ?? ErrorCode.VALIDATION_INVALID_INPUT,
     });
+
     this.name = 'ValidationError';
   }
 

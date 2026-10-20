@@ -7,7 +7,8 @@ import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySe
 import type { Credential } from '../../../../../../core/domain/credential/Credential';
 import type { Credentials } from '../../../../../../core/domain/credential/Credentials';
 import { isCustomProviderId } from '../../../../../../core/domain/provider/CustomProviderConfig';
-import { ProviderRegistry } from '../../../../../../core/domain/provider/ProviderRegistry';
+import { getProviderDefaultModelId } from '../../../../../../core/domain/provider/provider-definitions';
+import { resolveModelId } from '../../../../../../core/domain/preferences/model-selection';
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
 
@@ -58,12 +59,15 @@ export function createMainPageController(deps: MainPageDeps) {
    */
   const effectiveAutoBalanceProvider = $derived.by(() => {
     const mode = deps.auth.state.keySelectionMode;
+
     if (!mode.isAutoBalance) return null;
 
     const provider = mode.autoBalanceProvider;
+
     if (!provider) return null;
 
     const keys = deps.auth.state.credentials?.getByProvider(provider) ?? [];
+
     return keys.length >= 2 ? provider : null;
   });
 
@@ -98,14 +102,15 @@ export function createMainPageController(deps: MainPageDeps) {
   const providerModels = $derived(deps.models.modelsFor(effectiveProvider));
 
   const effectiveModelId = $derived.by(() => {
-    const saved = deps.preferences.state.selectedModels[effectiveProvider];
-    if (saved && providerModels.some((m) => m.id === saved)) return saved;
+    // The popup requires a catalog entry before enabling translation. A
+    // background request may still use a saved/default ID without a catalog.
+    if (providerModels.length === 0) return '';
 
-    const defaultId = ProviderRegistry.getDefaultModelId(effectiveProvider);
-    if (defaultId && providerModels.some((m) => m.id === defaultId)) {
-      return defaultId;
-    }
-    return providerModels[0]?.id ?? '';
+    return resolveModelId({
+      savedModelId: deps.preferences.state.selectedModels[effectiveProvider],
+      defaultModelId: getProviderDefaultModelId(effectiveProvider),
+      availableModels: providerModels,
+    });
   });
 
   const canTranslate = $derived(
@@ -114,6 +119,7 @@ export function createMainPageController(deps: MainPageDeps) {
 
   $effect(() => {
     if (!canTranslate) return;
+
     if (
       deps.preferences.state.selectedModels[effectiveProvider] !==
       effectiveModelId
@@ -127,9 +133,11 @@ export function createMainPageController(deps: MainPageDeps) {
 
   $effect(() => {
     const credentials = deps.auth.state.credentials;
+
     if (!credentials) return;
 
     const keys = credentials.getByProvider(effectiveProvider);
+
     if (keys.length === 0) return;
 
     // Only skip the active-key sync while auto-balance is genuinely rotating;
@@ -137,10 +145,12 @@ export function createMainPageController(deps: MainPageDeps) {
     if (effectiveAutoBalanceProvider === effectiveProvider) return;
 
     const active = credentials.getActive();
+
     if (active && active.provider === effectiveProvider) return;
 
     void deps.auth.setActiveKey(keys[0].id);
   });
+
   $effect(() => {
     if (isMissingCustomProvider(selectedOrActiveProvider)) {
       providerSelection.selectedProvider = 'deepseek';
@@ -150,6 +160,7 @@ export function createMainPageController(deps: MainPageDeps) {
   function revertProviderSelection(previous: AnyProvider, error: string) {
     providerSelection.selectedProvider =
       previous === activeProvider ? null : previous;
+
     deps.toast.show({
       type: 'error',
       message: 'Could not switch provider',
@@ -161,23 +172,28 @@ export function createMainPageController(deps: MainPageDeps) {
     if (!isAnyProvider(newValue) || newValue === effectiveProvider) return;
 
     const previous = effectiveProvider;
+
     providerSelection.selectedProvider = newValue;
 
     const candidates =
       deps.auth.state.credentials?.getByProvider(newValue) ?? [];
+
     if (candidates.length === 0) return;
 
     if (!deps.auth.state.keySelectionMode.isManual) {
       const modeError = await deps.auth.setKeySelectionMode(
         KeySelectionMode.manual(),
       );
+
       if (modeError) {
         revertProviderSelection(previous, modeError);
+
         return;
       }
     }
 
     const error = await deps.auth.setActiveKey(candidates[0].id);
+
     if (error) revertProviderSelection(previous, error);
   }
 

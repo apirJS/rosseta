@@ -48,12 +48,15 @@ export class FakeModelFetchService implements IModelFetchService {
     }
 
     const response = this.responses.get(provider);
+
     if (response === undefined) {
       return success([]);
     }
+
     if (response instanceof Error) {
       return failure(response as AppError);
     }
+
     return success(response);
   }
 

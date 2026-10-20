@@ -9,10 +9,12 @@ export function setPopupToastContext(controller: PopupToastController): void {
 
 export function getPopupToastContext(): PopupToastController {
   const context = getContext<PopupToastController>(TOAST_CONTEXT_KEY);
+
   if (!context) {
     throw new Error(
       'Popup toast context not found. Did you forget to call setPopupToastContext?',
     );
   }
+
   return context;
 }

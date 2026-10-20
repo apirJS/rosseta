@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   runtime: { getURL: vi.fn() },
   tabs: { create: vi.fn() },
 }));
+
 vi.mock('webextension-polyfill', () => api);
 
 describe('UI navigation: browser shortcut settings', () => {
@@ -45,9 +46,13 @@ describe('UI navigation: browser shortcut settings', () => {
 
   test('invokes the native Firefox editor immediately, preserving the user gesture', async () => {
     api.runtime.getURL.mockReturnValue('moz-extension://fixture/');
+
     const nativeOpen = vi.fn().mockResolvedValue(undefined);
+
     api.commands.openShortcutSettings = nativeOpen;
+
     const pending = openShortcutSettings();
+
     expect(nativeOpen).toHaveBeenCalledOnce();
     await pending;
     expect(api.tabs.create).not.toHaveBeenCalled();
@@ -62,6 +67,7 @@ describe('UI navigation: browser shortcut settings', () => {
           .fn()
           .mockRejectedValue(new Error('Unavailable'));
       await openShortcutSettings();
+
       expect(api.tabs.create).toHaveBeenCalledWith({
         url: 'https://support.mozilla.org/en-US/kb/manage-extension-shortcuts-firefox',
       });

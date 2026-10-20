@@ -1,4 +1,7 @@
-import type { IModelStorage, StoredModel } from '../../src/core/ports/outbound/IModelStorage';
+import type {
+  IModelStorage,
+  StoredModel,
+} from '../../src/core/ports/outbound/IModelStorage';
 import { success, failure, type Result } from '../../src/shared/types/Result';
 import type { AppError } from '../../src/shared/errors';
 
@@ -9,9 +12,12 @@ export class FakeModelStorage implements IModelStorage {
   async getModels(provider: string): Promise<Result<StoredModel[], AppError>> {
     if (this.nextFailure) {
       const err = this.nextFailure;
+
       this.nextFailure = null;
+
       return failure(err);
     }
+
     return success(this.store.get(provider) ?? []);
   }
 
@@ -20,13 +26,18 @@ export class FakeModelStorage implements IModelStorage {
   > {
     if (this.nextFailure) {
       const err = this.nextFailure;
+
       this.nextFailure = null;
+
       return failure(err);
     }
+
     const byProvider: Record<string, StoredModel[]> = {};
+
     for (const [provider, models] of this.store) {
       byProvider[provider] = [...models];
     }
+
     return success(byProvider);
   }
 
@@ -36,10 +47,14 @@ export class FakeModelStorage implements IModelStorage {
   ): Promise<Result<void, AppError>> {
     if (this.nextFailure) {
       const err = this.nextFailure;
+
       this.nextFailure = null;
+
       return failure(err);
     }
+
     this.store.set(provider, models);
+
     return success(undefined);
   }
 
@@ -48,25 +63,30 @@ export class FakeModelStorage implements IModelStorage {
   ): Promise<Result<void, AppError>> {
     if (this.nextFailure) {
       const err = this.nextFailure;
+
       this.nextFailure = null;
+
       return failure(err);
     }
+
     this.store = new Map(
-      Object.entries(models).map(([provider, items]) => [
-        provider,
-        [...items],
-      ]),
+      Object.entries(models).map(([provider, items]) => [provider, [...items]]),
     );
+
     return success(undefined);
   }
 
   async clearModels(provider: string): Promise<Result<void, AppError>> {
     if (this.nextFailure) {
       const err = this.nextFailure;
+
       this.nextFailure = null;
+
       return failure(err);
     }
+
     this.store.delete(provider);
+
     return success(undefined);
   }
 

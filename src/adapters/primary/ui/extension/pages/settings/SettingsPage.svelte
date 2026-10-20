@@ -35,6 +35,7 @@
     }),
     refresh: async () => {
       await customProviders.hydrate();
+
       await Promise.all([
         auth.hydrate(),
         preferences.hydrate(),
@@ -47,6 +48,7 @@
   async function handleFileChange(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
+
     if (file) await controller.importSettings(file);
     input.value = '';
   }

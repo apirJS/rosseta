@@ -71,10 +71,9 @@
     </span>
     <textarea
       class="{inputClass} resize-none font-mono"
-      placeholder='&#123;"HTTP-Referer": "https://rosseta.app"&#125;'
+      placeholder={'{"HTTP-Referer": "https://rosseta.app"}'}
       rows="2"
-      bind:value={headers}
-    ></textarea>
+      bind:value={headers}></textarea>
   </label>
 
   <label class="flex flex-col gap-1">
@@ -83,10 +82,9 @@
     </span>
     <textarea
       class="{inputClass} resize-none font-mono"
-      placeholder='&#123;"api-version": "2024-02-01"&#125;'
+      placeholder={'{"api-version": "2024-02-01"}'}
       rows="2"
-      bind:value={queryParams}
-    ></textarea>
+      bind:value={queryParams}></textarea>
     {#if type === 'anthropic'}
       <span class="text-[10px] text-muted">
         Anthropic requests use <code>/messages</code>; model discovery uses

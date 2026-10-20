@@ -17,8 +17,7 @@ export interface TranslationDraft {
 }
 
 export type TranslationProgress =
-  | { kind: 'reset' }
-  | { kind: 'snapshot'; draft: TranslationDraft };
+  { kind: 'reset' } | { kind: 'snapshot'; draft: TranslationDraft };
 
 export interface TranslationExecutionOptions {
   cancellationToken?: ICancellationToken;

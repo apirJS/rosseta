@@ -9,11 +9,12 @@ export interface ActiveKeyIndicatorDeps {
   getProvider: () => AnyProvider;
   getCredential: () => Credential | null;
   auth: {
-    state: { credentials: Credentials | null; keySelectionMode: KeySelectionMode };
+    state: {
+      credentials: Credentials | null;
+      keySelectionMode: KeySelectionMode;
+    };
     setActiveKey: (credentialId: string) => Promise<string | null>;
-    setKeySelectionMode: (
-      mode: KeySelectionMode,
-    ) => Promise<string | null>;
+    setKeySelectionMode: (mode: KeySelectionMode) => Promise<string | null>;
   };
   toast: Pick<PopupToastController, 'show'>;
 }
@@ -43,6 +44,7 @@ export function createActiveKeyIndicatorController(
 
   const providerActive = $derived.by(() => {
     const credential = deps.getCredential();
+
     return credential && credential.provider === deps.getProvider()
       ? credential
       : null;
@@ -67,6 +69,7 @@ export function createActiveKeyIndicatorController(
   function getTriggerLabel(): string {
     if (isAutoBalanceActive) return 'Auto ⟳';
     if (providerActive) return getDisplayLabel(providerActive);
+
     return '—';
   }
 
@@ -83,24 +86,30 @@ export function createActiveKeyIndicatorController(
       const modeError = await deps.auth.setKeySelectionMode(
         KeySelectionMode.manual(),
       );
+
       if (modeError) {
         deps.toast.show({
           type: 'error',
           message: 'Could not switch to manual key selection',
           description: modeError,
         });
+
         return;
       }
     }
+
     const error = await deps.auth.setActiveKey(cred.id);
+
     if (error) {
       deps.toast.show({
         type: 'error',
         message: 'Could not switch API key',
         description: error,
       });
+
       return;
     }
+
     state.isOpen = false;
   }
 
@@ -108,6 +117,7 @@ export function createActiveKeyIndicatorController(
     const error = await deps.auth.setKeySelectionMode(
       KeySelectionMode.autoBalance(targetProvider),
     );
+
     if (error) {
       deps.toast.show({
         type: 'error',
@@ -115,6 +125,7 @@ export function createActiveKeyIndicatorController(
         description: error,
       });
     }
+
     state.isOpen = false;
   }
 

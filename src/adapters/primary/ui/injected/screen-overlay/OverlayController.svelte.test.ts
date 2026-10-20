@@ -90,6 +90,7 @@ describe('UI Controller: OverlayController', () => {
     onReady?: () => void,
   ): { controller: OverlayController; cleanup: () => void } {
     let controller!: OverlayController;
+
     const cleanup = $effect.root(() => {
       controller = new OverlayController(
         mockImageBase64,
@@ -107,7 +108,9 @@ describe('UI Controller: OverlayController', () => {
         },
       );
     });
+
     flushSync(); // Trigger any pending effects
+
     return { controller, cleanup };
   }
 
@@ -181,6 +184,7 @@ describe('UI Controller: OverlayController', () => {
 
     beforeEach(() => {
       eventListeners = {};
+
       mockTarget = {
         setPointerCapture: vi.fn(),
         releasePointerCapture: vi.fn(),
@@ -206,6 +210,7 @@ describe('UI Controller: OverlayController', () => {
       expect(controller.isPointerMoving).toBe(true);
       expect(mockTarget.setPointerCapture).toHaveBeenCalledWith(1);
       expect(mockSelectionBoxInstance.mount).toHaveBeenCalled();
+
       expect(mockSelectionBoxInstance.update).toHaveBeenCalledWith({
         left: 100,
         top: 100,
@@ -217,10 +222,12 @@ describe('UI Controller: OverlayController', () => {
         'pointermove',
         expect.any(Function),
       );
+
       expect(mockTarget.addEventListener).toHaveBeenCalledWith(
         'pointerup',
         expect.any(Function),
       );
+
       cleanup();
     });
 
@@ -237,6 +244,7 @@ describe('UI Controller: OverlayController', () => {
 
       // End selection at (150, 150)
       const pointerUpHandler = eventListeners['pointerup'];
+
       expect(pointerUpHandler).toBeDefined();
 
       await pointerUpHandler({

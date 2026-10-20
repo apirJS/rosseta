@@ -16,7 +16,9 @@ export interface PopupToastShowOptions {
   duration?: number;
 }
 
-export type PopupToastUpdateOptions = Partial<Omit<PopupToastShowOptions, 'id'>>;
+export type PopupToastUpdateOptions = Partial<
+  Omit<PopupToastShowOptions, 'id'>
+>;
 
 const MAX_TOASTS = 5;
 const DISMISS_ANIMATION_MS = 200;
@@ -27,33 +29,49 @@ let nextId = 0;
 export class PopupToastController {
   toasts = $state<PopupToastItem[]>([]);
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
+  private dismissTimers = new Set<ReturnType<typeof setTimeout>>();
+  private disposed = false;
 
   show(opts: PopupToastShowOptions): string {
     const id = opts.id ?? `popup-toast-${nextId++}`;
+
+    if (this.disposed) return id;
+
     const duration =
       opts.duration ?? (opts.type === 'loading' ? 0 : DEFAULT_DURATION_MS);
 
     this.toasts = [
-      { id, type: opts.type, message: opts.message, description: opts.description },
+      {
+        id,
+        type: opts.type,
+        message: opts.message,
+        description: opts.description,
+      },
       ...this.toasts,
     ].slice(0, MAX_TOASTS);
 
     if (duration > 0) this.startTimer(id, duration);
+
     return id;
   }
 
   update(id: string, opts: PopupToastUpdateOptions): void {
+    if (this.disposed) return;
+
     const idx = this.toasts.findIndex((t) => t.id === id);
+
     if (idx === -1) return;
 
     this.clearTimer(id);
 
     const current = this.toasts[idx];
     const type = opts.type ?? current.type;
+
     const duration =
       opts.duration ?? (type === 'loading' ? 0 : DEFAULT_DURATION_MS);
 
     const copy = [...this.toasts];
+
     copy[idx] = {
       ...current,
       ...opts,
@@ -61,24 +79,40 @@ export class PopupToastController {
       type,
       dismissing: false,
     };
+
     this.toasts = copy;
 
     if (duration > 0) this.startTimer(id, duration);
   }
 
   dismiss(id: string): void {
+    if (this.disposed) return;
     this.clearTimer(id);
 
     const idx = this.toasts.findIndex((t) => t.id === id);
+
     if (idx === -1) return;
 
     const copy = [...this.toasts];
+
     copy[idx] = { ...copy[idx], dismissing: true };
     this.toasts = copy;
 
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      this.dismissTimers.delete(timer);
       this.toasts = this.toasts.filter((t) => t.id !== id);
     }, DISMISS_ANIMATION_MS);
+
+    this.dismissTimers.add(timer);
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    for (const timer of this.timers.values()) clearTimeout(timer);
+    for (const timer of this.dismissTimers) clearTimeout(timer);
+    this.timers.clear();
+    this.dismissTimers.clear();
+    this.toasts = [];
   }
 
   private startTimer(id: string, duration: number): void {
@@ -86,11 +120,13 @@ export class PopupToastController {
       this.timers.delete(id);
       this.dismiss(id);
     }, duration);
+
     this.timers.set(id, timer);
   }
 
   private clearTimer(id: string): void {
     const timer = this.timers.get(id);
+
     if (timer) {
       clearTimeout(timer);
       this.timers.delete(id);

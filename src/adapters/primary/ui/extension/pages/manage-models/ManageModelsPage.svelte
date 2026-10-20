@@ -39,7 +39,9 @@
     fetchModels: models.fetchModels,
     hasApiKeyFor: (provider) => {
       const credentials = auth.state.credentials;
+
       if (!credentials) return false;
+
       return credentials.getByProvider(provider).length > 0;
     },
     selectedModelFor: (provider) => preferences.state.selectedModels[provider],

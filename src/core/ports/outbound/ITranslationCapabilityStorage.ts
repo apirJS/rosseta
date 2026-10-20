@@ -2,9 +2,7 @@ import type { Result } from '../../../shared/types/Result';
 import type { AppError } from '../../../shared/errors';
 
 export type TranslationCapabilitySupport =
-  | 'unknown'
-  | 'supported'
-  | 'unsupported';
+  'unknown' | 'supported' | 'unsupported';
 
 /** Keys and evidence scopes are opaque to the application layer. */
 export interface TranslationCapabilityFact {

@@ -5,7 +5,7 @@ import { Credentials } from '../src/core/domain/credential/Credentials';
 import { UserPreferences } from '../src/core/domain/preferences/UserPreferences';
 import { EncodedImage } from '../src/core/domain/image/EncodedImage';
 import { Language } from '../src/core/domain/translation/Language';
-import type { TranslationSchemaOutput } from '../src/adapters/secondary/shared/translation-schema';
+import type { TranslationSchemaOutput } from '../src/adapters/secondary/translation/output/translation-schema';
 import { seedStore } from './browser-mock';
 import type { Provider } from '../src/core/domain/credential/Provider';
 
@@ -14,7 +14,9 @@ export const VALID_IMAGE_BASE64 =
 
 export const VALID_IMAGE = (() => {
   const result = EncodedImage.create(VALID_IMAGE_BASE64);
+
   if (!result.success) throw new Error('Failed to create test image');
+
   return result.data;
 })();
 
@@ -56,9 +58,13 @@ const XAI_KEY = 'a'.repeat(32) + '.abcdefghijklmn';
 
 function createCredentialFor(rawKey: string, provider: Provider): Credential {
   const apiKey = ApiKey.createWithProvider(rawKey, provider);
+
   if (!apiKey.success) throw apiKey.error;
+
   const credential = Credential.create(uuidv4(), apiKey.data, provider);
+
   if (!credential.success) throw credential.error;
+
   return credential.data;
 }
 
@@ -86,6 +92,7 @@ export function seedCredentialsAndPreferences(
     groq: createGroqCredential,
     xai: createXaiCredential,
   };
+
   const credential = credentialFactories[provider]();
 
   const credentials = Credentials.createEmpty(uuidv4()).add(credential);

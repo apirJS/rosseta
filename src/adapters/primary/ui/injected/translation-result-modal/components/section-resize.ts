@@ -1,5 +1,6 @@
 function freezeSiblingSections(currentSection: HTMLElement): () => void {
   const parent = currentSection.parentElement;
+
   if (!parent) return () => {};
 
   const siblings = Array.from(
@@ -15,6 +16,7 @@ function freezeSiblingSections(currentSection: HTMLElement): () => void {
 
   for (const sib of siblings) {
     const h = sib.getBoundingClientRect().height;
+
     sib.style.height = `${h}px`;
     sib.style.flex = 'none';
     sib.style.minHeight = '0';
@@ -37,21 +39,22 @@ export function startSectionResize(options: {
 }): void {
   const { event, box, minHeight, onEnd } = options;
   const handle = event.currentTarget as HTMLElement;
+
   handle.setPointerCapture(event.pointerId);
 
   const startY = event.clientY;
   const startHeight = box.getBoundingClientRect().height;
   const section = box.closest('.section') as HTMLElement | null;
 
-  const unfreezeSiblings = section
-    ? freezeSiblingSections(section)
-    : () => {};
+  const unfreezeSiblings = section ? freezeSiblingSections(section) : () => {};
 
   const onMove = (e: PointerEvent) => {
     const delta = e.clientY - startY;
     const newHeight = Math.max(minHeight, startHeight + delta);
+
     box.style.height = `${newHeight}px`;
     box.style.flex = 'none';
+
     if (section) {
       section.style.flex = 'none';
       section.style.minHeight = '0';

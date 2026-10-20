@@ -32,9 +32,12 @@ export class FakeTranslationService implements ITranslationService {
     options?: TranslationExecutionOptions,
   ): Promise<Result<Translation, AppError>> {
     this.calls.push({ image, targetLanguage, options });
+
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
 

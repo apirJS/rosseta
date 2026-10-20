@@ -15,6 +15,7 @@ export function createShadowDomHost(
   options: ShadowDomHostOptions,
 ): ShadowDomHostResult {
   const host = document.createElement('div');
+
   host.id = options.hostId;
 
   if (options.hostStyles) {
@@ -24,13 +25,16 @@ export function createShadowDomHost(
   const shadowRoot = host.attachShadow({ mode: 'open' });
 
   const styleEl = document.createElement('style');
+
   styleEl.textContent = options.styles;
   shadowRoot.appendChild(styleEl);
 
   const appContainer = document.createElement('div');
+
   if (options.containerStyles) {
     Object.assign(appContainer.style, options.containerStyles);
   }
+
   shadowRoot.appendChild(appContainer);
 
   document.body.appendChild(host);

@@ -14,9 +14,7 @@ export interface IKeySelectionStorage {
     credentialId: string,
   ): Promise<Result<void, AppError>>;
   clearLastUsedId(provider: AnyProvider): Promise<Result<void, AppError>>;
-  getAllLastUsedIds(): Promise<
-    Result<Record<string, string>, AppError>
-  >;
+  getAllLastUsedIds(): Promise<Result<Record<string, string>, AppError>>;
   replaceLastUsedIds(
     ids: Record<string, string>,
   ): Promise<Result<void, AppError>>;

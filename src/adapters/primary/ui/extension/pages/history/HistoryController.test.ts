@@ -4,8 +4,8 @@ import { TextSegment } from '../../../../../../core/domain/translation/TextSegme
 import { Language } from '../../../../../../core/domain/translation/Language';
 import { ErrorCode } from '../../../../../../shared/errors/ErrorCode';
 import { AppError } from '../../../../../../shared/errors/AppError';
-import type { IGetAllTranslationsUseCase } from '../../../../../../core/ports/inbound/translation/IGetAllTranslationsUseCase';
-import type { IDeleteTranslationUseCase } from '../../../../../../core/ports/inbound/translation/IDeleteTranslationUseCase';
+import type { IGetAllTranslationsUseCase } from '../../../../../../core/ports/inbound/history/IGetAllTranslationsUseCase';
+import type { IDeleteTranslationUseCase } from '../../../../../../core/ports/inbound/history/IDeleteTranslationUseCase';
 
 const mockGetAllTranslations: IGetAllTranslationsUseCase = {
   execute: vi.fn(),
@@ -52,7 +52,9 @@ import { sendMessageToRuntime } from '../../../../../../shared/messaging';
 function makeSegment(text: string, langCode: 'ja-JP' | 'en-US'): TextSegment {
   const lang = Language.create(langCode);
   const result = TextSegment.create(text, lang);
+
   if (!result.success) throw new Error('Failed to create TextSegment');
+
   return result.data;
 }
 
@@ -90,12 +92,14 @@ describe('UI Controller: HistoryController', () => {
       makeTranslation('t-1', 'ã“ã‚“ã«ã¡ã¯'),
       makeTranslation('t-2', 'ä¸–ç•Œ'),
     ];
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: items,
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     expect(controller.state.loading).toBe(false);
@@ -110,6 +114,7 @@ describe('UI Controller: HistoryController', () => {
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     expect(controller.state.loading).toBe(false);
@@ -122,12 +127,14 @@ describe('UI Controller: HistoryController', () => {
       makeTranslation('t-1', 'ã“ã‚“ã«ã¡ã¯'),
       makeTranslation('t-2', 'ä¸–ç•Œ'),
     ];
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: items,
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     controller.setSearchQuery('ã“ã‚“ã«ã¡ã¯');
@@ -141,12 +148,14 @@ describe('UI Controller: HistoryController', () => {
       makeTranslation('t-1', 'hello'),
       makeTranslation('t-2', 'world'),
     ];
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: items,
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     controller.setSearchQuery('hello');
@@ -158,17 +167,20 @@ describe('UI Controller: HistoryController', () => {
 
   test('setTimeFilter "24h" excludes older translations', async () => {
     const recent = makeTranslation('t-1', 'Recent', new Date());
+
     const old = makeTranslation(
       't-2',
       'Old',
       new Date(Date.now() - 48 * 60 * 60 * 1000),
     );
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: [recent, old],
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     controller.setTimeFilter('24h');
@@ -179,17 +191,20 @@ describe('UI Controller: HistoryController', () => {
 
   test('setTimeFilter "7d" excludes translations older than 7 days', async () => {
     const recent = makeTranslation('t-1', 'Recent', new Date());
+
     const old = makeTranslation(
       't-2',
       'Old',
       new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
     );
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: [recent, old],
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     controller.setTimeFilter('7d');
@@ -200,12 +215,14 @@ describe('UI Controller: HistoryController', () => {
   test('setTimeFilter "all" includes everything', async () => {
     const recent = makeTranslation('t-1', 'Recent', new Date());
     const old = makeTranslation('t-2', 'Old', new Date('2020-01-01'));
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: [recent, old],
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     controller.setTimeFilter('all');
@@ -215,17 +232,20 @@ describe('UI Controller: HistoryController', () => {
   test('search + time filter combine correctly', async () => {
     const recentMatch = makeTranslation('t-1', 'hello', new Date());
     const recentNoMatch = makeTranslation('t-2', 'world', new Date());
+
     const oldMatch = makeTranslation(
       't-3',
       'hello',
       new Date(Date.now() - 48 * 60 * 60 * 1000),
     );
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: [recentMatch, recentNoMatch, oldMatch],
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     controller.setTimeFilter('24h');
@@ -240,12 +260,14 @@ describe('UI Controller: HistoryController', () => {
       makeTranslation('t-1', 'keep'),
       makeTranslation('t-2', 'delete'),
     ];
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: items,
     });
 
     const controller = createHistoryController();
+
     await controller.load();
     expect(controller.state.translations).toHaveLength(2);
 
@@ -263,12 +285,14 @@ describe('UI Controller: HistoryController', () => {
       makeTranslation('t-1', 'keep'),
       makeTranslation('t-2', 'to-undo'),
     ];
+
     vi.mocked(mockGetAllTranslations.execute).mockResolvedValue({
       success: true,
       data: items,
     });
 
     const controller = createHistoryController();
+
     await controller.load();
 
     controller.deleteItem('t-2');
@@ -283,6 +307,7 @@ describe('UI Controller: HistoryController', () => {
     const t = makeTranslation('t-1', 'hello');
 
     const controller = createHistoryController();
+
     await controller.openItem(t);
 
     expect(sendMessageToRuntime).toHaveBeenCalledWith({

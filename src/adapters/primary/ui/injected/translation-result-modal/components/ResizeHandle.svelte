@@ -9,13 +9,8 @@
     onresizeend?: () => void;
   }
 
-  const {
-    box,
-    minHeight,
-    ariaLabel,
-    onresizestart,
-    onresizeend,
-  }: Props = $props();
+  const { box, minHeight, ariaLabel, onresizestart, onresizeend }: Props =
+    $props();
 
   function handlePointerDown(e: PointerEvent) {
     onresizestart?.();

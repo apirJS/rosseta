@@ -33,7 +33,9 @@
       {@render start()}
     {/if}
     {#if title}
-      <h2 class="flex-1 text-center text-base font-semibold text-foreground truncate">
+      <h2
+        class="flex-1 text-center text-base font-semibold text-foreground truncate"
+      >
         {title}
       </h2>
     {:else}

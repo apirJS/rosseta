@@ -15,6 +15,7 @@ function fixture() {
   const providers = new FakeCustomProviderStorage();
   const keys = new FakeKeySelectionStorage();
   const history = new FakeTranslationStorage();
+
   const useCase = new ExportSettingsUseCase(
     credentials,
     models,
@@ -22,6 +23,7 @@ function fixture() {
     keys,
     history,
   );
+
   return { credentials, models, providers, keys, history, useCase };
 }
 
@@ -29,8 +31,11 @@ describe('Application: ExportSettingsUseCase', () => {
   test('exports unchanged version-one history and excludes operational capability facts', async () => {
     const backup = settingsBackupFixture();
     const parsed = parseSettingsBackup(backup);
+
     if (!parsed.success) throw parsed.error;
+
     const f = fixture();
+
     f.credentials.seedWith(parsed.data.credentials);
     f.models.seedModels('openai', backup.settings.models.openai!);
     for (const translation of parsed.data.history ?? [])
@@ -38,20 +43,24 @@ describe('Application: ExportSettingsUseCase', () => {
     f.keys.seedLastUsedId('openai', 'key-1');
 
     const result = await f.useCase.execute(backup.settings.preferences);
+
     expect(result.success).toBe(true);
     if (!result.success) throw result.error;
     expect(result.data.format).toBe('rosseta-settings');
     expect(result.data.version).toBe(1);
     expect(Number.isNaN(Date.parse(result.data.exportedAt))).toBe(false);
     expect(result.data.settings).toEqual(backup.settings);
+
     expect(Object.keys(result.data).toSorted()).toEqual([
       'exportedAt',
       'format',
       'settings',
       'version',
     ]);
+
     expect(parseSettingsBackup(result.data).success).toBe(true);
     result.data.settings.preferences.selectedModels.openai = 'changed';
+
     expect(backup.settings.preferences.selectedModels.openai).toBe(
       'vision-model',
     );
@@ -61,6 +70,7 @@ describe('Application: ExportSettingsUseCase', () => {
     const result = await fixture().useCase.execute(
       settingsBackupFixture().settings.preferences,
     );
+
     expect(result.success).toBe(true);
     if (!result.success) throw result.error;
     expect(result.data.settings.apiKeys).toEqual([]);
@@ -73,8 +83,10 @@ describe('Application: ExportSettingsUseCase', () => {
     async (storage) => {
       const f = fixture();
       const error = StorageError.readFailed(storage);
+
       if (storage === 'providers') f.providers.failNext(error);
       else f[storage].failNextCallWith(error);
+
       expect(
         await f.useCase.execute(settingsBackupFixture().settings.preferences),
       ).toEqual({ success: false, error });

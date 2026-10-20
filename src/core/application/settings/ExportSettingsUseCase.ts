@@ -47,6 +47,7 @@ export class ExportSettingsUseCase implements IExportSettingsUseCase {
     if (!historyResult.success) return failure(historyResult.error);
 
     const credentials = credentialsResult.data;
+
     return success({
       format: 'rosseta-settings',
       version: 1,
@@ -67,9 +68,7 @@ export class ExportSettingsUseCase implements IExportSettingsUseCase {
           provider.toProps(),
         ),
         models: modelsResult.data,
-        history: historyResult.data.map((translation) =>
-          translation.toProps(),
-        ),
+        history: historyResult.data.map((translation) => translation.toProps()),
         keySelection: {
           mode: modeResult.data.value,
           lastUsedKeyIds: idsResult.data,

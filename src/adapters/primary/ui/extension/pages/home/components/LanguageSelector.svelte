@@ -22,13 +22,16 @@
 
   const effectiveValue = $derived.by(() => {
     const match = options.find((o) => o.value === value);
+
     if (match) return value;
 
     const browserLang = getBrowserLanguage();
     const browserMatch = options.find((o) => o.value === browserLang.code);
+
     if (browserMatch) return browserMatch.value as LanguageCode;
 
     const enMatch = options.find((o) => o.value === 'en-US');
+
     if (enMatch) return 'en-US' as LanguageCode;
 
     return options.length > 0 ? (options[0].value as LanguageCode) : value;

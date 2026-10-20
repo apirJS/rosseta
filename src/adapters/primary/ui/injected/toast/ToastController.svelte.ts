@@ -54,11 +54,13 @@ export class ToastController {
 
   update(id: string, opts: Partial<ShowOptions>): void {
     const idx = this.toasts.findIndex((t) => t.id === id);
+
     if (idx === -1) return;
 
     this.clearTimer(id);
 
     const current = this.toasts[idx];
+
     const updated: ToastItem = {
       ...current,
       ...opts,
@@ -67,9 +69,11 @@ export class ToastController {
     };
 
     const duration = opts.duration ?? (updated.type === 'loading' ? 0 : 4000);
+
     updated.duration = duration;
 
     const copy = [...this.toasts];
+
     copy[idx] = updated;
     this.toasts = copy;
 
@@ -82,11 +86,13 @@ export class ToastController {
     this.clearTimer(id);
 
     const idx = this.toasts.findIndex((t) => t.id === id);
+
     if (idx === -1) return;
 
     if (this.toasts[idx].dismissing) return;
 
     const copy = [...this.toasts];
+
     copy[idx] = { ...copy[idx], dismissing: true };
     this.toasts = copy;
 
@@ -100,11 +106,13 @@ export class ToastController {
       this.dismiss(id);
       this.timers.delete(id);
     }, duration);
+
     this.timers.set(id, timer);
   }
 
   private clearTimer(id: string): void {
     const timer = this.timers.get(id);
+
     if (timer) {
       clearTimeout(timer);
       this.timers.delete(id);

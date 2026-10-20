@@ -3,7 +3,7 @@ import TranslationModal from './TranslationModal.svelte';
 import styles from './translation-modal.css?inline';
 import { TranslationModalController } from './TranslationModalController.svelte';
 import { createShadowDomHost } from '../../../content/hosts/ShadowDomHost';
-import type { TranslationView } from '../../../content/services/TranslationSession';
+import type { TranslationView } from './TranslationView';
 import type { ThemeManager } from '../../../content/hosts/ThemeManager';
 import type { TranslationModalPayload } from '../../../../../shared/types/TranslationModalPayload';
 import { sendMessageToRuntime } from '../../../../../shared/messaging';
@@ -37,7 +37,7 @@ export function mountTranslationModal(
       overflow: 'visible',
     },
   });
-  
+
   themeManager.registerHost(host);
 
   const ctrl = new TranslationModalController({
@@ -56,6 +56,7 @@ export function mountTranslationModal(
     target: appContainer,
     props: { controller: ctrl },
   });
+
   let detached = false;
 
   return {

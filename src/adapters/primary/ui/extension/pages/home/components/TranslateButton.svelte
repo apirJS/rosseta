@@ -17,6 +17,7 @@
     shortcutSettingsUrl,
     onOpenShortcutSettings,
   }: Props = $props();
+
   const preferences = getPreferencesStateContext();
 
   const shortcutLabel = $derived(preferences.state.shortcut);
@@ -47,7 +48,7 @@
       onclick={(event) => {
         event.preventDefault();
         onOpenShortcutSettings();
-      }}
-    >Shortcut not set</a>
+      }}>Shortcut not set</a
+    >
   {/if}
 </div>

@@ -10,28 +10,28 @@ The server binds only `127.0.0.1:8787`. No real provider credentials or external
 
 Create a custom provider using either protocol:
 
-| Custom provider type | Base URL example |
-| --- | --- |
-| OpenAI compatible | `http://127.0.0.1:8787/openai/success/v1` |
+| Custom provider type | Base URL example                             |
+| -------------------- | -------------------------------------------- |
+| OpenAI compatible    | `http://127.0.0.1:8787/openai/success/v1`    |
 | Anthropic compatible | `http://127.0.0.1:8787/anthropic/success/v1` |
 
 Replace `success` with a scenario below. Each scenario has its own endpoint identity, so capability facts remain isolated. The response contains two multilingual visual blocks; image contents do not affect these deterministic outputs. Description on/off is respected.
 
-| Scenario | Expected behavior |
-| --- | --- |
-| `success` | Structured streaming with partial text before completion. |
-| `no-structured` | Structured request rejected; plain JSON streaming succeeds. |
+| Scenario                      | Expected behavior                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `success`                     | Structured streaming with partial text before completion.                                                          |
+| `no-structured`               | Structured request rejected; plain JSON streaming succeeds.                                                        |
 | `unavailable-response-format` | Captured HTTP 400 unavailable-format rejection; plain streaming succeeds and is reused directly on later requests. |
-| `no-stream` | Streaming rejected; structured buffered output succeeds. |
-| `buffered-only` | Structured output and streaming rejected; plain buffered generation succeeds. |
-| `combined-only` | Structured streaming rejected; plain streaming succeeds without disabling structured buffered support. |
-| `malformed-repair` | Initial normal completion is malformed; one buffered repair succeeds. |
-| `in-band-error` | Stream reports an error after partial text; eligible buffered restart succeeds. |
-| `interruption` | Stream fails after partial text; eligible buffered restart succeeds. |
-| `no-text` | Valid no-text envelope; no draft history entry. |
-| `no-vision` | Definitive unsupported image input; later translations fail locally until compatibility is explicitly reset. |
-| `slow-headers` | Headers wait 65 seconds; shared deadline ends the job. |
-| `silence` | Stream starts, then waits 65 seconds between chunks; shared deadline ends the job. |
+| `no-stream`                   | Streaming rejected; structured buffered output succeeds.                                                           |
+| `buffered-only`               | Structured output and streaming rejected; plain buffered generation succeeds.                                      |
+| `combined-only`               | Structured streaming rejected; plain streaming succeeds without disabling structured buffered support.             |
+| `malformed-repair`            | Initial normal completion is malformed; one buffered repair succeeds.                                              |
+| `in-band-error`               | Stream reports an error after partial text; eligible buffered restart succeeds.                                    |
+| `interruption`                | Stream fails after partial text; eligible buffered restart succeeds.                                               |
+| `no-text`                     | Valid no-text envelope; no draft history entry.                                                                    |
+| `no-vision`                   | Definitive unsupported image input; later translations fail locally until compatibility is explicitly reset.       |
+| `slow-headers`                | Headers wait 65 seconds; shared deadline ends the job.                                                             |
+| `silence`                     | Stream starts, then waits 65 seconds between chunks; shared deadline ends the job.                                 |
 
 Add optional custom header `X-Fixture-Route: test` and query parameter `fixture-route=test` to verify options survive every fallback. The [request log](http://127.0.0.1:8787/__requests) records protocol, scenario, model, structured/stream flags, repair flag, and whether those routing options were present. It never records authorization, header/query values, prompts, images, or request bodies.
 

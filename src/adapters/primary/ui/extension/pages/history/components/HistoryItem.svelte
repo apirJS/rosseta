@@ -20,6 +20,7 @@
 
   const formattedDate = $derived.by(() => {
     const d = translation.createdAt;
+
     return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
 

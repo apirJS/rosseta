@@ -15,10 +15,12 @@ export function setSettingsContext(useCases: SettingsUseCases): void {
 
 export function getSettingsContext(): SettingsUseCases {
   const context = getContext<SettingsUseCases>(SETTINGS_CONTEXT_KEY);
+
   if (!context) {
     throw new Error(
       'Settings context not found. Did you forget to call setSettingsContext?',
     );
   }
+
   return context;
 }

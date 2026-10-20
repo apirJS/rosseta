@@ -1,13 +1,13 @@
 import { mock } from 'bun:test';
-import type { Container } from '../src/shared/di/container-factory';
+import type { TranslationJobDependencies } from '../src/adapters/primary/background/translation/TranslationJobCoordinator';
 import type { TranslateImageCommand } from '../src/core/ports/inbound/translation/ITranslateImageUseCase';
-import type { ITranslationRequestPreparer } from '../src/adapters/primary/background/services/TranslationRequestPreparer';
-import type { TranslationEvent } from '../src/shared/validation/MessageSchema';
+import type { ITranslationRequestPreparer } from '../src/adapters/primary/background/translation/TranslationRequestPreparer';
+import type { TranslationEvent } from '../src/shared/messaging/MessageSchema';
 import { Translation } from '../src/core/domain/translation/Translation';
 import { Language } from '../src/core/domain/translation/Language';
 import { TextSegment } from '../src/core/domain/translation/TextSegment';
-import { SaveTranslationUseCase } from '../src/core/application/translation/SaveTranslationUseCase';
-import { GetTranslationUseCase } from '../src/core/application/translation/GetTranslationUseCase';
+import { SaveTranslationUseCase } from '../src/core/application/history/SaveTranslationUseCase';
+import { GetTranslationUseCase } from '../src/core/application/history/GetTranslationUseCase';
 import { FakeTranslationStorage } from './fakes/FakeTranslationStorage';
 import { success, type Result } from '../src/shared/types/Result';
 import type { AppError } from '../src/shared/errors';
@@ -15,10 +15,12 @@ import type { AppError } from '../src/shared/errors';
 export function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
+
   const promise = new Promise<T>((yes, no) => {
     resolve = yes;
     reject = no;
   });
+
   return { promise, resolve, reject };
 }
 
@@ -26,27 +28,33 @@ export async function nextTurn(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-export function completeTranslation(id = 'translation-1'): Translation {
+export function completeTranslation(
+  id = 'translation-1',
+  createdAt = new Date('2026-10-19T00:00:00Z'),
+): Translation {
   const original = TextSegment.create(
     'こんにちは',
     Language.create('ja-JP'),
     'konnichiwa',
     0,
   );
+
   const translated = TextSegment.create(
     'Hello',
     Language.create('en-US'),
     null,
     0,
   );
+
   if (!original.success || !translated.success)
     throw new Error('Invalid test translation');
+
   return Translation.create(
     id,
     [original.data],
     [translated.data],
     'A greeting',
-    new Date('2026-10-19T00:00:00Z'),
+    createdAt,
   );
 }
 
@@ -79,22 +87,27 @@ export function coordinatorFixture(
   ) => Promise<Result<Translation, AppError>>,
 ) {
   const storage = new FakeTranslationStorage();
+
   const generation = mock(
     execute ?? (async () => success(completeTranslation())),
   );
+
   const prepare = mock(async () =>
     success({
       useCase: { execute: generation },
       targetLanguage: { code: 'en-US', name: 'English' },
     }),
   );
+
   const preparer: ITranslationRequestPreparer = { prepare };
   const saveTranslationUseCase = new SaveTranslationUseCase(storage);
   const getTranslationUseCase = new GetTranslationUseCase(storage);
+
   const container = {
     saveTranslationUseCase,
     getTranslationUseCase,
-  } as unknown as Container;
+  } satisfies TranslationJobDependencies;
+
   return {
     storage,
     generation,
@@ -111,8 +124,8 @@ export function sentTranslationEvents(
 ): TranslationEvent[] {
   return calls.flatMap((call) => {
     const message = call[1] as
-      | { action?: string; payload?: TranslationEvent }
-      | undefined;
+      { action?: string; payload?: TranslationEvent } | undefined;
+
     return message?.action === 'TRANSLATION_EVENT' && message.payload
       ? [message.payload]
       : [];

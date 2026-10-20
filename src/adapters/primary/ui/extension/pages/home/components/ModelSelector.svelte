@@ -32,5 +32,5 @@
   value={isDisabled ? '' : value}
   {options}
   disabled={isDisabled}
-  onchange={onchange}
+  {onchange}
 />

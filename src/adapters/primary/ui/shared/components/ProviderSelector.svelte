@@ -2,7 +2,7 @@
   import Select from './Select.svelte';
   import { getCustomProvidersStateContext } from '../context';
   import { PROVIDERS } from '../../../../../core/domain/credential/Provider';
-  import { ProviderRegistry } from '../../../../../core/domain/provider/ProviderRegistry';
+  import { getProviderDefinition } from '../../../../../core/domain/provider/provider-definitions';
 
   interface Props {
     value: string;
@@ -17,7 +17,7 @@
   const options = $derived([
     ...PROVIDERS.map((id) => ({
       value: id,
-      label: ProviderRegistry.getConfig(id).name,
+      label: getProviderDefinition(id)!.name,
     })),
     ...customProviders.state.providers.map((provider) => ({
       value: provider.id,

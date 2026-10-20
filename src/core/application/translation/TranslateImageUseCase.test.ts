@@ -11,6 +11,7 @@ const VALID_PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA';
 function createUseCase() {
   const service = new FakeTranslationService();
   const useCase = new TranslateImageUseCase(service);
+
   return { service, useCase };
 }
 
@@ -18,6 +19,7 @@ describe('Application: TranslateImageUseCase', () => {
   // ==================== HAPPY PATH ====================
   test('successfully translates an image', async () => {
     const { useCase } = createUseCase();
+
     const command: TranslateImageCommand = {
       imageBase64: VALID_PNG_DATA_URL,
       targetLanguageCode: 'en-US',
@@ -26,6 +28,7 @@ describe('Application: TranslateImageUseCase', () => {
     const result = await useCase.execute(command);
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data).toBeInstanceOf(Translation);
     }
@@ -33,6 +36,7 @@ describe('Application: TranslateImageUseCase', () => {
 
   test('returns custom translation from service', async () => {
     const { service, useCase } = createUseCase();
+
     const expected = Translation.create(
       'custom-1',
       [],
@@ -40,6 +44,7 @@ describe('Application: TranslateImageUseCase', () => {
       'Custom result',
       new Date(),
     );
+
     service.willReturn(expected);
 
     const command: TranslateImageCommand = {
@@ -50,6 +55,7 @@ describe('Application: TranslateImageUseCase', () => {
     const result = await useCase.execute(command);
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data.id).toBe('custom-1');
       expect(result.data.description).toBe('Custom result');
@@ -58,10 +64,12 @@ describe('Application: TranslateImageUseCase', () => {
 
   test('forwards generic execution context without interpreting capabilities or progress', async () => {
     const { service, useCase } = createUseCase();
+
     const cancellationToken = {
       isCancellationRequested: false,
       onCancellationRequested: () => () => {},
     };
+
     const progress = { report: async () => success(undefined) };
     const generationDeadlineAt = Date.now() + 1_234;
 
@@ -75,12 +83,15 @@ describe('Application: TranslateImageUseCase', () => {
 
     expect(result.success).toBe(true);
     expect(service.calls).toHaveLength(1);
+
     expect(service.calls[0]?.options).toEqual({
       cancellationToken,
       progress,
       generationDeadlineAt,
     });
+
     expect(service.calls[0]?.options?.progress).toBe(progress);
+
     expect(service.calls[0]?.options?.cancellationToken).toBe(
       cancellationToken,
     );
@@ -89,6 +100,7 @@ describe('Application: TranslateImageUseCase', () => {
   // ==================== VALIDATION FAILURES ====================
   test('fails with unsupported language code', async () => {
     const { useCase, service } = createUseCase();
+
     const command: TranslateImageCommand = {
       imageBase64: VALID_PNG_DATA_URL,
       targetLanguageCode: 'xx-FAKE',
@@ -97,17 +109,21 @@ describe('Application: TranslateImageUseCase', () => {
     const result = await useCase.execute(command);
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBeInstanceOf(TranslationError);
+
       expect(result.error.code).toBe(
         ErrorCode.TRANSLATION_UNSUPPORTED_LANGUAGE,
       );
     }
+
     expect(service.calls).toHaveLength(0);
   });
 
   test('fails with invalid image data', async () => {
     const { useCase } = createUseCase();
+
     const command: TranslateImageCommand = {
       imageBase64: 'not-a-data-url',
       targetLanguageCode: 'en-US',
@@ -116,6 +132,7 @@ describe('Application: TranslateImageUseCase', () => {
     const result = await useCase.execute(command);
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBeInstanceOf(TranslationError);
       expect(result.error.code).toBe(ErrorCode.TRANSLATION_INVALID_IMAGE);
@@ -125,6 +142,7 @@ describe('Application: TranslateImageUseCase', () => {
   // ==================== SERVICE FAILURE ====================
   test('fails when translation service fails', async () => {
     const { service, useCase } = createUseCase();
+
     service.failWith(TranslationError.failed());
 
     const command: TranslateImageCommand = {
@@ -135,6 +153,7 @@ describe('Application: TranslateImageUseCase', () => {
     const result = await useCase.execute(command);
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBeInstanceOf(TranslationError);
       expect(result.error.code).toBe(ErrorCode.TRANSLATION_FAILED);
@@ -143,6 +162,7 @@ describe('Application: TranslateImageUseCase', () => {
 
   test('fails when service returns rate limited', async () => {
     const { service, useCase } = createUseCase();
+
     service.failWith(TranslationError.rateLimited());
 
     const command: TranslateImageCommand = {
@@ -153,6 +173,7 @@ describe('Application: TranslateImageUseCase', () => {
     const result = await useCase.execute(command);
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBeInstanceOf(TranslationError);
       expect(result.error.code).toBe(ErrorCode.TRANSLATION_RATE_LIMITED);

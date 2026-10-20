@@ -5,7 +5,7 @@ import {
   type MainPageDeps,
 } from './MainPageController.svelte';
 import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
-import { ProviderRegistry } from '../../../../../../core/domain/provider/ProviderRegistry';
+import { getProviderDefaultModelId } from '../../../../../../core/domain/provider/provider-definitions';
 import { CustomProviderConfig } from '../../../../../../core/domain/provider/CustomProviderConfig';
 import { CustomProvidersState } from '../../../shared/hooks/useCustomProviders.svelte';
 import type { Credential } from '../../../../../../core/domain/credential/Credential';
@@ -54,27 +54,43 @@ function createDeps() {
   };
 
   const customProviderState = new CustomProvidersState();
+
   customProviderState.hydrated = true;
+
   const customProviders = {
     state: customProviderState,
-    getProvider: vi.fn().mockImplementation((id: string) =>
-      customProviderState.providers.find((provider) => provider.id === id) ?? null,
-    ),
+    getProvider: vi
+      .fn()
+      .mockImplementation(
+        (id: string) =>
+          customProviderState.providers.find(
+            (provider) => provider.id === id,
+          ) ?? null,
+      ),
   };
 
   const toast = { show: vi.fn() };
 
-  const deps: MainPageDeps = { auth, preferences, models, customProviders, toast };
+  const deps: MainPageDeps = {
+    auth,
+    preferences,
+    models,
+    customProviders,
+    toast,
+  };
 
   return { deps, auth, preferences, models, customProviders, toast };
 }
 
 function createController(deps: MainPageDeps) {
   let controller!: ReturnType<typeof createMainPageController>;
+
   const cleanup = $effect.root(() => {
     controller = createMainPageController(deps);
   });
+
   flushSync();
+
   return { controller, cleanup };
 }
 
@@ -94,7 +110,9 @@ describe('UI Controller: MainPageController', () => {
 
   test('falls back to the default provider when no credential is active', () => {
     const { deps } = createDeps();
+
     deps.auth.state.credentials = makeCredentials([]);
+
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveProvider).toBe('google');
@@ -104,6 +122,7 @@ describe('UI Controller: MainPageController', () => {
 
   test('uses the auto-balance provider when the mode is auto-balance', () => {
     const { deps } = createDeps();
+
     deps.auth.state.credentials = makeCredentials(
       [
         makeCredential('google', 'gk1'),
@@ -112,7 +131,9 @@ describe('UI Controller: MainPageController', () => {
       ],
       'gk1',
     );
+
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('groq');
+
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveProvider).toBe('groq');
@@ -122,7 +143,9 @@ describe('UI Controller: MainPageController', () => {
 
   test('ignores auto-balance and keeps the active provider when the provider has one key', () => {
     const { deps } = createDeps();
+
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('groq');
+
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveProvider).toBe('google');
@@ -154,7 +177,9 @@ describe('UI Controller: MainPageController', () => {
 
   test('changeProvider switches to manual mode first when not manual', async () => {
     const { deps, auth } = createDeps();
+
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
+
     const { controller, cleanup } = createController(deps);
 
     await controller.changeProvider('groq');
@@ -162,6 +187,7 @@ describe('UI Controller: MainPageController', () => {
     expect(auth.setKeySelectionMode).toHaveBeenCalledWith(
       KeySelectionMode.manual(),
     );
+
     expect(auth.setActiveKey).toHaveBeenCalledWith('rk1');
 
     cleanup();
@@ -193,12 +219,15 @@ describe('UI Controller: MainPageController', () => {
 
   test('changeProvider reverts the selection and toasts when activation fails', async () => {
     const { deps, auth, toast } = createDeps();
+
     auth.setActiveKey = vi.fn().mockResolvedValue('Storage broken');
+
     const { controller, cleanup } = createController(deps);
 
     await controller.changeProvider('groq');
 
     expect(controller.state.selectedProvider).toBeNull();
+
     expect(toast.show).toHaveBeenCalledWith({
       type: 'error',
       message: 'Could not switch provider',
@@ -210,13 +239,16 @@ describe('UI Controller: MainPageController', () => {
 
   test('changeProvider reverts the selection on mode failure', async () => {
     const { deps, auth, toast } = createDeps();
+
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
     auth.setKeySelectionMode = vi.fn().mockResolvedValue('Mode failed');
+
     const { controller, cleanup } = createController(deps);
 
     await controller.changeProvider('groq');
 
     expect(controller.state.selectedProvider).toBeNull();
+
     expect(toast.show).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'Could not switch provider',
@@ -229,8 +261,13 @@ describe('UI Controller: MainPageController', () => {
 
   test('effectiveModelId prefers a saved selection present in the model list', () => {
     const { deps, models, preferences } = createDeps();
-    models.modelsFor = vi.fn().mockReturnValue([makeModel('m1'), makeModel('m2')]);
+
+    models.modelsFor = vi
+      .fn()
+      .mockReturnValue([makeModel('m1'), makeModel('m2')]);
+
     preferences.state.selectedModels = { google: 'm2' };
+
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveModelId).toBe('m2');
@@ -240,9 +277,14 @@ describe('UI Controller: MainPageController', () => {
 
   test('effectiveModelId falls back to the provider default when saved is stale', () => {
     const { deps, models, preferences } = createDeps();
-    const defaultId = ProviderRegistry.getDefaultModelId('google');
-    models.modelsFor = vi.fn().mockReturnValue([makeModel(defaultId), makeModel('m1')]);
+    const defaultId = getProviderDefaultModelId('google');
+
+    models.modelsFor = vi
+      .fn()
+      .mockReturnValue([makeModel(defaultId), makeModel('m1')]);
+
     preferences.state.selectedModels = { google: 'gone' };
+
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveModelId).toBe(defaultId);
@@ -252,7 +294,9 @@ describe('UI Controller: MainPageController', () => {
 
   test('effectiveModelId falls back to the first model when nothing matches', () => {
     const { deps, models } = createDeps();
+
     models.modelsFor = vi.fn().mockReturnValue([makeModel('m1')]);
+
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveModelId).toBe('m1');
@@ -263,18 +307,24 @@ describe('UI Controller: MainPageController', () => {
   test('canTranslate requires a key and a resolvable model', () => {
     const { deps, models } = createDeps();
     const { controller: withoutModels, cleanup: c1 } = createController(deps);
+
     expect(withoutModels.canTranslate).toBe(false);
     c1();
 
     models.modelsFor = vi.fn().mockReturnValue([makeModel('m1')]);
     deps.auth.state.credentials = makeCredentials([]);
+
     const { controller: withoutKeys, cleanup: c2 } = createController(deps);
+
     expect(withoutKeys.canTranslate).toBe(false);
     c2();
 
     const { deps: withBoth } = createDeps();
+
     withBoth.models.modelsFor = vi.fn().mockReturnValue([makeModel('m1')]);
+
     const { controller: ready, cleanup: c3 } = createController(withBoth);
+
     expect(ready.canTranslate).toBe(true);
     c3();
   });
@@ -285,17 +335,25 @@ describe('UI Controller: MainPageController', () => {
 
     controller.setSelectedModel('m9');
 
-    expect(preferences.setSelectedModelFor).toHaveBeenCalledWith('google', 'm9');
+    expect(preferences.setSelectedModelFor).toHaveBeenCalledWith(
+      'google',
+      'm9',
+    );
 
     cleanup();
   });
 
   test('persists the effective model when it differs from the saved selection', () => {
     const { deps, models, preferences } = createDeps();
+
     models.modelsFor = vi.fn().mockReturnValue([makeModel('m1')]);
+
     const { cleanup } = createController(deps);
 
-    expect(preferences.setSelectedModelFor).toHaveBeenCalledWith('google', 'm1');
+    expect(preferences.setSelectedModelFor).toHaveBeenCalledWith(
+      'google',
+      'm1',
+    );
 
     cleanup();
   });
@@ -323,10 +381,12 @@ describe('UI Controller: MainPageController', () => {
 
   test('snaps a deleted custom selection to DeepSeek even with a stale active custom key', () => {
     const { deps } = createDeps();
+
     deps.auth.state.credentials = makeCredentials(
       [makeCredential('custom-gone', 'orphan')],
       'orphan',
     );
+
     const { controller, cleanup } = createController(deps);
 
     controller.state.selectedProvider = 'custom-gone';
@@ -341,10 +401,12 @@ describe('UI Controller: MainPageController', () => {
 
   test('recovers a missing active custom provider when the popup reopens', () => {
     const { deps } = createDeps();
+
     deps.auth.state.credentials = makeCredentials(
       [makeCredential('custom-gone', 'orphan')],
       'orphan',
     );
+
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveProvider).toBe('deepseek');
@@ -355,7 +417,9 @@ describe('UI Controller: MainPageController', () => {
 
   test('keeps a custom selection while providers are still hydrating', () => {
     const { deps, customProviders } = createDeps();
+
     customProviders.state.hydrated = false;
+
     const { controller, cleanup } = createController(deps);
 
     controller.state.selectedProvider = 'custom-pending';
@@ -375,14 +439,18 @@ describe('UI Controller: MainPageController', () => {
 
   test('snaps to DeepSeek when the selected provider disappears from the loaded catalog', () => {
     const { deps, customProviders } = createDeps();
+
     const provider = CustomProviderConfig.create({
       id: 'custom-deepseek',
       name: 'Old DeepSeek',
       baseURL: 'https://api.deepseek.com',
     });
+
     if (!provider.success) throw new Error('Invalid test provider');
     customProviders.state.providers = [provider.data];
+
     const { controller, cleanup } = createController(deps);
+
     controller.state.selectedProvider = 'custom-deepseek';
     flushSync();
     expect(controller.effectiveProvider).toBe('custom-deepseek');
@@ -398,11 +466,14 @@ describe('UI Controller: MainPageController', () => {
 
   test('keeps another selected provider when an active custom provider is gone', () => {
     const { deps } = createDeps();
+
     deps.auth.state.credentials = makeCredentials(
       [makeCredential('custom-gone', 'orphan')],
       'orphan',
     );
+
     const { controller, cleanup } = createController(deps);
+
     controller.state.selectedProvider = 'groq';
     flushSync();
 

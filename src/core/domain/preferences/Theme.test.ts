@@ -7,6 +7,7 @@ describe('Domain: Theme', () => {
   describe('static factories', () => {
     test('system() creates system theme', () => {
       const theme = Theme.system();
+
       expect(theme.value).toBe('system');
       expect(theme.isSystem).toBe(true);
       expect(theme.isDark).toBe(false);
@@ -15,6 +16,7 @@ describe('Domain: Theme', () => {
 
     test('dark() creates dark theme', () => {
       const theme = Theme.dark();
+
       expect(theme.value).toBe('dark');
       expect(theme.isDark).toBe(true);
       expect(theme.isSystem).toBe(false);
@@ -23,6 +25,7 @@ describe('Domain: Theme', () => {
 
     test('light() creates light theme', () => {
       const theme = Theme.light();
+
       expect(theme.value).toBe('light');
       expect(theme.isLight).toBe(true);
       expect(theme.isDark).toBe(false);
@@ -44,6 +47,7 @@ describe('Domain: Theme', () => {
     test('accepts valid theme strings', () => {
       for (const val of ['dark', 'light', 'system'] as const) {
         const result = Theme.fromRaw(val);
+
         expect(result.success).toBe(true);
         if (result.success) expect(result.data.value).toBe(val);
       }
@@ -51,7 +55,9 @@ describe('Domain: Theme', () => {
 
     test('rejects empty string', () => {
       const result = Theme.fromRaw('');
+
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBeInstanceOf(DomainError);
       }
@@ -59,7 +65,9 @@ describe('Domain: Theme', () => {
 
     test('rejects invalid theme value', () => {
       const result = Theme.fromRaw('auto');
+
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error.message).toContain('Invalid theme');
       }

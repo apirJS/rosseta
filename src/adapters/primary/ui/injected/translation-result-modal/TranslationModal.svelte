@@ -13,9 +13,11 @@
 
   let backdropEl: HTMLDivElement;
   let retryEl = $state<HTMLButtonElement>();
+
   $effect(() => {
     backdropEl?.focus();
   });
+
   $effect(() => {
     if (ctrl.isUnsuccessful) retryEl?.focus({ preventScroll: true });
   });

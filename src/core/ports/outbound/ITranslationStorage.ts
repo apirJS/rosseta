@@ -6,9 +6,7 @@ export interface ITranslationStorage {
   save(translation: Translation): Promise<Result<void, AppError>>;
   getById(id: string): Promise<Result<Translation | null, AppError>>;
   getAll(): Promise<Result<Translation[], AppError>>;
-  replaceAll(
-    translations: Translation[],
-  ): Promise<Result<void, AppError>>;
+  replaceAll(translations: Translation[]): Promise<Result<void, AppError>>;
   delete(id: string): Promise<Result<void, AppError>>;
   clear(): Promise<Result<void, AppError>>;
 }

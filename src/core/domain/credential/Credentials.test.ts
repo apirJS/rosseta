@@ -13,9 +13,13 @@ function makeCredential(
   provider: 'google' | 'groq' = 'google',
 ): Credential {
   const apiKey = ApiKey.createWithProvider(raw, provider);
+
   if (!apiKey.success) throw new Error('Test helper: invalid API key');
+
   const cred = Credential.create(id, apiKey.data, apiKey.data.provider);
+
   if (!cred.success) throw new Error('Test helper: invalid credential');
+
   return cred.data;
 }
 
@@ -23,6 +27,7 @@ describe('Domain: Credentials (Aggregate)', () => {
   describe('createEmpty', () => {
     test('creates with no items and null active', () => {
       const creds = Credentials.createEmpty('creds-1');
+
       expect(creds.id).toBe('creds-1');
       expect(creds.items).toHaveLength(0);
       expect(creds.activeCredentialId).toBeNull();
@@ -61,6 +66,7 @@ describe('Domain: Credentials (Aggregate)', () => {
       const c2 = makeCredential('c2', VALID_GROQ_KEY, 'groq');
 
       const result = empty.add(c1).add(c2);
+
       expect(result.items).toHaveLength(2);
       expect(result.activeCredentialId).toBe('c2');
     });
@@ -106,6 +112,7 @@ describe('Domain: Credentials (Aggregate)', () => {
       const result = creds.setActive('c1');
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.activeCredentialId).toBe('c1');
       }
@@ -119,6 +126,7 @@ describe('Domain: Credentials (Aggregate)', () => {
       const result = creds.setActive('nope');
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBeInstanceOf(DomainError);
       }
@@ -140,7 +148,12 @@ describe('Domain: Credentials (Aggregate)', () => {
   describe('getNextRoundRobin', () => {
     test('returns first key when no lastUsedId', () => {
       const g1 = makeCredential('g1');
-      const g2 = makeCredential('g2', 'AIzaSyB1234567890abcdefghijklmnopqrstuv');
+
+      const g2 = makeCredential(
+        'g2',
+        'AIzaSyB1234567890abcdefghijklmnopqrstuv',
+      );
+
       const creds = Credentials.createEmpty('creds-1').add(g1).add(g2);
 
       expect(creds.getNextRoundRobin('google', null)?.id).toBe('g1');
@@ -148,7 +161,12 @@ describe('Domain: Credentials (Aggregate)', () => {
 
     test('advances to next key and wraps around', () => {
       const g1 = makeCredential('g1');
-      const g2 = makeCredential('g2', 'AIzaSyB1234567890abcdefghijklmnopqrstuv');
+
+      const g2 = makeCredential(
+        'g2',
+        'AIzaSyB1234567890abcdefghijklmnopqrstuv',
+      );
+
       const creds = Credentials.createEmpty('creds-1').add(g1).add(g2);
 
       expect(creds.getNextRoundRobin('google', 'g1')?.id).toBe('g2');
@@ -157,6 +175,7 @@ describe('Domain: Credentials (Aggregate)', () => {
 
     test('returns null when provider has no keys', () => {
       const creds = Credentials.createEmpty('creds-1');
+
       expect(creds.getNextRoundRobin('google', null)).toBeNull();
     });
   });
@@ -183,6 +202,7 @@ describe('Domain: Credentials (Aggregate)', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.items).toHaveLength(2);
         expect(result.data.activeCredentialId).toBe('c1');
@@ -195,6 +215,7 @@ describe('Domain: Credentials (Aggregate)', () => {
         activeCredentialId: null,
         items: [],
       });
+
       expect(result.success).toBe(false);
     });
 
@@ -204,6 +225,7 @@ describe('Domain: Credentials (Aggregate)', () => {
         activeCredentialId: 'missing',
         items: [],
       });
+
       expect(result.success).toBe(false);
     });
 
@@ -220,6 +242,7 @@ describe('Domain: Credentials (Aggregate)', () => {
           },
         ],
       });
+
       expect(result.success).toBe(false);
     });
   });
@@ -230,11 +253,13 @@ describe('Domain: Credentials (Aggregate)', () => {
         .add(makeCredential('c1'))
         .add(makeCredential('c2', VALID_GROQ_KEY, 'groq'))
         .setActive('c1');
+
       if (!creds.success) throw new Error('bad state');
 
       const result = Credentials.fromProps(creds.data.toProps());
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.items).toHaveLength(2);
         expect(result.data.activeCredentialId).toBe('c1');

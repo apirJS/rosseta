@@ -5,12 +5,7 @@
 
   interface Props {
     variant?:
-      | 'primary'
-      | 'secondary'
-      | 'outline'
-      | 'ghost'
-      | 'destructive'
-      | 'link';
+      'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link';
     size?: 'sm' | 'md' | 'lg' | 'icon';
     isLoading?: boolean;
     disabled?: boolean;

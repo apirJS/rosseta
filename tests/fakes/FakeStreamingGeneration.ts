@@ -5,7 +5,8 @@ import type {
   GenerationResult,
   ITranslationGenerationTransport,
   GenerationMode,
-} from '../../src/adapters/secondary/shared/ITranslationGenerationTransport';
+} from '../../src/adapters/secondary/translation/transports/GenerationTransport';
+
 export interface ScriptedGeneration {
   events?: GenerationEvent[];
   result?: GenerationResult;
@@ -21,14 +22,17 @@ export class FakeStreamingGeneration implements ITranslationGenerationTransport 
     onEvent: (event: GenerationEvent) => Promise<void>,
   ): Promise<GenerationResult> {
     this.requests.push(request);
+
     const script = this.scripts.shift();
+
     if (!script) throw new Error('No scripted provider response');
 
     for (const event of script.events ?? []) await onEvent(event);
-    
+
     if (script.wait) await script.wait;
     if (script.error) throw script.error;
     if (!script.result) throw new Error('No scripted result');
+
     return script.result;
   }
 }

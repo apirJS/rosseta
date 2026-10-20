@@ -40,10 +40,7 @@ export {
   getCustomProvidersStateContext,
 } from './providers';
 
-export {
-  setPopupToastContext,
-  getPopupToastContext,
-} from './toast';
+export { setPopupToastContext, getPopupToastContext } from './toast';
 
 export {
   type SettingsUseCases,

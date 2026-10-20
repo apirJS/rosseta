@@ -92,10 +92,13 @@ export function createHomeController(deps?: {
 
   function navigateTo(view: TranslationView, provider?: AnyProvider) {
     if (provider) state.selectedProvider = provider;
+
     if (view === 'main') {
       showMain();
+
       return;
     }
+
     state.slideDirection = 'forward';
     state.currentView = view;
     state.isMenuOpen = false;

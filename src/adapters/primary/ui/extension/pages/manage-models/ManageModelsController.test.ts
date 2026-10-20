@@ -10,12 +10,14 @@ import type { PopupToastController } from '../../../shared/toast/PopupToastContr
 
 function createToastFake() {
   const show = vi.fn();
+
   const toast = {
     show,
     dismiss: vi.fn(),
     update: vi.fn(),
     toasts: [],
   } as unknown as PopupToastController;
+
   return { toast, show };
 }
 
@@ -69,6 +71,7 @@ describe('UI Controller: ManageModelsController', () => {
   test('setProvider resets the model input', () => {
     const { deps } = createDeps();
     const controller = createManageModelsController(deps);
+
     controller.state.modelInput = 'pending-text';
 
     controller.setProvider('groq');
@@ -80,6 +83,7 @@ describe('UI Controller: ManageModelsController', () => {
   test('addModel succeeds and clears the input', async () => {
     const { deps } = createDeps();
     const controller = createManageModelsController(deps);
+
     controller.state.modelInput = 'new-model';
 
     await controller.addModel();
@@ -134,6 +138,7 @@ describe('UI Controller: ManageModelsController', () => {
   test('addModel no-ops when the input matches an existing model id', async () => {
     const { deps } = createDeps();
     const controller = createManageModelsController(deps);
+
     controller.state.modelInput = 'm1';
 
     await controller.addModel();
@@ -150,7 +155,9 @@ describe('UI Controller: ManageModelsController', () => {
           failure(ValidationError.invalidInput('Storage broken')),
         ),
     });
+
     const controller = createManageModelsController(deps);
+
     controller.state.modelInput = 'new-model';
 
     await controller.addModel();
@@ -162,6 +169,7 @@ describe('UI Controller: ManageModelsController', () => {
         description: 'Storage broken',
       }),
     );
+
     expect(controller.state.modelInput).toBe('new-model');
   });
 
@@ -171,6 +179,7 @@ describe('UI Controller: ManageModelsController', () => {
         .fn()
         .mockResolvedValue(failure(ValidationError.invalidInput('nope'))),
     });
+
     const controller = createManageModelsController(deps);
 
     await controller.removeModel('m1');
@@ -188,11 +197,13 @@ describe('UI Controller: ManageModelsController', () => {
     const { deps, show } = createDeps({
       hasApiKeyFor: vi.fn().mockReturnValue(false),
     });
+
     const controller = createManageModelsController(deps);
 
     await controller.fetchModels();
 
     expect(deps.fetchModels).not.toHaveBeenCalled();
+
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'info' }),
     );
@@ -205,9 +216,11 @@ describe('UI Controller: ManageModelsController', () => {
     await controller.fetchModels();
 
     expect(deps.fetchModels).toHaveBeenCalledWith('google');
+
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'success', message: 'Loaded 1 models' }),
     );
+
     expect(controller.state.isFetching).toBe(false);
   });
 
@@ -219,6 +232,7 @@ describe('UI Controller: ManageModelsController', () => {
           failure(ValidationError.invalidInput('401 Unauthorized')),
         ),
     });
+
     const controller = createManageModelsController(deps);
 
     await controller.fetchModels();
@@ -247,6 +261,7 @@ describe('UI Controller: ManageModelsController', () => {
         .fn()
         .mockResolvedValue(failure(ValidationError.invalidInput('denied'))),
     });
+
     const controller = createManageModelsController(deps);
 
     await controller.resetModels();
@@ -264,6 +279,7 @@ describe('UI Controller: ManageModelsController', () => {
     const { deps } = createDeps({
       selectedModelFor: vi.fn().mockReturnValue('m2'),
     });
+
     const controller = createManageModelsController(deps);
 
     expect(controller.selectedModelId).toBe('m2');
@@ -272,6 +288,7 @@ describe('UI Controller: ManageModelsController', () => {
   test('selectModel delegates with the selected provider', () => {
     const { deps } = createDeps();
     const controller = createManageModelsController(deps);
+
     controller.setProvider('groq');
 
     controller.selectModel('m1');

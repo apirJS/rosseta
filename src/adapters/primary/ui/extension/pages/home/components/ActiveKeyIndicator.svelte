@@ -29,9 +29,7 @@
 </script>
 
 <div>
-  <span class="block text-sm font-medium text-foreground mb-1">
-    API Key
-  </span>
+  <span class="block text-sm font-medium text-foreground mb-1"> API Key </span>
 
   {#if controller.hasMultiple}
     <div class="relative" use:clickOutside={controller.close}>

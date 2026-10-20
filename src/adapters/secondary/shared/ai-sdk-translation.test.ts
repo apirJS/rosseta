@@ -380,7 +380,7 @@ describe('Adapter: shared streaming execution', () => {
     expect(transport.requests[1].mode).toBe('plain-stream');
   });
 
-  test('stops before a fourth repair call and reuses learned compatibility on the next translation', async () => {
+  test('repairs after schema and streaming fallback and reuses learned compatibility', async () => {
     const storage = new FakeTranslationCapabilityStorage();
     const transport = new FakeStreamingGeneration([
       { error: api('response format json_schema not supported') },
@@ -393,22 +393,25 @@ describe('Adapter: shared streaming execution', () => {
         },
       },
       { result: plain },
+      { result: plain },
     ]);
-    expect((await run(transport, storage)).success).toBe(false);
+    expect((await run(transport, storage)).success).toBe(true);
     expect(transport.requests.map((request) => request.mode)).toEqual([
       'structured-stream',
       'plain-stream',
       'plain-buffered',
+      'plain-buffered',
     ]);
+    expect(transport.requests[3].userText).toContain('untrusted_previous_response');
     expect(transport.scripts).toHaveLength(1);
 
     expect((await run(transport, storage)).success).toBe(true);
-    expect(transport.requests).toHaveLength(4);
-    expect(transport.requests[3].mode).toBe('plain-buffered');
-    expect(transport.requests[3].userText).not.toContain(
+    expect(transport.requests).toHaveLength(5);
+    expect(transport.requests[4].mode).toBe('plain-buffered');
+    expect(transport.requests[4].userText).not.toContain(
       'untrusted_previous_response',
     );
-    expect(transport.requests[3].image).toBe(VALID_IMAGE);
+    expect(transport.requests[4].image).toBe(VALID_IMAGE);
   });
 
   test('does not promote interrupted text to success, allows one buffered restart', async () => {

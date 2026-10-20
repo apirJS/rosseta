@@ -3,8 +3,9 @@ import type { GenerationFailure } from './generation-errors';
 
 type ModeSupport = 'unknown' | 'supported' | 'unsupported';
 type SupportLookup = (mode: GenerationMode) => ModeSupport;
-// The initial request and all fallback/repair calls share this budget.
-const MAX_GENERATION_CALLS = 3;
+// Shared ceiling for the initial request, configuration/mode fallbacks, and repair.
+// Two rejected thinking controls + schema/stream fallback + generation + repair = six.
+const MAX_GENERATION_CALLS = 6;
 
 export const isStructured = (mode: GenerationMode) => mode.startsWith('structured');
 export const isStreamed = (mode: GenerationMode) => mode.endsWith('stream');

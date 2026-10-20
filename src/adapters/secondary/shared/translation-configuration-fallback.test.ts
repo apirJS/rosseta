@@ -359,32 +359,75 @@ describe('Adapter: translation configuration compatibility fallback', () => {
     expect(transport.requests[2].image).toBe(VALID_IMAGE);
   });
 
-  test('shares three calls across configuration and mode discovery and retains facts at exhaustion', async () => {
+  test('completes combined thinking, schema, streaming, and repair fallback in six calls', async () => {
     const storage = new FakeTranslationCapabilityStorage();
     const transport = new ConfiguredGeneration([
       { error: rejectedThinking() },
+      { error: api('Invalid value for reasoning_effort', 422) },
       { error: api('response_format is unsupported') },
       { error: api('streaming is unsupported') },
+      { result: malformed },
+      { result: plain },
+      { result: plain },
+    ]);
+    expect((await run(transport, storage)).success).toBe(true);
+    expect(transport.requests.map(request => request.mode)).toEqual([
+      'structured-stream', 'structured-stream', 'structured-stream',
+      'plain-stream', 'plain-buffered', 'plain-buffered',
+    ]);
+    expect(profileIds(transport)).toEqual([OFF, MINIMUM, OMIT, OMIT, OMIT, OMIT]);
+    expect(transport.requests[4].userText).not.toContain('untrusted_previous_response');
+    expect(transport.requests[5].userText).toContain('untrusted_previous_response');
+    expect(transport.requests[5].image).toBe(VALID_IMAGE);
+    const stored = await facts(storage);
+    expect(stored[`configuration.${OFF}`].support).toBe('unsupported');
+    expect(stored[`configuration.${MINIMUM}`].support).toBe('unsupported');
+    expect(stored[`configuration.${OMIT}`].support).toBe('supported');
+    expect(stored['feature.structured'].support).toBe('unsupported');
+    expect(stored['feature.stream'].support).toBe('unsupported');
+
+    // A later translation goes directly to the working configuration and mode.
+    expect((await run(transport, storage)).success).toBe(true);
+    expect(transport.requests).toHaveLength(7);
+    expect(transport.requests[6].mode).toBe('plain-buffered');
+    expect(transport.requests[6].configurationId).toBe(OMIT);
+    expect(transport.requests[6].userText).not.toContain('untrusted_previous_response');
+  });
+
+  test('stops at six shared calls and retains the final rejection for the next translation', async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+    const transport = new ConfiguredGeneration([
+      { error: api('response_format is unsupported') },
+      { error: api('streaming is unsupported') },
+      { error: new TypeError('network disconnected') },
+      { result: malformed },
+      { error: rejectedThinking() },
+      { error: api('Invalid value for reasoning_effort', 422) },
       { result: plain },
     ]);
     expect((await run(transport, storage)).success).toBe(false);
-    expect(transport.requests).toHaveLength(3);
+    expect(transport.requests).toHaveLength(6);
     expect(transport.scripts).toHaveLength(1);
     expect(transport.requests.map(request => request.mode)).toEqual([
-      'structured-stream', 'structured-stream', 'plain-stream',
+      'structured-stream', 'plain-stream', 'plain-buffered',
+      'plain-buffered', 'plain-buffered', 'plain-buffered',
     ]);
-    expect(profileIds(transport)).toEqual([OFF, MINIMUM, MINIMUM]);
+    expect(profileIds(transport)).toEqual([OFF, OFF, OFF, OFF, OFF, MINIMUM]);
+    expect(transport.requests[3].userText).not.toContain('untrusted_previous_response');
+    expect(transport.requests[4].userText).toContain('untrusted_previous_response');
+    expect(transport.requests[5].userText).toBe(transport.requests[4].userText);
     const stored = await facts(storage);
     expect(stored[`configuration.${OFF}`].support).toBe('unsupported');
+    expect(stored[`configuration.${MINIMUM}`].support).toBe('unsupported');
     expect(stored['feature.structured'].support).toBe('unsupported');
     expect(stored['feature.stream'].support).toBe('unsupported');
 
     // A later real translation skips the failed settings/modes without probing.
     expect((await run(transport, storage)).success).toBe(true);
-    expect(transport.requests).toHaveLength(4);
+    expect(transport.requests).toHaveLength(7);
     expect(transport.scripts).toHaveLength(0);
-    expect(transport.requests[3].mode).toBe('plain-buffered');
-    expect(transport.requests[3].configurationId).toBe(MINIMUM);
+    expect(transport.requests[6].mode).toBe('plain-buffered');
+    expect(transport.requests[6].configurationId).toBe(OMIT);
   });
 
   test('cancellation before start prevents configuration discovery requests', async () => {

@@ -16,7 +16,10 @@ import { AbortCancellationToken } from '../../primary/background/services/AbortC
 import { success } from '../../../shared/types/Result';
 import { ErrorCode } from '../../../shared/errors';
 
-function adapter(storage = new FakeTranslationCapabilityStorage()) {
+function adapter(
+  storage = new FakeTranslationCapabilityStorage(),
+  modelId = 'fixture-native',
+) {
   const key = ApiKey.createWithProvider('fixture-token', 'puter');
   if (!key.success) throw key.error;
   const credential = Credential.create(crypto.randomUUID(), key.data, 'puter');
@@ -25,7 +28,7 @@ function adapter(storage = new FakeTranslationCapabilityStorage()) {
     credential.data,
     UserPreferences.createDefault(crypto.randomUUID()).withSelectedModel(
       'puter',
-      'fixture-native',
+      modelId,
     ),
     storage,
   );
@@ -111,6 +114,129 @@ describe('Adapter: PuterTranslationAdapter', () => {
       { model: 'fixture-native', temperature: 0, normalize: true },
       { model: 'fixture-native', temperature: 0, normalize: true },
     ]);
+  });
+
+  test('a rejected native thinking control falls back to minimum effort and directly reuses the cached profile', async () => {
+    chat.mockRejectedValueOnce({
+      status: 400,
+      error: {
+        code: 'invalid_request_error',
+        message: "Unsupported value: 'none'",
+        param: 'reasoning_effort',
+      },
+    });
+    chat.mockResolvedValueOnce(chunks([{ type: 'text', text: raw }]) as never);
+    chat.mockResolvedValueOnce(chunks([{ type: 'text', text: raw }]) as never);
+    const storage = new FakeTranslationCapabilityStorage();
+    const service = adapter(storage, 'gpt-5.2');
+
+    expect(
+      (await service.translateImage(VALID_IMAGE, TARGET_LANGUAGE)).success,
+    ).toBe(true);
+    expect(
+      (await service.translateImage(VALID_IMAGE, TARGET_LANGUAGE)).success,
+    ).toBe(true);
+    expect(
+      chat.mock.calls.map((_, index) => callAt(index)[2].reasoning_effort),
+    ).toEqual(['none', 'low', 'low']);
+    expect(
+      chat.mock.calls.every((_, index) => callAt(index)[2].stream === true),
+    ).toBe(true);
+    const facts = [...storage.records.values()][0].facts;
+    expect(facts['configuration.thinking.puter.none.v1'].support).toBe(
+      'unsupported',
+    );
+    expect(facts['configuration.thinking.puter.low.v1'].support).toBe(
+      'supported',
+    );
+    expect(facts['feature.stream'].support).toBe('supported');
+  });
+
+  test('typed in-band native control errors fall back through minimum to omission and cache that selection', async () => {
+    const error = {
+      type: 'error',
+      code: 'invalid_request_error',
+      message: 'reasoning_effort is unsupported',
+    };
+    chat.mockResolvedValueOnce(chunks([error]) as never);
+    chat.mockResolvedValueOnce(chunks([error]) as never);
+    chat.mockResolvedValueOnce(chunks([{ type: 'text', text: raw }]) as never);
+    chat.mockResolvedValueOnce(chunks([{ type: 'text', text: raw }]) as never);
+    const storage = new FakeTranslationCapabilityStorage();
+    const service = adapter(storage, 'gpt-5.2');
+
+    expect(
+      (await service.translateImage(VALID_IMAGE, TARGET_LANGUAGE)).success,
+    ).toBe(true);
+    expect(
+      (await service.translateImage(VALID_IMAGE, TARGET_LANGUAGE)).success,
+    ).toBe(true);
+    expect(
+      chat.mock.calls.map((_, index) => callAt(index)[2].reasoning_effort),
+    ).toEqual(['none', 'low', undefined, undefined]);
+    const facts = [...storage.records.values()][0].facts;
+    expect(facts['configuration.thinking.puter.none.v1'].support).toBe(
+      'unsupported',
+    );
+    expect(facts['configuration.thinking.puter.low.v1'].support).toBe(
+      'unsupported',
+    );
+    expect(facts['configuration.thinking.provider-default.v1'].support).toBe(
+      'supported',
+    );
+  });
+
+  test('preserves native failed-envelope thinking metadata when the Puter SDK omits HTTP status', async () => {
+    chat.mockRejectedValueOnce({
+      success: false,
+      error: {
+        code: 'invalid_request_error',
+        message: "Unsupported value: 'none'",
+        param: 'reasoning_effort',
+      },
+    });
+    chat.mockResolvedValueOnce(chunks([{ type: 'text', text: raw }]) as never);
+    chat.mockResolvedValueOnce(chunks([{ type: 'text', text: raw }]) as never);
+    const service = adapter(new FakeTranslationCapabilityStorage(), 'gpt-5.2');
+
+    expect(
+      (await service.translateImage(VALID_IMAGE, TARGET_LANGUAGE)).success,
+    ).toBe(true);
+    expect(
+      (await service.translateImage(VALID_IMAGE, TARGET_LANGUAGE)).success,
+    ).toBe(true);
+    expect(
+      chat.mock.calls.map((_, index) => callAt(index)[2].reasoning_effort),
+    ).toEqual(['none', 'low', 'low']);
+  });
+
+  test('Puter usage-limit metadata cannot become a thinking incompatibility fact', async () => {
+    chat.mockRejectedValueOnce({
+      status: 400,
+      metadata: { usage_limited: true },
+      error: {
+        code: 'invalid_request_error',
+        message: "Unsupported value: 'none'",
+        param: 'reasoning_effort',
+      },
+    });
+    const storage = new FakeTranslationCapabilityStorage();
+    const result = await adapter(storage, 'gpt-5.2').translateImage(
+      VALID_IMAGE,
+      TARGET_LANGUAGE,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.code).toBe(
+        ErrorCode.TRANSLATION_PROVIDER_QUOTA_EXCEEDED,
+      );
+    expect(chat.mock.calls).toHaveLength(1);
+    expect(
+      [...storage.records.values()][0].facts[
+        'configuration.thinking.puter.none.v1'
+      ].support,
+    ).toBe('unknown');
   });
 
   test('malformed completion has one buffered repair preserving original image and paired schema prompt', async () => {

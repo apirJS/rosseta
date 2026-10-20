@@ -13,12 +13,37 @@ import { executeTranslation } from '../shared/ai-sdk-translation';
 import { AiSdkGenerationTransport } from '../shared/AiSdkGenerationTransport';
 import { providerProtocol } from '../shared/translation-capability-key';
 export class DeepInfraTranslationAdapter implements ITranslationService {
-    constructor(private readonly credential: Credential, private readonly userPreferences: UserPreferences, private readonly capabilities: ITranslationCapabilityStorage) { }
-    public async translateImage(image: EncodedImage, targetLanguage: Language, options?: TranslationExecutionOptions): Promise<Result<Translation, AppError>> {
-        const deepinfra = createDeepInfra({
-            apiKey: this.credential.apiKey.value,
-        });
-        const model = deepinfra(this.userPreferences.getModelIdFor(this.credential.provider));
-        return executeTranslation(new AiSdkGenerationTransport(model), { providerId: this.credential.provider, modelId: this.userPreferences.getModelIdFor(this.credential.provider), protocol: providerProtocol(this.credential.provider), legacyUnambiguous: true }, image, targetLanguage, this.userPreferences.includeDescription, this.capabilities, options);
-    }
+  constructor(
+    private readonly credential: Credential,
+    private readonly userPreferences: UserPreferences,
+    private readonly capabilities: ITranslationCapabilityStorage,
+  ) {}
+
+  async translateImage(
+    image: EncodedImage,
+    targetLanguage: Language,
+    options?: TranslationExecutionOptions,
+  ): Promise<Result<Translation, AppError>> {
+    const apiKey = this.credential.apiKey.value;
+    const modelId = this.userPreferences.getModelIdFor(
+      this.credential.provider,
+    );
+    const transport = new AiSdkGenerationTransport(
+      createDeepInfra({ apiKey })(modelId),
+    );
+    return executeTranslation(
+      transport,
+      {
+        providerId: this.credential.provider,
+        modelId,
+        protocol: providerProtocol(this.credential.provider),
+        legacyUnambiguous: true,
+      },
+      image,
+      targetLanguage,
+      this.userPreferences.includeDescription,
+      this.capabilities,
+      options,
+    );
+  }
 }

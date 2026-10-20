@@ -4,7 +4,10 @@ import type {
   TranslationCapabilityFact,
   TranslationCapabilitySupport,
 } from '../../../core/ports/outbound/ITranslationCapabilityStorage';
-import { GENERATION_MODES, type GenerationMode } from './ITranslationGenerationTransport';
+import {
+  GENERATION_MODES,
+  type GenerationMode,
+} from './ITranslationGenerationTransport';
 import { TranslationCapabilityJournal } from './TranslationCapabilityJournal';
 import type { CapabilityFacts } from './translation-capability-facts';
 import { migrateLegacyCapabilities } from './translation-capability-migration';
@@ -23,12 +26,17 @@ export class TranslationCapabilityState {
     private readonly storage: ITranslationCapabilityStorage,
     refreshContext?: TranslationCapabilityReadContext,
   ) {
-    this.journal = new TranslationCapabilityJournal(identity, storage, refreshContext);
+    this.journal = new TranslationCapabilityJournal(
+      identity,
+      storage,
+      refreshContext,
+    );
   }
 
   async load(legacyModelKey?: string, unambiguous = false): Promise<void> {
     await this.journal.load();
-    if (legacyModelKey && unambiguous) await this.importLegacyFacts(legacyModelKey);
+    if (legacyModelKey && unambiguous)
+      await this.importLegacyFacts(legacyModelKey);
     await this.recordUnknownDefaults();
   }
 
@@ -38,8 +46,13 @@ export class TranslationCapabilityState {
 
   support(mode: GenerationMode): TranslationCapabilitySupport {
     if (this.imageUnsupported()) return 'unsupported';
-    if (isStructured(mode) && this.applicable('feature.structured') === 'unsupported') return 'unsupported';
-    if (isStreamed(mode) && this.applicable('feature.stream') === 'unsupported') return 'unsupported';
+    if (
+      isStructured(mode) &&
+      this.applicable('feature.structured') === 'unsupported'
+    )
+      return 'unsupported';
+    if (isStreamed(mode) && this.applicable('feature.stream') === 'unsupported')
+      return 'unsupported';
     if (this.allowedModes && !this.allowedModes.has(mode)) return 'unsupported';
     return this.applicable(this.modeKey(mode));
   }
@@ -51,44 +64,112 @@ export class TranslationCapabilityState {
     this.allowedModes = new Set(allowed);
   }
 
-  async accepted(mode: GenerationMode, schemaValidated: boolean, imageAccepted = true): Promise<void> {
+  configurationSupport(id: string): TranslationCapabilitySupport {
+    return this.applicable(this.configurationKey(id));
+  }
+
+  async declareConfigurations(ids: readonly string[]): Promise<void> {
+    const defaults: CapabilityFacts = {};
+    for (const id of ids) {
+      const key = this.configurationKey(id);
+      if (!(key in this.journal.facts))
+        defaults[key] = {
+          support: 'unknown',
+          source: 'default',
+          observedAt: 0,
+          scope: 'model',
+        };
+    }
+    if (Object.keys(defaults).length) await this.journal.record(defaults);
+  }
+
+  async acceptedConfiguration(id: string): Promise<void> {
+    await this.journal.record({
+      [this.configurationKey(id)]: this.fact(
+        'supported',
+        'observed-completion',
+      ),
+    });
+  }
+
+  async rejectedConfiguration(id: string): Promise<void> {
+    await this.journal.record({
+      [this.configurationKey(id)]: this.fact(
+        'unsupported',
+        'explicit-provider',
+      ),
+    });
+  }
+
+  private configurationKey(id: string): string {
+    return `configuration.${id}`;
+  }
+
+  async accepted(
+    mode: GenerationMode,
+    schemaValidated: boolean,
+    imageAccepted = true,
+  ): Promise<void> {
     const facts: CapabilityFacts = {};
     if (!isStructured(mode) || schemaValidated) {
-      facts[this.modeKey(mode)] = this.fact('supported', 'observed-completion', this.modeScope(mode));
+      facts[this.modeKey(mode)] = this.fact(
+        'supported',
+        'observed-completion',
+        this.modeScope(mode),
+      );
     }
-    if (isStreamed(mode)) facts['feature.stream'] = this.fact('supported', 'observed-completion');
+    if (isStreamed(mode))
+      facts['feature.stream'] = this.fact('supported', 'observed-completion');
     if (schemaValidated && isStructured(mode)) {
-      facts['feature.structured'] = this.fact('supported', 'observed-completion');
+      facts['feature.structured'] = this.fact(
+        'supported',
+        'observed-completion',
+      );
     }
-    if (imageAccepted) facts['feature.image'] = this.fact('supported', 'observed-completion');
+    if (imageAccepted)
+      facts['feature.image'] = this.fact('supported', 'observed-completion');
     await this.journal.record(facts);
   }
 
-  async rejected(mode: GenerationMode, kind: UnsupportedFeature, general = false): Promise<void> {
+  async rejected(
+    mode: GenerationMode,
+    kind: UnsupportedFeature,
+    general = false,
+  ): Promise<void> {
     const key = this.rejectedFactKey(mode, kind, general);
     const scope = key.startsWith('feature.') ? 'model' : this.modeScope(mode);
-    await this.journal.record({ [key]: this.fact('unsupported', 'explicit-provider', scope) });
+    await this.journal.record({
+      [key]: this.fact('unsupported', 'explicit-provider', scope),
+    });
   }
 
   private async importLegacyFacts(modelKey: string): Promise<void> {
     const imported = await migrateLegacyCapabilities(this.storage, {
-      identity: this.identity, modelKey, unambiguous: true,
-      factKey: 'feature.structured', scope: 'model',
+      identity: this.identity,
+      modelKey,
+      unambiguous: true,
+      factKey: 'feature.structured',
+      scope: 'model',
       context: this.journal.scopeContext,
     });
-    if (imported.success && imported.data) this.journal.adoptMigration(imported.data);
+    if (imported.success && imported.data)
+      this.journal.adoptMigration(imported.data);
   }
 
   private async recordUnknownDefaults(): Promise<void> {
     const keys = [
-      'feature.image', 'feature.structured', 'feature.stream',
-      ...GENERATION_MODES.map(mode => this.modeKey(mode)),
+      'feature.image',
+      'feature.structured',
+      'feature.stream',
+      ...GENERATION_MODES.map((mode) => this.modeKey(mode)),
     ];
     const defaults: CapabilityFacts = {};
     for (const key of keys) {
       if (!(key in this.journal.facts)) {
         defaults[key] = {
-          support: 'unknown', source: 'default', observedAt: 0,
+          support: 'unknown',
+          source: 'default',
+          observedAt: 0,
           scope: key.includes(this.schemaScope) ? this.schemaScope : 'model',
         };
       }
@@ -96,7 +177,11 @@ export class TranslationCapabilityState {
     if (Object.keys(defaults).length) await this.journal.record(defaults);
   }
 
-  private rejectedFactKey(mode: GenerationMode, kind: UnsupportedFeature, general: boolean): string {
+  private rejectedFactKey(
+    mode: GenerationMode,
+    kind: UnsupportedFeature,
+    general: boolean,
+  ): string {
     if (kind === 'vision') return 'feature.image';
     if (general && kind === 'structured') return 'feature.structured';
     if (general && kind === 'stream') return 'feature.stream';
@@ -108,7 +193,9 @@ export class TranslationCapabilityState {
   }
 
   private modeKey(mode: GenerationMode): string {
-    return isStructured(mode) ? `mode.${mode}:${this.schemaScope}` : `mode.${mode}`;
+    return isStructured(mode)
+      ? `mode.${mode}:${this.schemaScope}`
+      : `mode.${mode}`;
   }
 
   private modeScope(mode: GenerationMode): string {

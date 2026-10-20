@@ -7,13 +7,31 @@ import type { ITranslationCapabilityStorage } from '../../../core/ports/outbound
 import type { TranslationExecutionOptions } from '../../../core/ports/outbound/TranslationExecutionOptions';
 import { failure, success, type Result } from '../../../shared/types/Result';
 import { AppError, TranslationError } from '../../../shared/errors';
-import { createTranslationDataSchema, type TranslationResponse } from './translation-schema';
+import {
+  createTranslationDataSchema,
+  type TranslationResponse,
+} from './translation-schema';
 import { mapResponseToDomain } from './translation-response-mapper';
-import { buildBasePrompt, buildPlainPrompt, buildRepairPrompt } from './prompt-base';
-import { executionScope, raceAbort, throwIfAborted, type TranslationExecutionScope } from './translation-execution';
-import { modelScopeKey, capabilityDigest, type ModelScopeInput } from './translation-capability-key';
+import {
+  buildBasePrompt,
+  buildPlainPrompt,
+  buildRepairPrompt,
+} from './prompt-base';
+import {
+  executionScope,
+  raceAbort,
+  throwIfAborted,
+  type TranslationExecutionScope,
+} from './translation-execution';
+import {
+  modelScopeKey,
+  capabilityDigest,
+  type ModelScopeInput,
+} from './translation-capability-key';
 import { TranslationCapabilityState } from './TranslationCapabilityState';
 import { TranslationAttemptPreview } from './TranslationAttemptPreview';
+import { TranslationConfigurationPolicy } from './TranslationConfigurationPolicy';
+import { isConfigurationRejection } from './generation-configuration-error';
 import { classifyGenerationError } from './generation-errors';
 import { inspectTranslationCompletion } from './translation-completion';
 import { isStructured, TranslationAttemptPolicy } from './translation-fallback';
@@ -44,6 +62,7 @@ interface TranslationJob {
 interface PreparedTranslationJob extends TranslationJob {
   state: TranslationCapabilityState;
   schema: ReturnType<typeof createTranslationDataSchema>;
+  configurations?: TranslationConfigurationPolicy;
 }
 
 /** Stable provider facade; each internal component owns one execution concern. */
@@ -57,7 +76,16 @@ export async function executeTranslation(
   options: TranslationExecutionOptions = {},
 ): Promise<Result<Translation, AppError>> {
   const scope = executionScope(options);
-  const job = { transport, context, image, targetLanguage, includeDescription, storage, options, scope };
+  const job = {
+    transport,
+    context,
+    image,
+    targetLanguage,
+    includeDescription,
+    storage,
+    options,
+    scope,
+  };
   try {
     return await raceAbort(runTranslation(job), scope.signal);
   } catch (error) {
@@ -67,25 +95,53 @@ export async function executeTranslation(
   }
 }
 
-async function runTranslation(job: TranslationJob): Promise<Result<Translation, AppError>> {
+async function runTranslation(
+  job: TranslationJob,
+): Promise<Result<Translation, AppError>> {
   const prepared = await prepareTranslation(job);
-  if (prepared.state.imageUnsupported()) return failure(TranslationError.modelNoVision());
-  const policy = new TranslationAttemptPolicy(mode => prepared.state.support(mode));
+  if (prepared.state.imageUnsupported())
+    return failure(TranslationError.modelNoVision());
+  const policy = new TranslationAttemptPolicy((mode) =>
+    prepared.state.support(mode),
+  );
   return runAttempts(prepared, policy);
 }
 
-async function prepareTranslation(job: TranslationJob): Promise<PreparedTranslationJob> {
+async function prepareTranslation(
+  job: TranslationJob,
+): Promise<PreparedTranslationJob> {
   const identity = await modelScopeKey(job.context);
   const schema = createTranslationDataSchema(job.includeDescription);
-  const schemaScope = await capabilityDigest(z.toJSONSchema(schema, { target: 'draft-07', io: 'input' }));
-  const state = new TranslationCapabilityState(identity, schemaScope, job.storage, {
-    namespace: job.context.providerId,
-    refreshAfterMs: COMPATIBILITY_REFRESH_INTERVAL_MS,
-  });
-  await state.load(job.transport.legacyModelKey, job.context.legacyUnambiguous ?? false);
+  const schemaScope = await capabilityDigest(
+    z.toJSONSchema(schema, { target: 'draft-07', io: 'input' }),
+  );
+  const state = new TranslationCapabilityState(
+    identity,
+    schemaScope,
+    job.storage,
+    {
+      namespace: job.context.providerId,
+      refreshAfterMs: COMPATIBILITY_REFRESH_INTERVAL_MS,
+    },
+  );
+  await state.load(
+    job.transport.legacyModelKey,
+    job.context.legacyUnambiguous ?? false,
+  );
   throwIfAborted(job.scope.signal);
-  if (job.transport.supportedModes) await state.declareModes(job.transport.supportedModes);
-  return { ...job, state, schema };
+  if (job.transport.supportedModes)
+    await state.declareModes(job.transport.supportedModes);
+  let configurations: TranslationConfigurationPolicy | undefined;
+  if (job.transport.configurations?.length) {
+    await state.declareConfigurations(
+      job.transport.configurations.map((configuration) => configuration.id),
+    );
+    configurations = new TranslationConfigurationPolicy(
+      job.transport.configurations,
+      (id) => state.configurationSupport(id),
+    );
+  }
+  return { ...job, state, schema, configurations };
 }
 
 async function runAttempts(
@@ -95,7 +151,10 @@ async function runAttempts(
   let mode = policy.initialMode();
   while (mode && policy.hasBudget) {
     throwIfAborted(job.scope.signal);
-    if (job.state.support(mode) === 'unsupported') return failure(TranslationError.requestRejected());
+    if (job.state.support(mode) === 'unsupported')
+      return failure(TranslationError.requestRejected());
+    if (job.configurations && !job.configurations.current)
+      return failure(TranslationError.requestRejected());
 
     const reset = await job.options.progress?.report({ kind: 'reset' });
     if (reset && !reset.success) return failure(reset.error);
@@ -103,17 +162,33 @@ async function runAttempts(
     policy.recordAttempt(mode);
 
     try {
-      const { generated, text } = await generateAttempt(job, mode, policy.repairText);
+      const { generated, text } = await generateAttempt(
+        job,
+        mode,
+        policy.repairText,
+      );
       throwIfAborted(job.scope.signal);
-      const completion = inspectTranslationCompletion(generated, text, job.includeDescription);
+      const completion = inspectTranslationCompletion(
+        generated,
+        text,
+        job.includeDescription,
+      );
       if (completion.kind === 'failed') return failure(completion.error);
       if (completion.kind === 'accepted') {
-        return await acceptTranslation(job, mode, generated, completion.response);
+        return await acceptTranslation(
+          job,
+          mode,
+          generated,
+          completion.response,
+        );
       }
 
       const repairMode = policy.repair(completion.text);
       if (!repairMode) return failure(TranslationError.malformedResponse());
-      if (completion.finishReason !== 'stop' && completion.finishReason !== 'length') {
+      if (
+        completion.finishReason !== 'stop' &&
+        completion.finishReason !== 'length'
+      ) {
         return failure(TranslationError.interrupted());
       }
       mode = repairMode;
@@ -131,10 +206,16 @@ async function generateAttempt(
   mode: GenerationMode,
   repairText?: string,
 ): Promise<{ generated: GenerationResult; text: string }> {
-  const preview = new TranslationAttemptPreview(mode, job.scope, job.options.progress);
+  const preview = new TranslationAttemptPreview(
+    mode,
+    job.scope,
+    job.options.progress,
+  );
   try {
     const request = createGenerationRequest(job, mode, repairText);
-    const generated = await job.transport.generate(request, event => preview.receive(event));
+    const generated = await job.transport.generate(request, (event) =>
+      preview.receive(event),
+    );
     return { generated, text: preview.text };
   } finally {
     // Disposal also suppresses callbacks from old native readers after fallback.
@@ -155,12 +236,16 @@ function createGenerationRequest(
   return {
     mode,
     image: job.image,
-    instructions: isStructured(mode) ? buildBasePrompt(prompt) : buildPlainPrompt(prompt),
-    userText: repairText === undefined
-      ? 'Extract and translate all text in this image.'
-      : buildRepairPrompt(repairText),
+    instructions: isStructured(mode)
+      ? buildBasePrompt(prompt)
+      : buildPlainPrompt(prompt),
+    userText:
+      repairText === undefined
+        ? 'Extract and translate all text in this image.'
+        : buildRepairPrompt(repairText),
     schema: job.schema,
     signal: job.scope.signal,
+    configurationId: job.configurations?.current?.id,
   };
 }
 
@@ -171,14 +256,22 @@ async function acceptTranslation(
   response: TranslationResponse,
 ): Promise<Result<Translation, AppError>> {
   const imageAccepted = response.success && response.data !== null;
+  const configuration = job.configurations?.current;
+  if (configuration) await job.state.acceptedConfiguration(configuration.id);
   await job.state.accepted(mode, generated.schemaValidated, imageAccepted);
   throwIfAborted(job.scope.signal);
   if (!response.success || !response.data) {
-    return failure(response.error === 'NO_TEXT_FOUND'
-      ? TranslationError.noTextFound()
-      : TranslationError.aiRejected(response.error ?? 'Unknown error'));
+    return failure(
+      response.error === 'NO_TEXT_FOUND'
+        ? TranslationError.noTextFound()
+        : TranslationError.aiRejected(response.error ?? 'Unknown error'),
+    );
   }
-  return mapResponseToDomain(response.data, job.targetLanguage, job.context.providerId);
+  return mapResponseToDomain(
+    response.data,
+    job.targetLanguage,
+    job.context.providerId,
+  );
 }
 
 async function fallbackAfterFailure(
@@ -189,6 +282,17 @@ async function fallbackAfterFailure(
 ): Promise<Result<GenerationMode, AppError>> {
   throwIfAborted(job.scope.signal);
   const classified = classifyGenerationError(error, mode);
+  const configuration = job.configurations?.current;
+  if (
+    configuration &&
+    isConfigurationRejection(error, configuration.rejectionFields)
+  ) {
+    await job.state.rejectedConfiguration(configuration.id);
+    throwIfAborted(job.scope.signal);
+    return job.configurations?.rejectCurrent()
+      ? success(mode)
+      : failure(classified.error);
+  }
   if (classified.unsupported) {
     await job.state.rejected(mode, classified.unsupported, classified.general);
     throwIfAborted(job.scope.signal);
@@ -197,9 +301,16 @@ async function fallbackAfterFailure(
   return nextMode ? success(nextMode) : failure(classified.error);
 }
 
-function executionError(error: unknown, scope: TranslationExecutionScope): AppError {
+function executionError(
+  error: unknown,
+  scope: TranslationExecutionScope,
+): AppError {
   if (scope.signal.aborted) {
-    return scope.signal.reason instanceof AppError ? scope.signal.reason : scope.error();
+    return scope.signal.reason instanceof AppError
+      ? scope.signal.reason
+      : scope.error();
   }
-  return error instanceof AppError ? error : classifyGenerationError(error, 'plain-buffered').error;
+  return error instanceof AppError
+    ? error
+    : classifyGenerationError(error, 'plain-buffered').error;
 }

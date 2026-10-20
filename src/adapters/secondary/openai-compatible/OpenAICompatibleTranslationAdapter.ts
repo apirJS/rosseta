@@ -13,18 +13,64 @@ import type { ITranslationCapabilityStorage } from '../../../core/ports/outbound
 import { executeTranslation } from '../shared/ai-sdk-translation';
 import { AiSdkGenerationTransport } from '../shared/AiSdkGenerationTransport';
 import { providerProtocol } from '../shared/translation-capability-key';
+import { configuredGenerationFetch } from '../shared/configured-generation-fetch';
 export class OpenAICompatibleTranslationAdapter implements ITranslationService {
-    constructor(private readonly credential: Credential, private readonly userPreferences: UserPreferences, private readonly providerConfig: CustomProviderConfig, private readonly capabilities: ITranslationCapabilityStorage) { }
-    public async translateImage(image: EncodedImage, targetLanguage: Language, options?: TranslationExecutionOptions): Promise<Result<Translation, AppError>> {
-        const provider = createOpenAICompatible({
-            name: this.providerConfig.name,
-            baseURL: this.providerConfig.baseURL,
-            apiKey: this.credential.apiKey.value,
-            headers: this.providerConfig.headers,
-            queryParams: this.providerConfig.queryParams,
-            supportsStructuredOutputs: true,
-        });
-        const model = provider(this.userPreferences.getModelIdFor(this.credential.provider));
-        return executeTranslation(new AiSdkGenerationTransport(model), { providerId: this.credential.provider, modelId: this.userPreferences.getModelIdFor(this.credential.provider), protocol: providerProtocol(this.credential.provider, this.providerConfig), customConfig: this.providerConfig }, image, targetLanguage, this.userPreferences.includeDescription, this.capabilities, options);
-    }
+  constructor(
+    private readonly credential: Credential,
+    private readonly userPreferences: UserPreferences,
+    private readonly providerConfig: CustomProviderConfig,
+    private readonly capabilities: ITranslationCapabilityStorage,
+  ) {}
+
+  async translateImage(
+    image: EncodedImage,
+    targetLanguage: Language,
+    options?: TranslationExecutionOptions,
+  ): Promise<Result<Translation, AppError>> {
+    const modelId = this.userPreferences.getModelIdFor(
+      this.credential.provider,
+    );
+    const settings = {
+      name: this.providerConfig.name,
+      baseURL: this.providerConfig.baseURL,
+      apiKey: this.credential.apiKey.value,
+      headers: this.providerConfig.headers,
+      queryParams: this.providerConfig.queryParams,
+      supportsStructuredOutputs: true,
+    };
+    const transport = new AiSdkGenerationTransport(
+      createOpenAICompatible(settings)(modelId),
+      {
+        thinkingContext: {
+          provider: this.credential.provider,
+          modelId,
+          baseURL: settings.baseURL,
+          providerName: settings.name,
+          protocol: 'openai-compatible',
+        },
+        createModel: (configuration) =>
+          createOpenAICompatible({
+            ...settings,
+            fetch: configuredGenerationFetch(configuration.requestBody),
+          })(modelId),
+      },
+    );
+    return executeTranslation(
+      transport,
+      {
+        providerId: this.credential.provider,
+        modelId,
+        protocol: providerProtocol(
+          this.credential.provider,
+          this.providerConfig,
+        ),
+        customConfig: this.providerConfig,
+      },
+      image,
+      targetLanguage,
+      this.userPreferences.includeDescription,
+      this.capabilities,
+      options,
+    );
+  }
 }

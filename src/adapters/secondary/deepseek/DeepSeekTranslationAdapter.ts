@@ -16,7 +16,10 @@ import { providerProtocol } from '../shared/translation-capability-key';
 
 // The native SDK preserves image input, but its public client configuration
 // supports JSON-object output rather than provider-enforced JSON Schema.
-const DEEPSEEK_MODES: readonly GenerationMode[] = ['plain-stream', 'plain-buffered'];
+const DEEPSEEK_MODES: readonly GenerationMode[] = [
+  'plain-stream',
+  'plain-buffered',
+];
 
 export class DeepSeekTranslationAdapter implements ITranslationService {
   constructor(
@@ -33,8 +36,14 @@ export class DeepSeekTranslationAdapter implements ITranslationService {
     const provider = createDeepSeek({ apiKey: this.credential.apiKey.value });
     const modelId = this.preferences.getModelIdFor(this.credential.provider);
     return executeTranslation(
-      new AiSdkGenerationTransport(provider(modelId), undefined, DEEPSEEK_MODES),
-      { providerId: this.credential.provider, modelId, protocol: providerProtocol(this.credential.provider) },
+      new AiSdkGenerationTransport(provider(modelId), {
+        supportedModes: DEEPSEEK_MODES,
+      }),
+      {
+        providerId: this.credential.provider,
+        modelId,
+        protocol: providerProtocol(this.credential.provider),
+      },
       image,
       targetLanguage,
       this.preferences.includeDescription,

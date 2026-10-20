@@ -13,12 +13,35 @@ import { executeTranslation } from '../shared/ai-sdk-translation';
 import { AiSdkGenerationTransport } from '../shared/AiSdkGenerationTransport';
 import { providerProtocol } from '../shared/translation-capability-key';
 export class OpenRouterTranslationAdapter implements ITranslationService {
-    constructor(private readonly credential: Credential, private readonly userPreferences: UserPreferences, private readonly capabilities: ITranslationCapabilityStorage) { }
-    public async translateImage(image: EncodedImage, targetLanguage: Language, options?: TranslationExecutionOptions): Promise<Result<Translation, AppError>> {
-        const openrouter = createOpenRouter({
-            apiKey: this.credential.apiKey.value,
-        });
-        const model = openrouter(this.userPreferences.getModelIdFor(this.credential.provider));
-        return executeTranslation(new AiSdkGenerationTransport(model), { providerId: this.credential.provider, modelId: this.userPreferences.getModelIdFor(this.credential.provider), protocol: providerProtocol(this.credential.provider), legacyUnambiguous: true }, image, targetLanguage, this.userPreferences.includeDescription, this.capabilities, options);
-    }
+  constructor(
+    private readonly credential: Credential,
+    private readonly userPreferences: UserPreferences,
+    private readonly capabilities: ITranslationCapabilityStorage,
+  ) {}
+  public async translateImage(
+    image: EncodedImage,
+    targetLanguage: Language,
+    options?: TranslationExecutionOptions,
+  ): Promise<Result<Translation, AppError>> {
+    const openrouter = createOpenRouter({
+      apiKey: this.credential.apiKey.value,
+    });
+    const model = openrouter(
+      this.userPreferences.getModelIdFor(this.credential.provider),
+    );
+    return executeTranslation(
+      new AiSdkGenerationTransport(model),
+      {
+        providerId: this.credential.provider,
+        modelId: this.userPreferences.getModelIdFor(this.credential.provider),
+        protocol: providerProtocol(this.credential.provider),
+        legacyUnambiguous: true,
+      },
+      image,
+      targetLanguage,
+      this.userPreferences.includeDescription,
+      this.capabilities,
+      options,
+    );
+  }
 }

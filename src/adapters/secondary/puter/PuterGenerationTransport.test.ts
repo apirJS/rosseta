@@ -118,6 +118,23 @@ describe('Adapter: PuterGenerationTransport', () => {
     });
   });
 
+  test.each(['plain-stream', 'plain-buffered'] as const)(
+    '%s requests the minimum for Puter models that reject none',
+    async (mode) => {
+      if (mode === 'plain-stream')
+        chat.mockResolvedValueOnce(chunks([]) as never);
+      else
+        chat.mockResolvedValueOnce({
+          message: { role: 'assistant', content: '{}' },
+        } as never);
+      await new PuterGenerationTransport(
+        'token-fixture',
+        'gemini-3.1-flash-lite',
+      ).generate(request(mode), async () => {});
+      expect(callAt(0)[2].reasoning_effort).toBe('minimal');
+    },
+  );
+
   test('normalizes blocked completion without inviting JSON repair', async () => {
     chat.mockResolvedValueOnce({
       message: { role: 'assistant', content: '' },

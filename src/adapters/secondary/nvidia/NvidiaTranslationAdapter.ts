@@ -11,7 +11,10 @@ import type { AppError } from '../../../shared/errors';
 import type { Result } from '../../../shared/types/Result';
 import { executeTranslation } from '../shared/ai-sdk-translation';
 import { AiSdkGenerationTransport } from '../shared/AiSdkGenerationTransport';
-import { PROVIDER_ENDPOINTS, providerProtocol } from '../shared/translation-capability-key';
+import {
+  PROVIDER_ENDPOINTS,
+  providerProtocol,
+} from '../shared/translation-capability-key';
 
 export class NvidiaTranslationAdapter implements ITranslationService {
   constructor(
@@ -34,8 +37,19 @@ export class NvidiaTranslationAdapter implements ITranslationService {
     const modelId = this.preferences.getModelIdFor(this.credential.provider);
 
     return executeTranslation(
-      new AiSdkGenerationTransport(provider(modelId)),
-      { providerId: this.credential.provider, modelId, protocol: providerProtocol(this.credential.provider) },
+      new AiSdkGenerationTransport(provider(modelId), {
+        thinkingContext: {
+          provider: 'nvidia',
+          modelId,
+          providerName: 'NVIDIA',
+          baseURL: PROVIDER_ENDPOINTS.nvidia,
+        },
+      }),
+      {
+        providerId: this.credential.provider,
+        modelId,
+        protocol: providerProtocol(this.credential.provider),
+      },
       image,
       targetLanguage,
       this.preferences.includeDescription,

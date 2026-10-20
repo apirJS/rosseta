@@ -12,13 +12,46 @@ import type { ITranslationCapabilityStorage } from '../../../core/ports/outbound
 import { executeTranslation } from '../shared/ai-sdk-translation';
 import { AiSdkGenerationTransport } from '../shared/AiSdkGenerationTransport';
 import { providerProtocol } from '../shared/translation-capability-key';
+import { configuredGenerationFetch } from '../shared/configured-generation-fetch';
 export class MistralTranslationAdapter implements ITranslationService {
-    constructor(private readonly credential: Credential, private readonly userPreferences: UserPreferences, private readonly capabilities: ITranslationCapabilityStorage) { }
-    public async translateImage(image: EncodedImage, targetLanguage: Language, options?: TranslationExecutionOptions): Promise<Result<Translation, AppError>> {
-        const mistral = createMistral({
-            apiKey: this.credential.apiKey.value,
-        });
-        const model = mistral(this.userPreferences.getModelIdFor(this.credential.provider));
-        return executeTranslation(new AiSdkGenerationTransport(model), { providerId: this.credential.provider, modelId: this.userPreferences.getModelIdFor(this.credential.provider), protocol: providerProtocol(this.credential.provider), legacyUnambiguous: true }, image, targetLanguage, this.userPreferences.includeDescription, this.capabilities, options);
-    }
+  constructor(
+    private readonly credential: Credential,
+    private readonly userPreferences: UserPreferences,
+    private readonly capabilities: ITranslationCapabilityStorage,
+  ) {}
+
+  async translateImage(
+    image: EncodedImage,
+    targetLanguage: Language,
+    options?: TranslationExecutionOptions,
+  ): Promise<Result<Translation, AppError>> {
+    const apiKey = this.credential.apiKey.value;
+    const modelId = this.userPreferences.getModelIdFor(
+      this.credential.provider,
+    );
+    const transport = new AiSdkGenerationTransport(
+      createMistral({ apiKey })(modelId),
+      {
+        createModel: (configuration) =>
+          createMistral({
+            apiKey,
+            fetch: configuredGenerationFetch(configuration.requestBody),
+          })(modelId),
+      },
+    );
+    return executeTranslation(
+      transport,
+      {
+        providerId: this.credential.provider,
+        modelId,
+        protocol: providerProtocol(this.credential.provider),
+        legacyUnambiguous: true,
+      },
+      image,
+      targetLanguage,
+      this.userPreferences.includeDescription,
+      this.capabilities,
+      options,
+    );
+  }
 }

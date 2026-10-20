@@ -12,13 +12,49 @@ import type { ITranslationCapabilityStorage } from '../../../core/ports/outbound
 import { executeTranslation } from '../shared/ai-sdk-translation';
 import { AiSdkGenerationTransport } from '../shared/AiSdkGenerationTransport';
 import { providerProtocol } from '../shared/translation-capability-key';
+import { configuredGenerationFetch } from '../shared/configured-generation-fetch';
 export class AnthropicTranslationAdapter implements ITranslationService {
-    constructor(private readonly credential: Credential, private readonly userPreferences: UserPreferences, private readonly capabilities: ITranslationCapabilityStorage) { }
-    public async translateImage(image: EncodedImage, targetLanguage: Language, options?: TranslationExecutionOptions): Promise<Result<Translation, AppError>> {
-        const anthropic = createAnthropic({
-            apiKey: this.credential.apiKey.value,
-        });
-        const model = anthropic(this.userPreferences.getModelIdFor(this.credential.provider));
-        return executeTranslation(new AiSdkGenerationTransport(model, { anthropic: { structuredOutputMode: 'outputFormat' } }), { providerId: this.credential.provider, modelId: this.userPreferences.getModelIdFor(this.credential.provider), protocol: providerProtocol(this.credential.provider), legacyUnambiguous: true }, image, targetLanguage, this.userPreferences.includeDescription, this.capabilities, options);
-    }
+  constructor(
+    private readonly credential: Credential,
+    private readonly userPreferences: UserPreferences,
+    private readonly capabilities: ITranslationCapabilityStorage,
+  ) {}
+
+  async translateImage(
+    image: EncodedImage,
+    targetLanguage: Language,
+    options?: TranslationExecutionOptions,
+  ): Promise<Result<Translation, AppError>> {
+    const apiKey = this.credential.apiKey.value;
+    const modelId = this.userPreferences.getModelIdFor(
+      this.credential.provider,
+    );
+    const transport = new AiSdkGenerationTransport(
+      createAnthropic({ apiKey })(modelId),
+      {
+        structuredProviderOptions: {
+          anthropic: { structuredOutputMode: 'outputFormat' },
+        },
+        createModel: (configuration) =>
+          createAnthropic({
+            apiKey,
+            fetch: configuredGenerationFetch(configuration.requestBody),
+          })(modelId),
+      },
+    );
+    return executeTranslation(
+      transport,
+      {
+        providerId: this.credential.provider,
+        modelId,
+        protocol: providerProtocol(this.credential.provider),
+        legacyUnambiguous: true,
+      },
+      image,
+      targetLanguage,
+      this.userPreferences.includeDescription,
+      this.capabilities,
+      options,
+    );
+  }
 }

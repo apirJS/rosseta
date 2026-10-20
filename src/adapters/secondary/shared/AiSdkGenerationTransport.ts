@@ -4,27 +4,28 @@ import {
   Output,
   NoObjectGeneratedError,
   type LanguageModel,
-} from 'ai';
+} from "ai";
 import type {
   GenerationEvent,
   GenerationMode,
   GenerationRequest,
   GenerationResult,
   ITranslationGenerationTransport,
-} from './ITranslationGenerationTransport';
-import { isStreamed, isStructured } from './translation-fallback';
-import { raceAbort } from './translation-execution';
-import { unwrapGenerationError } from './generation-errors';
-import { thinkingConfigurations } from './thinking-configurations';
+} from "./ITranslationGenerationTransport";
+import { isStreamed, isStructured } from "./translation-fallback";
+import { raceAbort } from "./translation-execution";
+import { unwrapGenerationError } from "./generation-errors";
+import { thinkingConfigurations } from "./thinking-configurations";
 import {
   PROVIDER_DEFAULT_CONFIGURATION,
   type ConfiguredModelFactory,
   type SdkProviderOptions,
   type ThinkingConfiguration,
   type ThinkingContext,
-} from './generation-configurations';
+} from "./generation-configurations";
 
-export type { SdkProviderOptions } from './generation-configurations';
+export type { SdkProviderOptions } from "./generation-configurations";
+
 interface TransportOptions {
   providerOptions?: SdkProviderOptions;
   structuredProviderOptions?: SdkProviderOptions;
@@ -33,6 +34,7 @@ interface TransportOptions {
   thinkingContext?: ThinkingContext;
   createModel?: ConfiguredModelFactory;
 }
+
 type SdkGenerationOptions = ReturnType<typeof createGenerationOptions>;
 type SdkStreamResult = ReturnType<typeof streamText>;
 type GenerationObserver = (event: GenerationEvent) => Promise<void>;
@@ -49,17 +51,19 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
   ) {
     this.supportedModes = options.supportedModes;
     const context =
-      typeof model === 'object'
+      typeof model === "object"
         ? {
-            provider: model.provider.replace(/\.[^.]+$/, '').toLowerCase(),
+            provider: model.provider.replace(/\.[^.]+$/, "").toLowerCase(),
             modelId: model.modelId,
           }
-        : { provider: '', modelId: model };
+        : { provider: "", modelId: model };
+
     this.configurations =
       options.configurations ??
       thinkingConfigurations(options.thinkingContext ?? context);
-    if (typeof model === 'object')
-      this.legacyModelKey = model.provider + ':' + model.modelId;
+
+    if (typeof model === "object")
+      this.legacyModelKey = model.provider + ":" + model.modelId;
   }
 
   async generate(
@@ -78,6 +82,7 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
       configuration,
     );
     const structured = isStructured(request.mode);
+
     return isStreamed(request.mode)
       ? this.generateStream(options, structured, onEvent, controller)
       : this.generateBuffered(options, structured);
@@ -86,10 +91,12 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
   private configurationFor(id: string | undefined): ThinkingConfiguration {
     if (id === undefined)
       return this.configurations[0] ?? PROVIDER_DEFAULT_CONFIGURATION;
+
     const configuration = this.configurations.find(
       (candidate) => candidate.id === id,
     );
-    if (!configuration) throw new Error('Unknown generation configuration');
+
+    if (!configuration) throw new Error("Unknown generation configuration");
     return configuration;
   }
 
@@ -108,6 +115,7 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
     } catch (error) {
       const recovered = recoverSchemaRejection(unwrapGenerationError(error));
       if (recovered) return recovered;
+
       throw error;
     }
   }
@@ -122,10 +130,12 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
     const recordError = (error: unknown) => {
       firstError ??= error;
     };
+
     const result = streamText({
       ...options,
       onError: ({ error }) => recordError(error),
     });
+
     // Observe the final-output promise before pumping either stream branch so a
     // schema rejection cannot become an unhandled promise rejection.
     const finalOutput = observeFinalOutput(result, structured);
@@ -135,6 +145,7 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
       onEvent,
       recordError,
     );
+
     const partialPump = structured
       ? consumePartialOutput(result.partialOutputStream, onEvent)
       : Promise.resolve();
@@ -144,15 +155,19 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
         Promise.all([textPump, partialPump]),
         options.abortSignal,
       );
+
       if (firstError) throw firstError;
+
       const finishReason = await result.finishReason;
       const final = await finalOutput;
-      if ('error' in final) {
+
+      if ("error" in final) {
         const error = unwrapGenerationError(final.error);
         const recovered = recoverSchemaRejection(error, text, finishReason);
         if (recovered) return recovered;
         throw error;
       }
+
       return {
         text,
         output: final.output,
@@ -179,12 +194,12 @@ function createGenerationOptions(
     instructions: request.instructions,
     messages: [
       {
-        role: 'user' as const,
+        role: "user" as const,
         content: [
-          { type: 'text' as const, text: request.userText },
+          { type: "text" as const, text: request.userText },
           {
-            type: 'file' as const,
-            data: { type: 'data' as const, data: request.image.base64Data },
+            type: "file" as const,
+            data: { type: "data" as const, data: request.image.base64Data },
             mediaType: request.image.mimeType,
           },
         ],
@@ -239,23 +254,23 @@ function observeFinalOutput(
 }
 
 async function consumeTextStream(
-  stream: SdkStreamResult['stream'],
+  stream: SdkStreamResult["stream"],
   signal: AbortSignal,
   onEvent: GenerationObserver,
   recordError: (error: unknown) => void,
 ): Promise<string> {
-  let text = '';
+  let text = "";
   for await (const part of stream) {
     switch (part.type) {
-      case 'error':
+      case "error":
         recordError(part.error);
         break;
-      case 'abort':
-        recordError(signal.reason ?? new Error('Stream aborted'));
+      case "abort":
+        recordError(signal.reason ?? new Error("Stream aborted"));
         break;
-      case 'text-delta':
+      case "text-delta":
         text += part.text;
-        await onEvent({ type: 'text', text: part.text });
+        await onEvent({ type: "text", text: part.text });
         break;
     }
   }
@@ -263,21 +278,21 @@ async function consumeTextStream(
 }
 
 async function consumePartialOutput(
-  stream: SdkStreamResult['partialOutputStream'],
+  stream: SdkStreamResult["partialOutputStream"],
   onEvent: GenerationObserver,
 ): Promise<void> {
-  for await (const value of stream) await onEvent({ type: 'partial', value });
+  for await (const value of stream) await onEvent({ type: "partial", value });
 }
 
 function recoverSchemaRejection(
   error: unknown,
-  accumulated = '',
+  accumulated = "",
   finishReason?: string,
 ): GenerationResult | null {
   if (!NoObjectGeneratedError.isInstance(error)) return null;
   return {
-    text: accumulated || error.text || '',
-    finishReason: finishReason ?? error.finishReason ?? 'stop',
+    text: accumulated || error.text || "",
+    finishReason: finishReason ?? error.finishReason ?? "stop",
     schemaValidated: false,
     validationError: error,
   };

@@ -13,21 +13,27 @@ export interface TranslationModalPayload {
   description: string;
   createdAt: Date;
 }
-function serializeSegments(segments: Translation['original']): TranslationSegmentPayload[] {
-  return (
-    segments.map((segment) => ({
-      language: { code: segment.language.code, name: segment.language.name },
-      text: segment.text,
-      romanization: segment.romanization,
-      blockIndex: segment.blockIndex,
-    }))
-  );
+
+function serializeSegments(
+  segments: Translation['original'],
+): TranslationSegmentPayload[] {
+  return segments.map((segment) => ({
+    language: { code: segment.language.code, name: segment.language.name },
+    text: segment.text,
+    romanization: segment.romanization,
+    blockIndex: segment.blockIndex,
+  }));
 }
+
 /** Framework-free serialization shared by background, history and injected UI. */
-export function serializeForModal(translation: Translation): TranslationModalPayload {
+export function serializeForModal(
+  translation: Translation,
+): TranslationModalPayload {
   return {
-    id: translation.id, original: serializeSegments(translation.original),
-    translated: serializeSegments(translation.translated), description: translation.description,
+    id: translation.id,
+    original: serializeSegments(translation.original),
+    translated: serializeSegments(translation.translated),
+    description: translation.description,
     createdAt: translation.createdAt,
   };
 }

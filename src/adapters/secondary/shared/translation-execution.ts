@@ -1,5 +1,5 @@
-import type { TranslationExecutionOptions } from '../../../core/ports/outbound/TranslationExecutionOptions';
-import { NetworkError, TranslationError } from '../../../shared/errors';
+import type { TranslationExecutionOptions } from "../../../core/ports/outbound/TranslationExecutionOptions";
+import { NetworkError, TranslationError } from "../../../shared/errors";
 
 const DEFAULT_GENERATION_TIMEOUT_MS = 60_000;
 
@@ -12,14 +12,19 @@ export interface TranslationExecutionScope {
 }
 
 /** One cancellation subscription and deadline cover every attempt in a job. */
-export function executionScope(options: TranslationExecutionOptions = {}): TranslationExecutionScope {
+export function executionScope(
+  options: TranslationExecutionOptions = {},
+): TranslationExecutionScope {
   const controller = new AbortController();
-  const deadline = options.generationDeadlineAt ?? Date.now() + DEFAULT_GENERATION_TIMEOUT_MS;
+  const deadline =
+    options.generationDeadlineAt ?? Date.now() + DEFAULT_GENERATION_TIMEOUT_MS;
+
   let timedOut = false;
   const expire = () => {
     timedOut = true;
     controller.abort(NetworkError.timeout());
   };
+
   const timer = setTimeout(expire, Math.max(0, deadline - Date.now()));
   const unsubscribe = options.cancellationToken?.onCancellationRequested(() => {
     controller.abort(TranslationError.cancelled());
@@ -33,10 +38,11 @@ export function executionScope(options: TranslationExecutionOptions = {}): Trans
   return {
     signal: controller.signal,
     deadline,
-    abort: reason => controller.abort(reason),
-    error: () => timedOut || Date.now() >= deadline
-      ? NetworkError.timeout()
-      : TranslationError.cancelled(),
+    abort: (reason) => controller.abort(reason),
+    error: () =>
+      timedOut || Date.now() >= deadline
+        ? NetworkError.timeout()
+        : TranslationError.cancelled(),
     dispose() {
       clearTimeout(timer);
       unsubscribe?.();
@@ -49,19 +55,24 @@ export function throwIfAborted(signal: AbortSignal): void {
 }
 
 /** Observe late settlement even when the logical job finishes before native work. */
-export function raceAbort<T>(work: PromiseLike<T>, signal?: AbortSignal): Promise<T> {
+export function raceAbort<T>(
+  work: PromiseLike<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   if (!signal) return Promise.resolve(work);
 
   return new Promise((resolve, reject) => {
     const aborted = () => reject(signal.reason ?? TranslationError.cancelled());
-    signal.addEventListener('abort', aborted, { once: true });
+
+    signal.addEventListener("abort", aborted, { once: true });
+
     Promise.resolve(work).then(
-      value => {
-        signal.removeEventListener('abort', aborted);
+      (value) => {
+        signal.removeEventListener("abort", aborted);
         resolve(value);
       },
-      error => {
-        signal.removeEventListener('abort', aborted);
+      (error) => {
+        signal.removeEventListener("abort", aborted);
         reject(error);
       },
     );

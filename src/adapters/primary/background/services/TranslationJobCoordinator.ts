@@ -1,39 +1,39 @@
-import type { Container } from '../../../../shared/di/container-factory';
-import type { Translation } from '../../../../core/domain/translation/Translation';
+import type { Container } from "../../../../shared/di/container-factory";
+import type { Translation } from "../../../../core/domain/translation/Translation";
 import {
   AppError,
   ErrorCode,
   NetworkError,
   TranslationError,
-} from '../../../../shared/errors';
-import { failure, success, type Result } from '../../../../shared/types/Result';
-import { serializeForModal } from '../../../../shared/types/TranslationModalPayload';
+} from "../../../../shared/errors";
+import { failure, success, type Result } from "../../../../shared/types/Result";
+import { serializeForModal } from "../../../../shared/types/TranslationModalPayload";
 import type {
   TranslationRequestIdentity,
   TranslationStatusResponse,
-} from '../../../../shared/validation/MessageSchema';
-import { TranslationProgressPublisher } from './TranslationProgressPublisher';
+} from "../../../../shared/validation/MessageSchema";
+import { TranslationProgressPublisher } from "./TranslationProgressPublisher";
 import {
   TranslationRequestRegistry,
   type ActiveTranslationJob,
   type TranslationOrigin,
   type TranslationTerminalSummary,
-} from './TranslationRequestRegistry';
+} from "./TranslationRequestRegistry";
 import {
   TranslationRequestPreparer,
   type ITranslationRequestPreparer,
   type PreparedTranslationRequest,
-} from './TranslationRequestPreparer';
+} from "./TranslationRequestPreparer";
 import {
   awaitTranslationWork,
   safeTranslationError,
-} from './translation-job-utils';
+} from "./translation-job-utils";
 
 export type TranslateImagePayload = TranslationRequestIdentity & {
   imageBase64: string;
 };
 
-type CompletedJob = Extract<TranslationTerminalSummary, { state: 'completed' }>;
+type CompletedJob = Extract<TranslationTerminalSummary, { state: "completed" }>;
 interface JobOutcome {
   summary: TranslationTerminalSummary;
   result: Result<void, AppError>;
@@ -79,7 +79,7 @@ export class TranslationJobCoordinator {
       const mapped = AppError.fromUnknown(error);
       this.registry.finish(
         job,
-        { state: 'failed', error: safeTranslationError(mapped) },
+        { state: "failed", error: safeTranslationError(mapped) },
         failure(mapped),
       );
     });
@@ -104,11 +104,11 @@ export class TranslationJobCoordinator {
     const summary = this.registry.summary(identity, origin);
     if (!summary) {
       return this.registry.wasCancelled(identity, origin)
-        ? { state: 'cancelled' }
-        : { state: 'unknown' };
+        ? { state: "cancelled" }
+        : { state: "unknown" };
     }
-    if (summary.state !== 'completed') return summary;
-    if (!summary.historySaved) return { state: 'completed-unavailable' };
+    if (summary.state !== "completed") return summary;
+    if (!summary.historySaved) return { state: "completed-unavailable" };
 
     return this.recoverCompleted(summary);
   }
@@ -141,6 +141,7 @@ export class TranslationJobCoordinator {
             generationDeadlineAt,
           )
         : failure(prepared.error);
+
       const committed = generated.success
         ? await this.commit(job, publisher, generated.data)
         : failure(generated.error);
@@ -151,9 +152,10 @@ export class TranslationJobCoordinator {
     } catch (error: unknown) {
       const failed = this.failedOutcome(AppError.fromUnknown(error));
       outcome = failed;
+
       if (publisher)
         await publisher.control({
-          kind: 'failed',
+          kind: "failed",
           error: failed.summary.error,
         });
     } finally {
@@ -162,6 +164,7 @@ export class TranslationJobCoordinator {
         outcome.result.error instanceof NetworkError
       )
         job.token.cancel();
+
       publisher?.dispose();
       this.registry.finish(job, outcome.summary, outcome.result);
     }
@@ -186,7 +189,7 @@ export class TranslationJobCoordinator {
     generationDeadlineAt: number,
   ): Promise<Result<Translation, AppError>> {
     const started = await publisher.control({
-      kind: 'started',
+      kind: "started",
       targetLanguage: prepared.targetLanguage,
       generationDeadlineAt,
     });
@@ -203,6 +206,7 @@ export class TranslationJobCoordinator {
       generationDeadlineAt,
       job.token,
     );
+
     if (
       !generated.success &&
       generated.error.code === ErrorCode.NETWORK_TIMEOUT
@@ -213,10 +217,12 @@ export class TranslationJobCoordinator {
     const translation = generated.success
       ? generated.data
       : failure(generated.error);
+
     if (!translation.success)
       return failure(publisher.error ?? translation.error);
     if (job.token.isCancellationRequested)
       return failure(TranslationError.cancelled());
+
     return translation;
   }
 
@@ -225,13 +231,13 @@ export class TranslationJobCoordinator {
     publisher: TranslationProgressPublisher,
     translation: Translation,
   ): Promise<Result<CompletedJob, AppError>> {
-    const committing = await publisher.control({ kind: 'committing' });
+    const committing = await publisher.control({ kind: "committing" });
     if (!committing.success) return committing;
     if (job.token.isCancellationRequested)
       return failure(TranslationError.cancelled());
 
     // No await between the last cancellation check and crossing the commit boundary.
-    job.phase = 'committing';
+    job.phase = "committing";
     const saved = await awaitTranslationWork(
       this.container.saveTranslationUseCase.execute({ translation }),
       Date.now() + COMMIT_TIMEOUT_MS,
@@ -239,15 +245,17 @@ export class TranslationJobCoordinator {
     if (!saved.success) return failure(saved.error);
 
     const summary: CompletedJob = {
-      state: 'completed',
+      state: "completed",
       translationId: translation.id,
       historySaved: saved.data.success,
     };
+
     await publisher.control({
-      kind: 'completed',
+      kind: "completed",
       translation: serializeForModal(translation),
       historySaved: summary.historySaved,
     });
+
     return success(summary);
   }
 
@@ -262,21 +270,21 @@ export class TranslationJobCoordinator {
         !publisher.error &&
         error.code !== ErrorCode.NETWORK_TIMEOUT);
     if (cancelled) {
-      await publisher.control({ kind: 'cancelled' });
+      await publisher.control({ kind: "cancelled" });
       return {
-        summary: { state: 'cancelled' },
+        summary: { state: "cancelled" },
         result: failure(TranslationError.cancelled()),
       };
     }
 
     const outcome = this.failedOutcome(error);
-    await publisher.control({ kind: 'failed', error: outcome.summary.error });
+    await publisher.control({ kind: "failed", error: outcome.summary.error });
     return outcome;
   }
 
   private failedOutcome(error: AppError) {
     return {
-      summary: { state: 'failed' as const, error: safeTranslationError(error) },
+      summary: { state: "failed" as const, error: safeTranslationError(error) },
       result: failure(error),
     };
   }
@@ -284,8 +292,8 @@ export class TranslationJobCoordinator {
   private resultFromSummary(
     summary: TranslationTerminalSummary,
   ): Result<void, AppError> {
-    if (summary.state === 'completed') return success(undefined);
-    if (summary.state === 'cancelled')
+    if (summary.state === "completed") return success(undefined);
+    if (summary.state === "cancelled")
       return failure(TranslationError.cancelled());
     const code =
       Object.values(ErrorCode).find((value) => value === summary.error.code) ??
@@ -303,10 +311,10 @@ export class TranslationJobCoordinator {
       Date.now() + HISTORY_RECOVERY_TIMEOUT_MS,
     );
     if (!loaded.success || !loaded.data.success || !loaded.data.data) {
-      return { state: 'completed-unavailable' };
+      return { state: "completed-unavailable" };
     }
     return {
-      state: 'completed',
+      state: "completed",
       translation: serializeForModal(loaded.data.data),
       historySaved: true,
     };

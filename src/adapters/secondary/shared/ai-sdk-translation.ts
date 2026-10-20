@@ -1,46 +1,46 @@
 /* eslint-disable no-await-in-loop -- Provider attempts depend on the preceding result. */
-import { z } from 'zod';
-import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
-import type { Translation } from '../../../core/domain/translation/Translation';
-import type { Language } from '../../../core/domain/translation/Language';
-import type { ITranslationCapabilityStorage } from '../../../core/ports/outbound/ITranslationCapabilityStorage';
-import type { TranslationExecutionOptions } from '../../../core/ports/outbound/TranslationExecutionOptions';
-import { failure, success, type Result } from '../../../shared/types/Result';
-import { AppError, TranslationError } from '../../../shared/errors';
+import { z } from "zod";
+import type { EncodedImage } from "../../../core/domain/image/EncodedImage";
+import type { Translation } from "../../../core/domain/translation/Translation";
+import type { Language } from "../../../core/domain/translation/Language";
+import type { ITranslationCapabilityStorage } from "../../../core/ports/outbound/ITranslationCapabilityStorage";
+import type { TranslationExecutionOptions } from "../../../core/ports/outbound/TranslationExecutionOptions";
+import { failure, success, type Result } from "../../../shared/types/Result";
+import { AppError, TranslationError } from "../../../shared/errors";
 import {
   createTranslationDataSchema,
   type TranslationResponse,
-} from './translation-schema';
-import { mapResponseToDomain } from './translation-response-mapper';
+} from "./translation-schema";
+import { mapResponseToDomain } from "./translation-response-mapper";
 import {
   buildBasePrompt,
   buildPlainPrompt,
   buildRepairPrompt,
-} from './prompt-base';
+} from "./prompt-base";
 import {
   executionScope,
   raceAbort,
   throwIfAborted,
   type TranslationExecutionScope,
-} from './translation-execution';
+} from "./translation-execution";
 import {
   modelScopeKey,
   capabilityDigest,
   type ModelScopeInput,
-} from './translation-capability-key';
-import { TranslationCapabilityState } from './TranslationCapabilityState';
-import { TranslationAttemptPreview } from './TranslationAttemptPreview';
-import { TranslationConfigurationPolicy } from './TranslationConfigurationPolicy';
-import { isConfigurationRejection } from './generation-configuration-error';
-import { classifyGenerationError } from './generation-errors';
-import { inspectTranslationCompletion } from './translation-completion';
-import { isStructured, TranslationAttemptPolicy } from './translation-fallback';
+} from "./translation-capability-key";
+import { TranslationCapabilityState } from "./TranslationCapabilityState";
+import { TranslationAttemptPreview } from "./TranslationAttemptPreview";
+import { TranslationConfigurationPolicy } from "./TranslationConfigurationPolicy";
+import { isConfigurationRejection } from "./generation-configuration-error";
+import { classifyGenerationError } from "./generation-errors";
+import { inspectTranslationCompletion } from "./translation-completion";
+import { isStructured, TranslationAttemptPolicy } from "./translation-fallback";
 import type {
   GenerationMode,
   GenerationRequest,
   GenerationResult,
   ITranslationGenerationTransport,
-} from './ITranslationGenerationTransport';
+} from "./ITranslationGenerationTransport";
 
 export interface TranslationProviderContext extends ModelScopeInput {
   legacyUnambiguous?: boolean;
@@ -86,6 +86,7 @@ export async function executeTranslation(
     options,
     scope,
   };
+
   try {
     return await raceAbort(runTranslation(job), scope.signal);
   } catch (error) {
@@ -113,8 +114,9 @@ async function prepareTranslation(
   const identity = await modelScopeKey(job.context);
   const schema = createTranslationDataSchema(job.includeDescription);
   const schemaScope = await capabilityDigest(
-    z.toJSONSchema(schema, { target: 'draft-07', io: 'input' }),
+    z.toJSONSchema(schema, { target: "draft-07", io: "input" }),
   );
+
   const state = new TranslationCapabilityState(
     identity,
     schemaScope,
@@ -124,23 +126,29 @@ async function prepareTranslation(
       refreshAfterMs: COMPATIBILITY_REFRESH_INTERVAL_MS,
     },
   );
+
   await state.load(
     job.transport.legacyModelKey,
     job.context.legacyUnambiguous ?? false,
   );
+
   throwIfAborted(job.scope.signal);
+
   if (job.transport.supportedModes)
     await state.declareModes(job.transport.supportedModes);
+
   let configurations: TranslationConfigurationPolicy | undefined;
   if (job.transport.configurations?.length) {
     await state.declareConfigurations(
       job.transport.configurations.map((configuration) => configuration.id),
     );
+
     configurations = new TranslationConfigurationPolicy(
       job.transport.configurations,
       (id) => state.configurationSupport(id),
     );
   }
+
   return { ...job, state, schema, configurations };
 }
 
@@ -151,13 +159,15 @@ async function runAttempts(
   let mode = policy.initialMode();
   while (mode && policy.hasBudget) {
     throwIfAborted(job.scope.signal);
-    if (job.state.support(mode) === 'unsupported')
+
+    if (job.state.support(mode) === "unsupported")
       return failure(TranslationError.requestRejected());
     if (job.configurations && !job.configurations.current)
       return failure(TranslationError.requestRejected());
 
-    const reset = await job.options.progress?.report({ kind: 'reset' });
+    const reset = await job.options.progress?.report({ kind: "reset" });
     if (reset && !reset.success) return failure(reset.error);
+
     throwIfAborted(job.scope.signal);
     policy.recordAttempt(mode);
 
@@ -167,14 +177,17 @@ async function runAttempts(
         mode,
         policy.repairText,
       );
+
       throwIfAborted(job.scope.signal);
+
       const completion = inspectTranslationCompletion(
         generated,
         text,
         job.includeDescription,
       );
-      if (completion.kind === 'failed') return failure(completion.error);
-      if (completion.kind === 'accepted') {
+
+      if (completion.kind === "failed") return failure(completion.error);
+      if (completion.kind === "accepted") {
         return await acceptTranslation(
           job,
           mode,
@@ -186,11 +199,12 @@ async function runAttempts(
       const repairMode = policy.repair(completion.text);
       if (!repairMode) return failure(TranslationError.malformedResponse());
       if (
-        completion.finishReason !== 'stop' &&
-        completion.finishReason !== 'length'
+        completion.finishReason !== "stop" &&
+        completion.finishReason !== "length"
       ) {
         return failure(TranslationError.interrupted());
       }
+
       mode = repairMode;
     } catch (error) {
       const fallback = await fallbackAfterFailure(job, policy, mode, error);
@@ -216,6 +230,7 @@ async function generateAttempt(
     const generated = await job.transport.generate(request, (event) =>
       preview.receive(event),
     );
+
     return { generated, text: preview.text };
   } finally {
     // Disposal also suppresses callbacks from old native readers after fallback.
@@ -233,6 +248,7 @@ function createGenerationRequest(
     targetLanguageName: job.targetLanguage.name,
     includeDescription: job.includeDescription,
   };
+
   return {
     mode,
     image: job.image,
@@ -241,7 +257,7 @@ function createGenerationRequest(
       : buildPlainPrompt(prompt),
     userText:
       repairText === undefined
-        ? 'Extract and translate all text in this image.'
+        ? "Extract and translate all text in this image."
         : buildRepairPrompt(repairText),
     schema: job.schema,
     signal: job.scope.signal,
@@ -257,16 +273,20 @@ async function acceptTranslation(
 ): Promise<Result<Translation, AppError>> {
   const imageAccepted = response.success && response.data !== null;
   const configuration = job.configurations?.current;
+
   if (configuration) await job.state.acceptedConfiguration(configuration.id);
+
   await job.state.accepted(mode, generated.schemaValidated, imageAccepted);
   throwIfAborted(job.scope.signal);
+
   if (!response.success || !response.data) {
     return failure(
-      response.error === 'NO_TEXT_FOUND'
+      response.error === "NO_TEXT_FOUND"
         ? TranslationError.noTextFound()
-        : TranslationError.aiRejected(response.error ?? 'Unknown error'),
+        : TranslationError.aiRejected(response.error ?? "Unknown error"),
     );
   }
+
   return mapResponseToDomain(
     response.data,
     job.targetLanguage,
@@ -283,6 +303,7 @@ async function fallbackAfterFailure(
   throwIfAborted(job.scope.signal);
   const classified = classifyGenerationError(error, mode);
   const configuration = job.configurations?.current;
+
   if (
     configuration &&
     isConfigurationRejection(error, configuration.rejectionFields)
@@ -293,10 +314,12 @@ async function fallbackAfterFailure(
       ? success(mode)
       : failure(classified.error);
   }
+
   if (classified.unsupported) {
     await job.state.rejected(mode, classified.unsupported, classified.general);
     throwIfAborted(job.scope.signal);
   }
+
   const nextMode = policy.afterFailure(mode, classified);
   return nextMode ? success(nextMode) : failure(classified.error);
 }
@@ -310,7 +333,8 @@ function executionError(
       ? scope.signal.reason
       : scope.error();
   }
+
   return error instanceof AppError
     ? error
-    : classifyGenerationError(error, 'plain-buffered').error;
+    : classifyGenerationError(error, "plain-buffered").error;
 }

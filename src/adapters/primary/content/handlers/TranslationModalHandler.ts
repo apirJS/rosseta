@@ -1,19 +1,19 @@
-﻿import { sendMessageToRuntime } from '../../../../shared/messaging';
-import type { TranslationModalPayload } from '../../../../shared/types/TranslationModalPayload';
+﻿import { sendMessageToRuntime } from "../../../../shared/messaging";
+import type { TranslationModalPayload } from "../../../../shared/types/TranslationModalPayload";
 import type {
   TranslationAcknowledgement,
   TranslationEvent,
   TranslationRequestIdentity,
-} from '../../../../shared/validation/MessageSchema';
+} from "../../../../shared/validation/MessageSchema";
 import {
   mountTranslationModal,
   type MountedTranslationView,
-} from '../../ui/injected/translation-result-modal/mountTranslationModal.svelte';
+} from "../../ui/injected/translation-result-modal/mountTranslationModal.svelte";
 import {
   TranslationSession,
   type TranslationSessionDeps,
-} from '../services/TranslationSession';
-import type { ThemeManager } from '../hosts/ThemeManager';
+} from "../services/TranslationSession";
+import type { ThemeManager } from "../hosts/ThemeManager";
 
 export type TranslationViewMount = typeof mountTranslationModal;
 const CLOSED_REQUEST_RETENTION_MS = 120_000;
@@ -29,9 +29,9 @@ export class TranslationModalHandler {
     private readonly mountView: TranslationViewMount = mountTranslationModal,
     private readonly sessionDeps: TranslationSessionDeps = {
       cancel: (payload) =>
-        sendMessageToRuntime({ action: 'CANCEL_TRANSLATION', payload }),
+        sendMessageToRuntime({ action: "CANCEL_TRANSLATION", payload }),
       status: (payload) =>
-        sendMessageToRuntime({ action: 'GET_TRANSLATION_STATUS', payload }),
+        sendMessageToRuntime({ action: "GET_TRANSLATION_STATUS", payload }),
     },
   ) {}
 
@@ -45,7 +45,7 @@ export class TranslationModalHandler {
     if (this.live.has(requestId) || this.closed.has(requestId)) return identity;
     const mounted = this.mountView(
       this.themeManager,
-      'rosseta-live-' + requestId,
+      "rosseta-live-" + requestId,
       () => this.live.get(requestId)?.close(),
     );
     const session = new TranslationSession(
@@ -70,11 +70,11 @@ export class TranslationModalHandler {
 
   receive(event: TranslationEvent): TranslationAcknowledgement {
     if (event.documentSessionId !== this.documentSessionId)
-      return { status: 'unknown' };
+      return { status: "unknown" };
     this.prune();
-    if (this.closed.has(event.requestId)) return { status: 'closed' };
+    if (this.closed.has(event.requestId)) return { status: "closed" };
     return (
-      this.live.get(event.requestId)?.accept(event) ?? { status: 'unknown' }
+      this.live.get(event.requestId)?.accept(event) ?? { status: "unknown" }
     );
   }
 
@@ -104,7 +104,7 @@ export class TranslationModalHandler {
     let mounted: MountedTranslationView;
     mounted = this.mountView(
       this.themeManager,
-      'rosseta-modal-' + payload.id,
+      "rosseta-modal-" + payload.id,
       () => mounted.detach(),
       payload,
     );

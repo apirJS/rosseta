@@ -1,9 +1,9 @@
-import { StreamProviderError, UnsupportedFunctionalityError } from 'ai';
+import { StreamProviderError, UnsupportedFunctionalityError } from "ai";
 import {
   readGenerationErrorDetails,
   type GenerationErrorDetails,
-} from './generation-error-details';
-import { unwrapGenerationError } from './generation-errors';
+} from "./generation-error-details";
+import { unwrapGenerationError } from "./generation-errors";
 
 /** Only explicit rejection of a control actually sent can teach compatibility. */
 export function isConfigurationRejection(
@@ -34,11 +34,11 @@ export function isConfigurationRejection(
 
   const text = (
     details.code +
-    '\n' +
+    "\n" +
     details.message +
-    '\n' +
-    (sdkUnsupported ? unwrapped.functionality : '')
-  ).replace(/[_-]+/g, ' ');
+    "\n" +
+    (sdkUnsupported ? unwrapped.functionality : "")
+  ).replace(/[_-]+/g, " ");
 
   if (!parameterNames.length && !namesActiveField(text, activeFields))
     return false;
@@ -62,18 +62,18 @@ function permitsConfigurationEvidence(
 }
 
 function isTypedProviderEnvelope(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
+  if (typeof error !== "object" || error === null) return false;
   if (
-    'type' in error &&
-    (error.type === 'error' || error.type === 'invalid_request_error')
+    "type" in error &&
+    (error.type === "error" || error.type === "invalid_request_error")
   )
     return true;
-    
+
   return (
-    'success' in error &&
+    "success" in error &&
     error.success === false &&
-    'error' in error &&
-    typeof error.error === 'object' &&
+    "error" in error &&
+    typeof error.error === "object" &&
     error.error !== null
   );
 }
@@ -90,13 +90,13 @@ function namesActiveField(text: string, fields: readonly RegExp[]): boolean {
 
 function fieldPattern(value: string): RegExp | null {
   const words = value
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
     .toLowerCase()
     .match(/[a-z0-9]+/g);
   return words?.length
     ? new RegExp(
-        `(?:^|[^a-z0-9_])${words.join('[\\s_.-]*')}(?=$|[^a-z0-9_])`,
-        'i',
+        `(?:^|[^a-z0-9_])${words.join("[\\s_.-]*")}(?=$|[^a-z0-9_])`,
+        "i",
       )
     : null;
 }
@@ -119,7 +119,7 @@ function hasUnrelatedFailure({
   code,
   message,
 }: GenerationErrorDetails): boolean {
-  const text = (code + '\n' + message).replace(/[_-]+/g, ' ');
+  const text = (code + "\n" + message).replace(/[_-]+/g, " ");
   return (
     isAccessFailure(text) ||
     isTemporaryFailure(text) ||
@@ -170,15 +170,15 @@ function isInputFailure(text: string): boolean {
 
 function isConditionalModeRejection(text: string): boolean {
   const feature =
-    '(?:stream(?:ing)?|json\\s*schema|response\\s*format|structured(?:\\s+output)?)';
+    "(?:stream(?:ing)?|json\\s*schema|response\\s*format|structured(?:\\s+output)?)";
   return (
     new RegExp(
       `\\b(?:with|without|when|while|during|for|in|if)\\s+(?:(?:using|requesting|sending|enabling|the|a|an)\\s+)*${feature}\\b`,
-      'i',
+      "i",
     ).test(text) ||
     new RegExp(
       `\\b${feature}\\b[^.\\n]{0,80}\\b(?:with|without|when|while|during|if)\\b`,
-      'i',
+      "i",
     ).test(text)
   );
 }

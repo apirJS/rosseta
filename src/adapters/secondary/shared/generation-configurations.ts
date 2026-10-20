@@ -1,4 +1,4 @@
-import type { generateText, LanguageModel } from 'ai';
+import type { generateText, LanguageModel } from "ai";
 
 /** Adapter-local request variants; identities are opaque to persistence/core. */
 export interface GenerationConfiguration {
@@ -7,12 +7,12 @@ export interface GenerationConfiguration {
 }
 
 export type SdkProviderOptions = NonNullable<
-  Parameters<typeof generateText>[0]['providerOptions']
+  Parameters<typeof generateText>[0]["providerOptions"]
 >;
 
 export interface ThinkingConfiguration extends GenerationConfiguration {
-  intent: 'disabled' | 'minimum' | 'provider-default';
-  reasoning?: Parameters<typeof generateText>[0]['reasoning'];
+  intent: "disabled" | "minimum" | "provider-default";
+  reasoning?: Parameters<typeof generateText>[0]["reasoning"];
   providerOptions?: SdkProviderOptions;
   requestBody?: Readonly<Record<string, unknown>>;
   puterEffort?: string;
@@ -27,9 +27,9 @@ export interface ThinkingContext {
 }
 
 export const PROVIDER_DEFAULT_CONFIGURATION: ThinkingConfiguration = {
-  id: 'thinking.provider-default.v1',
+  id: "thinking.provider-default.v1",
   rejectionFields: [],
-  intent: 'provider-default',
+  intent: "provider-default",
 };
 
 export type ConfiguredModelFactory = (

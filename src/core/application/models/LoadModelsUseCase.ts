@@ -28,7 +28,7 @@ export class LoadModelsUseCase implements ILoadModelsUseCase {
     for (const [provider, models] of Object.entries(result.data)) {
       if (!ProviderRegistry.hasProvider(provider)) continue;
 
-      ProviderRegistry.setModels(
+      ProviderRegistry.setModels( 
         provider,
         models.map((m) => ({ id: m.id, name: m.name })),
       );

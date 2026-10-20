@@ -1,17 +1,20 @@
-import type { EncodedImage } from '../../../core/domain/image/EncodedImage';
-import type { z } from 'zod';
-import type { GenerationConfiguration } from './generation-configurations';
+import type { EncodedImage } from "../../../core/domain/image/EncodedImage";
+import type { z } from "zod";
+import type { GenerationConfiguration } from "./generation-configurations";
+
 export type GenerationMode =
-  | 'structured-stream'
-  | 'plain-stream'
-  | 'structured-buffered'
-  | 'plain-buffered';
+  | "structured-stream"
+  | "plain-stream"
+  | "structured-buffered"
+  | "plain-buffered";
+
 export const GENERATION_MODES: readonly GenerationMode[] = [
-  'structured-stream',
-  'plain-stream',
-  'structured-buffered',
-  'plain-buffered',
+  "structured-stream",
+  "plain-stream",
+  "structured-buffered",
+  "plain-buffered",
 ];
+
 export interface GenerationRequest {
   mode: GenerationMode;
   image: EncodedImage;
@@ -21,15 +24,17 @@ export interface GenerationRequest {
   signal: AbortSignal;
   configurationId?: string;
 }
+
 export type GenerationEvent =
   | {
-      type: 'text';
+      type: "text";
       text: string;
     }
   | {
-      type: 'partial';
+      type: "partial";
       value: unknown;
     };
+
 export interface GenerationResult {
   text: string;
   output?: unknown;
@@ -37,6 +42,7 @@ export interface GenerationResult {
   schemaValidated: boolean;
   validationError?: unknown;
 }
+
 export interface ITranslationGenerationTransport {
   readonly supportedModes?: readonly GenerationMode[];
   readonly legacyModelKey?: string;

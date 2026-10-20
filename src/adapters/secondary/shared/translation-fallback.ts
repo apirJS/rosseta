@@ -1,17 +1,21 @@
-import { GENERATION_MODES, type GenerationMode } from './ITranslationGenerationTransport';
-import type { GenerationFailure } from './generation-errors';
+import {
+  GENERATION_MODES,
+  type GenerationMode,
+} from "./ITranslationGenerationTransport";
+import type { GenerationFailure } from "./generation-errors";
 
-type ModeSupport = 'unknown' | 'supported' | 'unsupported';
+type ModeSupport = "unknown" | "supported" | "unsupported";
 type SupportLookup = (mode: GenerationMode) => ModeSupport;
 // Shared ceiling for the initial request, configuration/mode fallbacks, and repair.
 // Two rejected thinking controls + schema/stream fallback + generation + repair = six.
 const MAX_GENERATION_CALLS = 6;
 
-export const isStructured = (mode: GenerationMode) => mode.startsWith('structured');
-export const isStreamed = (mode: GenerationMode) => mode.endsWith('stream');
+export const isStructured = (mode: GenerationMode) =>
+  mode.startsWith("structured");
+export const isStreamed = (mode: GenerationMode) => mode.endsWith("stream");
 
 export function bufferedMode(mode: GenerationMode): GenerationMode {
-  return isStructured(mode) ? 'structured-buffered' : 'plain-buffered';
+  return isStructured(mode) ? "structured-buffered" : "plain-buffered";
 }
 
 export function selectGenerationMode(
@@ -19,10 +23,10 @@ export function selectGenerationMode(
   visited: ReadonlySet<GenerationMode>,
   preferred?: GenerationMode,
 ): GenerationMode | null {
-  const available = GENERATION_MODES.filter(mode => {
-    return !visited.has(mode) && support(mode) !== 'unsupported';
+  const available = GENERATION_MODES.filter((mode) => {
+    return !visited.has(mode) && support(mode) !== "unsupported";
   });
-  const knownWorking = available.find(mode => support(mode) === 'supported');
+  const knownWorking = available.find((mode) => support(mode) === "supported");
   if (knownWorking) return knownWorking;
   if (preferred && available.includes(preferred)) return preferred;
   return available[0] ?? null;
@@ -57,23 +61,30 @@ export class TranslationAttemptPolicy {
 
   repair(text: string): GenerationMode | null {
     if (this.repaired) return null;
-    const mode = this.support('plain-buffered') !== 'unsupported'
-      ? 'plain-buffered'
-      : this.support('structured-buffered') !== 'unsupported'
-        ? 'structured-buffered'
-        : null;
+    const mode =
+      this.support("plain-buffered") !== "unsupported"
+        ? "plain-buffered"
+        : this.support("structured-buffered") !== "unsupported"
+          ? "structured-buffered"
+          : null;
     if (!mode) return null;
     this.repaired = true;
     this.previousResponse = text;
     return mode;
   }
 
-  afterFailure(mode: GenerationMode, failure: GenerationFailure): GenerationMode | null {
-    if (this.repaired || failure.unsupported === 'vision') return null;
+  afterFailure(
+    mode: GenerationMode,
+    failure: GenerationFailure,
+  ): GenerationMode | null {
+    if (this.repaired || failure.unsupported === "vision") return null;
     if (failure.unsupported) {
-      const preferred = failure.unsupported === 'stream'
-        ? bufferedMode(mode)
-        : isStreamed(mode) ? 'plain-stream' : 'plain-buffered';
+      const preferred =
+        failure.unsupported === "stream"
+          ? bufferedMode(mode)
+          : isStreamed(mode)
+            ? "plain-stream"
+            : "plain-buffered";
       return selectGenerationMode(this.support, this.visited, preferred);
     }
     if (!failure.transient || this.restarted) return null;
@@ -82,12 +93,14 @@ export class TranslationAttemptPolicy {
 
   private restartBuffered(mode: GenerationMode): GenerationMode | null {
     const buffered = bufferedMode(mode);
-    const selected = this.support(buffered) !== 'unsupported'
-      ? buffered
-      : selectGenerationMode(
-        candidate => isStreamed(candidate) ? 'unsupported' : this.support(candidate),
-        this.visited,
-      );
+    const selected =
+      this.support(buffered) !== "unsupported"
+        ? buffered
+        : selectGenerationMode(
+            (candidate) =>
+              isStreamed(candidate) ? "unsupported" : this.support(candidate),
+            this.visited,
+          );
     if (selected) this.restarted = true;
     return selected;
   }

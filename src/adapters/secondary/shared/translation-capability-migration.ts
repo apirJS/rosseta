@@ -2,9 +2,9 @@ import type {
   ITranslationCapabilityStorage,
   TranslationCapabilityReadContext,
   TranslationCapabilityRecord,
-} from '../../../core/ports/outbound/ITranslationCapabilityStorage';
-import type { AppError } from '../../../shared/errors';
-import type { Result } from '../../../shared/types/Result';
+} from "../../../core/ports/outbound/ITranslationCapabilityStorage";
+import type { AppError } from "../../../shared/errors";
+import type { Result } from "../../../shared/types/Result";
 
 export interface LegacyStructuredOutputMigration {
   identity: string;
@@ -16,11 +16,19 @@ export interface LegacyStructuredOutputMigration {
   context?: TranslationCapabilityReadContext;
 }
 
-type LegacyMigration = (options: LegacyStructuredOutputMigration) => Promise<Result<TranslationCapabilityRecord | null, AppError>>;
-const migrations = new WeakMap<ITranslationCapabilityStorage, LegacyMigration>();
+type LegacyMigration = (
+  options: LegacyStructuredOutputMigration,
+) => Promise<Result<TranslationCapabilityRecord | null, AppError>>;
+const migrations = new WeakMap<
+  ITranslationCapabilityStorage,
+  LegacyMigration
+>();
 
 /** Browser storage registers its legacy reader without coupling native transports to browser modules. */
-export function registerLegacyCapabilityMigration(storage: ITranslationCapabilityStorage, migration: LegacyMigration): void {
+export function registerLegacyCapabilityMigration(
+  storage: ITranslationCapabilityStorage,
+  migration: LegacyMigration,
+): void {
   migrations.set(storage, migration);
 }
 
@@ -28,5 +36,8 @@ export function migrateLegacyCapabilities(
   storage: ITranslationCapabilityStorage,
   options: LegacyStructuredOutputMigration,
 ): Promise<Result<TranslationCapabilityRecord | null, AppError>> {
-  return migrations.get(storage)?.(options) ?? storage.read(options.identity, options.context);
+  return (
+    migrations.get(storage)?.(options) ??
+    storage.read(options.identity, options.context)
+  );
 }

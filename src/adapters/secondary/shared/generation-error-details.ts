@@ -8,7 +8,7 @@ export interface GenerationErrorDetails {
 
 const MAX_ERROR_ENVELOPES = 16;
 const MAX_ERROR_TEXT_LENGTH = 65_536;
-const PROVIDER_ERROR_FIELDS = ['error', 'data', 'responseBody'] as const;
+const PROVIDER_ERROR_FIELDS = ["error", "data", "responseBody"] as const;
 
 /** Read known SDK/provider envelopes without inspecting requests or metadata. */
 export function readGenerationErrorDetails(
@@ -28,14 +28,14 @@ export function readGenerationErrorDetails(
     index++
   ) {
     const decoded = decodeEnvelope(queue[index]);
-    if (typeof decoded === 'string') {
+    if (typeof decoded === "string") {
       messages.add(decoded);
       continue;
     }
 
     if (
       !decoded ||
-      typeof decoded !== 'object' ||
+      typeof decoded !== "object" ||
       Array.isArray(decoded) ||
       seen.has(decoded)
     )
@@ -45,14 +45,14 @@ export function readGenerationErrorDetails(
     const record = decoded as Record<string, unknown>;
     status ||= readStatus(record);
 
-    if (!url && typeof record.url === 'string') url = record.url;
-    if (typeof record.message === 'string' && record.message.trim())
+    if (!url && typeof record.url === "string") url = record.url;
+    if (typeof record.message === "string" && record.message.trim())
       messages.add(record.message);
-    if (typeof record.code === 'string') codes.add(record.code.toLowerCase());
-    if (typeof record.type === 'string') codes.add(record.type.toLowerCase());
+    if (typeof record.code === "string") codes.add(record.code.toLowerCase());
+    if (typeof record.type === "string") codes.add(record.type.toLowerCase());
 
-    for (const key of ['param', 'parameter']) {
-      if (typeof record[key] === 'string' && record[key].trim())
+    for (const key of ["param", "parameter"]) {
+      if (typeof record[key] === "string" && record[key].trim())
         parameters.add(record[key]);
     }
 
@@ -63,15 +63,15 @@ export function readGenerationErrorDetails(
   }
   return {
     status,
-    message: [...messages].join('\n') || String(error),
-    code: [...codes].join('\n'),
+    message: [...messages].join("\n") || String(error),
+    code: [...codes].join("\n"),
     parameters: [...parameters],
     url,
   };
 }
 
 function decodeEnvelope(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
+  if (typeof value !== "string") return value;
   const text = value.slice(0, MAX_ERROR_TEXT_LENGTH);
   try {
     return JSON.parse(text);

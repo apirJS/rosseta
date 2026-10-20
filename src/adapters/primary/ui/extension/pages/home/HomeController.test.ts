@@ -1,8 +1,14 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { createHomeController } from './HomeController.svelte';
+import { openShortcutSettings } from '../../../shared/browser/shortcut-settings';
 
 vi.mock('../../../../../../shared/messaging', () => ({
   sendMessageToRuntime: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../../shared/browser/shortcut-settings', () => ({
+  openShortcutSettings: vi.fn().mockResolvedValue(undefined),
+  shortcutSettingsUrl: () => 'chrome://extensions/shortcuts',
 }));
 
 import { sendMessageToRuntime } from '../../../../../../shared/messaging';
@@ -100,6 +106,24 @@ describe('UI Controller: HomeController', () => {
     expect(closeSpy).toHaveBeenCalled();
 
     closeSpy.mockRestore();
+  });
+
+  test('opens shortcut settings independently of translation', async () => {
+    const controller = createHomeController();
+    await controller.openShortcutSettings();
+    expect(openShortcutSettings).toHaveBeenCalledOnce();
+    expect(controller.shortcutSettingsUrl).toBe('chrome://extensions/shortcuts');
+    expect(sendMessageToRuntime).not.toHaveBeenCalled();
+  });
+
+  test('reports navigation failure with a manual settings destination', async () => {
+    vi.mocked(openShortcutSettings).mockRejectedValueOnce(new Error('Navigation blocked'));
+    const toast = { show: vi.fn() };
+    await createHomeController({ toast }).openShortcutSettings();
+    expect(toast.show).toHaveBeenCalledWith({
+      type: 'error', message: 'Could not open shortcut settings',
+      description: 'Open chrome://extensions/shortcuts to configure the translation shortcut.',
+    });
   });
 
   test('navigateTo switches to any view and closes the menu', () => {

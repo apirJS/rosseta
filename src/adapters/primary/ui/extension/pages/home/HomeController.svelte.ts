@@ -1,5 +1,10 @@
 import { sendMessageToRuntime } from '../../../../../../shared/messaging';
 import type { AnyProvider } from '../../../../../../core/domain/credential/Provider';
+import {
+  openShortcutSettings as openBrowserShortcutSettings,
+  shortcutSettingsUrl,
+} from '../../../shared/browser/shortcut-settings';
+import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
 
 export type TranslationView =
   | 'main'
@@ -25,8 +30,22 @@ async function startTranslation(): Promise<void> {
   window.close();
 }
 
-export function createHomeController() {
+export function createHomeController(deps?: {
+  toast: Pick<PopupToastController, 'show'>;
+}) {
   const state = new TranslationControllerState();
+
+  async function openShortcutSettings() {
+    try {
+      await openBrowserShortcutSettings();
+    } catch {
+      deps?.toast.show({
+        type: 'error',
+        message: 'Could not open shortcut settings',
+        description: `Open ${shortcutSettingsUrl()} to configure the translation shortcut.`,
+      });
+    }
+  }
 
   function showMain() {
     state.slideDirection = 'back';
@@ -94,5 +113,7 @@ export function createHomeController() {
     toggleMenu,
     closeMenu,
     startTranslation,
+    openShortcutSettings,
+    shortcutSettingsUrl: shortcutSettingsUrl(),
   };
 }

@@ -81,6 +81,8 @@
         <TranslateButton
           onclick={navigation.startTranslation}
           disabled={!controller.canTranslate}
+          shortcutSettingsUrl={navigation.shortcutSettingsUrl}
+          onOpenShortcutSettings={navigation.openShortcutSettings}
         />
       </div>
     </div>

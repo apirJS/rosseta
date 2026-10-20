@@ -6,8 +6,9 @@
   import CustomProvidersPage from './pages/custom-providers/CustomProvidersPage.svelte';
   import HistoryPage from './pages/history/HistoryPage.svelte';
   import SettingsPage from './pages/settings/SettingsPage.svelte';
+  import { getPopupToastContext } from '../shared/context';
 
-  const controller = createHomeController();
+  const controller = createHomeController({ toast: getPopupToastContext() });
 
   const currentView = $derived(controller.state.currentView);
 </script>

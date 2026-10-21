@@ -26,7 +26,7 @@ Format example: {"success":true,"error":null,"data":{"segments":[{"blockIndex":0
 No readable text: {"success":false,"error":"NO_TEXT_FOUND","data":null}
 originalLanguageBcp47Code: source language's common regional tag, e.g. en-US, ja-JP, ko-KR, zh-CN (Simplified), zh-TW (Traditional); never bare codes. Digits only: number; symbols/emoji only: symbol; unidentified: unknown.
 romanization: source pronunciation, never translation. Use Hepburn, Revised Romanization or Hanyu Pinyin as appropriate, omitting punctuation; null for Latin text, numbers or symbols.
-${includeDescription ? 'After segments, emit description: a compact contextual summary in the target language, plain text, at most two sentences.' : 'Omit the description field entirely.'}
+${includeDescription ? 'Inside data, after segments, emit description: a compact contextual summary in the target language, plain text, at most two sentences.' : 'Omit the description field entirely.'}
 Output JSON only, no markdown, no prose, no extra keys.`;
 }
 

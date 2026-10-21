@@ -149,6 +149,115 @@ describe('Adapter: complete translation response normalization', () => {
     expect(normalizeTranslationResponse(paired(), true).success).toBe(true);
   });
 
+  for (const [format, makeResponse] of [
+    ['paired', paired],
+    ['legacy', legacy],
+  ] as const) {
+    test(`recovers a root description in a complete ${format} response without changing the input`, () => {
+      const response = makeResponse();
+      const { description: _description, ...data } = response.data;
+
+      const misplaced = {
+        ...response,
+        data,
+        description: 'A complete contextual summary.',
+      };
+
+      const result = normalizeTranslationResponse(misplaced, true);
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw result.error;
+
+      expect(result.data.data?.description).toBe(misplaced.description);
+      expect(result.data.data?.originalText.contents).toHaveLength(1);
+      expect(result.data.data?.translatedText.contents).toHaveLength(1);
+      expect('description' in misplaced.data).toBe(false);
+      expect(misplaced.description).toBe('A complete contextual summary.');
+    });
+
+    test(`accepts identical duplicated descriptions in a ${format} response`, () => {
+      const response = makeResponse();
+
+      const result = normalizeTranslationResponse(
+        { ...response, description: response.data.description },
+        true,
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw result.error;
+      expect(result.data.data?.description).toBe('');
+    });
+
+    test(`rejects conflicting descriptions in a ${format} response`, () => {
+      expectMalformed({ ...makeResponse(), description: 'Different summary' });
+    });
+  }
+
+  test.each([42, null, false, {}, []].map((description) => ({ description })))(
+    'rejects invalid root description types: %j',
+    ({ description }) => {
+      const response = paired();
+      const { description: _description, ...data } = response.data;
+
+      expectMalformed({ ...response, data, description });
+    },
+  );
+
+  test('defaults omitted nullable metadata without inventing source or translated text', () => {
+    const { romanization: _romanization, ...segment } = pair();
+
+    const result = normalizeTranslationResponse(
+      {
+        success: true,
+        data: { segments: [segment], description: 'A greeting.' },
+      },
+      true,
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw result.error;
+
+    expect(result.data.error).toBeNull();
+    expect(result.data.data?.originalText.contents[0]?.romanization).toBeNull();
+
+    expect(result.data.data?.originalText.contents[0]?.text).toBe(
+      segment.originalText,
+    );
+
+    expect(result.data.data?.translatedText.contents[0]?.text).toBe(
+      segment.translatedText,
+    );
+  });
+
+  test('accepts omitted romanization in complete legacy segment pairs', () => {
+    const response = legacy();
+
+    const withoutRomanization = (
+      items: typeof response.data.originalText.contents,
+    ) => items.map(({ romanization: _romanization, ...segment }) => segment);
+
+    const result = normalizeTranslationResponse({
+      ...response,
+      data: {
+        ...response.data,
+        originalText: {
+          contents: withoutRomanization(response.data.originalText.contents),
+        },
+        translatedText: {
+          contents: withoutRomanization(response.data.translatedText.contents),
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw result.error;
+    expect(result.data.data?.originalText.contents[0]?.romanization).toBeNull();
+
+    expect(
+      result.data.data?.translatedText.contents[0]?.romanization,
+    ).toBeNull();
+  });
+
   test('rejects mixed paired and legacy envelopes instead of choosing one interpretation', () => {
     const response = {
       ...paired(),

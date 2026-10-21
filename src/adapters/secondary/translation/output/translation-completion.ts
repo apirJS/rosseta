@@ -21,8 +21,14 @@ export function inspectTranslationCompletion(
   includeDescription: boolean,
 ): TranslationCompletion {
   const raw = generated.text || streamedText;
+  const texts = [...new Set([generated.text, streamedText])];
 
-  if (new TextEncoder().encode(raw).byteLength > MAX_TRANSLATION_BYTES) {
+  if (
+    texts.some(
+      (text) =>
+        new TextEncoder().encode(text).byteLength > MAX_TRANSLATION_BYTES,
+    )
+  ) {
     return { kind: 'failed', error: TranslationError.responseLimit() };
   }
 
@@ -30,14 +36,26 @@ export function inspectTranslationCompletion(
     return { kind: 'failed', error: TranslationError.contentBlocked() };
   }
 
-  if (!raw.trim() && generated.output === undefined) {
+  if (texts.every((text) => !text.trim()) && generated.output === undefined) {
     return { kind: 'failed', error: TranslationError.emptyResponse() };
   }
 
-  const parsed =
-    generated.output !== undefined
-      ? normalizeTranslationResponse(generated.output, includeDescription)
-      : parseTranslationResponse(raw, includeDescription);
+  let parsed = normalizeTranslationResponse(
+    generated.output,
+    includeDescription,
+  );
+
+  // SDK schema validation and transport text can disagree. Try each complete
+  // representation before requesting another generation, using the same gate.
+  for (const text of texts) {
+    if (
+      parsed.success ||
+      parsed.error.code === ErrorCode.TRANSLATION_RESPONSE_LIMIT
+    )
+      break;
+
+    parsed = parseTranslationResponse(text, includeDescription);
+  }
 
   if (
     !parsed.success &&

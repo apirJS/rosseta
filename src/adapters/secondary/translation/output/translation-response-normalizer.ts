@@ -43,7 +43,7 @@ function normalizePairedEnvelope(
   if (!envelope.success || !envelope.data) {
     return success({
       success: envelope.success,
-      error: envelope.error,
+      error: envelope.error ?? null,
       data: null,
     });
   }
@@ -52,7 +52,7 @@ function normalizePairedEnvelope(
 
   return success({
     success: true,
-    error: envelope.error,
+    error: envelope.error ?? null,
     data: {
       originalText: {
         contents: segments.map((segment) => ({
@@ -77,14 +77,30 @@ function normalizePairedEnvelope(
   });
 }
 
+/** Repair a known layout variation without inventing or discarding content. */
+function normalizeDescriptionPlacement(raw: unknown): unknown {
+  const envelope = record(raw);
+  const data = record(envelope?.data);
+
+  if (!envelope || !data || !Object.hasOwn(envelope, 'description')) return raw;
+
+  const { description, ...rest } = envelope;
+
+  if (Object.hasOwn(data, 'description') && data.description !== description)
+    return raw;
+
+  return { ...rest, data: { ...data, description } };
+}
+
 function parseResponseEnvelope(
   raw: unknown,
 ): Result<TranslationResponse, AppError> {
-  const paired = pairedTranslationSchema.safeParse(raw);
+  const envelope = normalizeDescriptionPlacement(raw);
+  const paired = pairedTranslationSchema.safeParse(envelope);
 
   if (paired.success) return normalizePairedEnvelope(paired.data);
 
-  const legacy = translationDataLenientSchema.safeParse(raw);
+  const legacy = translationDataLenientSchema.safeParse(envelope);
 
   if (!legacy.success) return failure(TranslationError.malformedResponse());
 

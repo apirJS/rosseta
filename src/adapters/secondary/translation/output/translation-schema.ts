@@ -29,13 +29,18 @@ export function createTranslationDataSchema(includeDescription = true) {
     .strict();
 }
 
+// Receipt-only schemas tolerate omitted nullable metadata; requests stay strict.
 export const pairedTranslationSchema = z
   .object({
     success: z.boolean(),
-    error: z.string().nullable(),
+    error: z.string().nullable().optional(),
     data: z
       .object({
-        segments: z.array(segmentSchema),
+        segments: z.array(
+          segmentSchema.extend({
+            romanization: z.string().nullable().default(null),
+          }),
+        ),
         description: z.string().optional(),
       })
       .strict()
@@ -50,7 +55,7 @@ const legacySegment = z
     text: z.string(),
     languageBcp47Code: z.string(),
     language: z.string(),
-    romanization: z.string().nullable(),
+    romanization: z.string().nullable().default(null),
     blockIndex: blockIndexSchema.default(0),
   })
   .strict();

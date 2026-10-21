@@ -13,7 +13,10 @@ import type {
   TranslationProgress,
   TranslationExecutionOptions,
 } from '../../../core/ports/outbound/TranslationExecutionOptions';
-import type { GenerationResult } from './transports/GenerationTransport';
+import type {
+  GenerationMode,
+  GenerationResult,
+} from './transports/GenerationTransport';
 import {
   modelScopeKey,
   capabilityDigest,
@@ -21,6 +24,10 @@ import {
 import { ErrorCode, NetworkError } from '../../../shared/errors';
 import { AbortCancellationToken } from '../../primary/background/translation/AbortCancellationToken';
 import { UNAVAILABLE_RESPONSE_FORMAT_ERROR } from '../../../../tests/fixtures/captured-provider-errors';
+import {
+  CAPTURED_ROOT_DESCRIPTION_RESPONSE,
+  CAPTURED_ROOT_DESCRIPTION_TEXT,
+} from '../../../../tests/fixtures/completed-translation-output';
 
 export const PAIRED_RESPONSE = {
   success: true,
@@ -120,6 +127,165 @@ async function exclude(
 }
 
 describe('Adapter: shared streaming execution', () => {
+  test.each<GenerationMode>([
+    'plain-stream',
+    'plain-buffered',
+    'structured-stream',
+    'structured-buffered',
+  ])(
+    'accepts the captured complete root-description response through %s without retrying',
+    async (mode) => {
+      const progress: TranslationProgress[] = [];
+      const structured = mode.startsWith('structured');
+
+      const validation = createTranslationDataSchema(true).safeParse(
+        CAPTURED_ROOT_DESCRIPTION_RESPONSE,
+      );
+
+      expect(validation.success).toBe(false);
+
+      const transport = new FakeStreamingGeneration([
+        {
+          events: mode.endsWith('stream')
+            ? [
+                {
+                  type: 'text',
+                  text: CAPTURED_ROOT_DESCRIPTION_TEXT.slice(0, 173),
+                },
+                {
+                  type: 'text',
+                  text: CAPTURED_ROOT_DESCRIPTION_TEXT.slice(173),
+                },
+              ]
+            : [],
+          result: {
+            text: CAPTURED_ROOT_DESCRIPTION_TEXT,
+            finishReason: 'stop',
+            schemaValidated: false,
+            validationError:
+              structured && !validation.success ? validation.error : undefined,
+          },
+        },
+      ]);
+
+      transport.supportedModes = [mode];
+
+      const result = await run(transport, undefined, {
+        progress: {
+          report: async (event) => {
+            progress.push(event);
+
+            return success(undefined);
+          },
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(transport.requests.map((request) => request.mode)).toEqual([mode]);
+
+      expect(transport.requests[0].userText).not.toContain(
+        'untrusted_previous_response',
+      );
+
+      expect(progress.filter((event) => event.kind === 'reset')).toHaveLength(
+        1,
+      );
+
+      if (!result.success) return;
+
+      const expected = CAPTURED_ROOT_DESCRIPTION_RESPONSE;
+
+      expect(result.data.description).toBe(expected.description);
+
+      expect(
+        result.data.original.map((segment) => ({
+          text: segment.text,
+          languageCode: segment.language.code,
+          romanization: segment.romanization,
+          blockIndex: segment.blockIndex,
+        })),
+      ).toEqual(
+        expected.data.segments.map((segment) => ({
+          text: segment.originalText,
+          languageCode: segment.originalLanguageBcp47Code,
+          romanization: segment.romanization,
+          blockIndex: segment.blockIndex,
+        })),
+      );
+
+      expect(
+        result.data.translated.map((segment) => ({
+          text: segment.text,
+          languageCode: segment.language.code,
+          blockIndex: segment.blockIndex,
+        })),
+      ).toEqual(
+        expected.data.segments.map((segment) => ({
+          text: segment.translatedText,
+          languageCode: TARGET_LANGUAGE.code,
+          blockIndex: segment.blockIndex,
+        })),
+      );
+    },
+  );
+
+  test('repairs a genuinely truncated root-description response instead of committing its complete segments', async () => {
+    const truncated = CAPTURED_ROOT_DESCRIPTION_TEXT.slice(0, -20);
+
+    const transport = new FakeStreamingGeneration([
+      {
+        events: [{ type: 'text', text: truncated }],
+        result: {
+          text: truncated,
+          finishReason: 'stop',
+          schemaValidated: false,
+        },
+      },
+      { result: valid },
+    ]);
+
+    const result = await run(transport);
+
+    expect(result.success).toBe(true);
+
+    expect(transport.requests.map((request) => request.mode)).toEqual([
+      'structured-stream',
+      'plain-buffered',
+    ]);
+
+    expect(transport.requests[1].userText).toContain(
+      'untrusted_previous_response',
+    );
+
+    if (result.success) expect(result.data.description).toBe('Greeting');
+  });
+
+  test('rejects contradictory completion envelopes even when their segments are valid', async () => {
+    const contradictory = {
+      ...CAPTURED_ROOT_DESCRIPTION_RESPONSE,
+      success: false,
+      error: 'NO_TEXT_FOUND',
+    };
+
+    const generation = {
+      text: JSON.stringify(contradictory),
+      finishReason: 'stop',
+      schemaValidated: false,
+    };
+
+    const transport = new FakeStreamingGeneration([
+      { result: generation },
+      { result: generation },
+    ]);
+
+    const result = await run(transport);
+
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.code).toBe(ErrorCode.TRANSLATION_MALFORMED_RESPONSE);
+    expect(transport.requests).toHaveLength(2);
+  });
+
   test('publishes unfinished strings before final validation and returns canonical domain data', async () => {
     const progress: TranslationProgress[] = [];
 

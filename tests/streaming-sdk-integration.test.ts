@@ -12,6 +12,7 @@ import type { LanguageModelV4StreamPart } from '@ai-sdk/provider';
 import { AiSdkGenerationTransport } from '../src/adapters/secondary/translation/transports/ai-sdk/AiSdkGenerationTransport';
 import { EncodedImage } from '../src/core/domain/image/EncodedImage';
 import { createTranslationDataSchema } from '../src/adapters/secondary/translation/output/translation-schema';
+import { inspectTranslationCompletion } from '../src/adapters/secondary/translation/output/translation-completion';
 import { createTranslationFixture } from './fixtures/translation-provider-server';
 
 import { ApiKey } from '../src/core/domain/credential/ApiKey';
@@ -168,6 +169,89 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
       true,
     );
   });
+
+  test.each(['structured-stream', 'structured-buffered'] as const)(
+    '%s recovers a complete translation rejected only for description placement',
+    async (mode) => {
+      const image = EncodedImage.create('data:image/png;base64,AQ==');
+
+      if (!image.success) throw image.error;
+
+      const text = JSON.stringify({
+        success: true,
+        error: null,
+        data: {
+          segments: [
+            {
+              blockIndex: 0,
+              originalText: 'こんにちは',
+              translatedText: 'Hello',
+              originalLanguageBcp47Code: 'ja-JP',
+              romanization: 'konnichiwa',
+            },
+          ],
+        },
+        description: 'A greeting.',
+      });
+
+      const model = new MockLanguageModelV4({
+        doGenerate: {
+          content: [{ type: 'text', text }],
+          finishReason: { unified: 'stop', raw: 'stop' },
+          usage,
+          warnings: [],
+        },
+        doStream: {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: 'text-start', id: 't' },
+              { type: 'text-delta', id: 't', delta: text },
+              { type: 'text-end', id: 't' },
+              finish,
+            ],
+            initialDelayInMs: 0,
+            chunkDelayInMs: 0,
+          }),
+        },
+      });
+
+      let streamedText = '';
+
+      const generated = await new AiSdkGenerationTransport(model).generate(
+        {
+          mode,
+          image: image.data,
+          instructions: 'Return JSON',
+          userText: 'test',
+          schema: createTranslationDataSchema(true),
+          signal: new AbortController().signal,
+        },
+        async (event) => {
+          if (event.type === 'text') streamedText += event.text;
+        },
+      );
+
+      expect(NoObjectGeneratedError.isInstance(generated.validationError)).toBe(
+        true,
+      );
+
+      expect(generated.finishReason).toBe('stop');
+
+      expect(
+        inspectTranslationCompletion(generated, streamedText, true),
+      ).toMatchObject({
+        kind: 'accepted',
+        response: {
+          data: {
+            description: 'A greeting.',
+            translatedText: { contents: [{ text: 'Hello' }] },
+          },
+        },
+      });
+
+      expect(model.doGenerateCalls.length + model.doStreamCalls.length).toBe(1);
+    },
+  );
 
   test('production transport rejects in-band interruption even after receiving balanced JSON', async () => {
     const image = EncodedImage.create('data:image/png;base64,AQ==');

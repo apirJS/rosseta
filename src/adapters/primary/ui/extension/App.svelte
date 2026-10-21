@@ -18,15 +18,15 @@
     type ModelUseCases,
     type CustomProviderUseCases,
     type SettingsUseCases,
-  } from '../shared/context';
-  import { useAuth } from '../shared/hooks/useAuth.svelte';
-  import { usePreferences } from '../shared/hooks/usePreferences.svelte';
-  import { useModels } from '../shared/hooks/useModels.svelte';
-  import { useCustomProviders } from '../shared/hooks/useCustomProviders.svelte';
-  import { PopupToastContainer } from '../shared/components';
-  import { PopupToastController } from '../shared/toast/PopupToastController.svelte';
+  } from './context';
+  import { useAuth } from './state/useAuth.svelte';
+  import { usePreferences } from './state/usePreferences.svelte';
+  import { useModels } from './state/useModels.svelte';
+  import { useCustomProviders } from './state/useCustomProviders.svelte';
+  import PopupToastContainer from './toast/PopupToastContainer.svelte';
+  import { PopupToastController } from './toast/PopupToastController.svelte';
   import PopupRouter from './PopupRouter.svelte';
-  import { createPopupLifecycle } from './popup-lifecycle.svelte';
+  import { createPopupInitializationController } from './PopupInitializationController.svelte';
 
   interface Props {
     authUseCases: AuthUseCases;
@@ -62,64 +62,72 @@
   // svelte-ignore state_referenced_locally
   const feedback = new PopupToastController();
 
-  setPopupToastContext(feedback);
-
-  const auth = useAuth();
-
-  setAuthStateContext(auth);
-
   // svelte-ignore state_referenced_locally
   const preferences = usePreferences(preferencesUseCases);
 
-  setPreferencesStateContext(preferences);
-
+  const auth = useAuth();
   const models = useModels();
+  const customProviders = useCustomProviders();
+
+  setPopupToastContext(feedback);
+
+  setAuthStateContext(auth);
+
+  setPreferencesStateContext(preferences);
 
   setModelsStateContext(models);
 
-  const customProviders = useCustomProviders();
-
   setCustomProvidersStateContext(customProviders);
 
-  const lifecycle = createPopupLifecycle({
+  const initialization = createPopupInitializationController({
     auth,
     preferences,
     models,
     customProviders,
-    disposeFeedback: () => feedback.dispose(),
   });
 
   onMount(() => {
-    void lifecycle.initialize();
+    void initialization.initialize();
 
-    return lifecycle.dispose;
+    // Release resources if this component unmounts while the page stays alive.
+    return () => {
+      initialization.dispose();
+      auth.dispose();
+      preferences.dispose();
+      models.dispose();
+      customProviders.dispose();
+      feedback.dispose();
+    };
   });
 </script>
 
 <div class="h-full overflow-y-auto">
-  {#if !lifecycle.state.initialized}
+  {#if !initialization.state.initialized}
     <p class="p-4 text-sm text-muted" role="status">Loading settings…</p>
   {:else}
-    {#if lifecycle.state.failures.length > 0}
+    {#if initialization.state.failures.length > 0}
       <div
         class="p-3 text-sm text-foreground bg-surface border-b border-border"
         role="alert"
       >
         <p>Some settings could not be loaded.</p>
-        {#each lifecycle.state.failures as failure}
+        {#each initialization.state.failures as failure}
           <p class="text-xs text-muted">{failure.name}: {failure.message}</p>
         {/each}
         <button
           type="button"
           class="mt-1 underline underline-offset-2 cursor-pointer"
-          disabled={lifecycle.state.loading}
-          onclick={() => lifecycle.initialize()}
+          disabled={initialization.state.loading}
+          onclick={initialization.initialize}
         >
-          {lifecycle.state.loading ? 'Loading…' : 'Retry'}
+          {initialization.state.loading ? 'Loading…' : 'Retry'}
         </button>
       </div>
     {/if}
     <PopupRouter />
   {/if}
 </div>
-<PopupToastContainer />
+<PopupToastContainer
+  toasts={feedback.toasts}
+  ondismiss={feedback.dismiss.bind(feedback)}
+/>

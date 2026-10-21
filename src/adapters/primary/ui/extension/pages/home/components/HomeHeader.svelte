@@ -5,7 +5,7 @@
     ProviderSelector,
     ThemeToggle,
   } from '../../../../shared/components';
-  import type { MenuDestination } from '../HomeController.svelte';
+  import type { MenuDestination } from '../../../PopupNavigationController.svelte';
   import AppMenu from './AppMenu.svelte';
 
   interface Props {
@@ -13,6 +13,9 @@
     onToggleMenu: () => void;
     onCloseMenu: () => void;
     selectedProvider: string;
+    providerOptions: Array<{ value: string; label: string }>;
+    changingProvider: boolean;
+    version: string;
     onProviderChange: (value: string) => void;
     isDark: boolean;
     onToggleTheme: () => void;
@@ -24,6 +27,9 @@
     onToggleMenu,
     onCloseMenu,
     selectedProvider,
+    providerOptions,
+    changingProvider,
+    version,
     onProviderChange,
     isDark,
     onToggleTheme,
@@ -43,12 +49,14 @@
         <Icon name="menu" class="w-5 h-5" />
       </button>
       {#if isMenuOpen}
-        <AppMenu onnavigate={onNavigate} />
+        <AppMenu {version} onnavigate={onNavigate} />
       {/if}
     </div>
     <div class="w-36 shrink-0">
       <ProviderSelector
         value={selectedProvider}
+        options={providerOptions}
+        disabled={changingProvider}
         compact
         onchange={onProviderChange}
       />

@@ -3,7 +3,7 @@ import type { AnyProvider } from '../../../../../../core/domain/credential/Provi
 import type { Result } from '../../../../../../shared/types/Result';
 import type { AppError } from '../../../../../../shared/errors';
 import { ERROR_TITLES } from '../../../../../../shared/errors';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 class ManageModelsState {
   selectedProvider = $state<string>('google');
@@ -68,13 +68,15 @@ export function createManageModelsController(
 
   async function addModel() {
     const id = state.modelInput.trim();
+    const provider = state.selectedProvider;
 
     if (!id || !canAddModel) return;
 
-    const result = await deps.addModel(state.selectedProvider, id);
+    const result = await deps.addModel(provider, id);
 
     if (result.success) {
-      state.modelInput = '';
+      if (state.selectedProvider === provider && state.modelInput.trim() === id)
+        state.modelInput = '';
     } else {
       deps.toast.show({
         type: 'error',
@@ -97,6 +99,8 @@ export function createManageModelsController(
   }
 
   async function fetchModels() {
+    if (state.isFetching) return;
+
     if (!deps.hasApiKeyFor(state.selectedProvider)) {
       deps.toast.show({
         type: 'info',
@@ -109,9 +113,22 @@ export function createManageModelsController(
 
     state.isFetching = true;
 
-    const result = await deps.fetchModels(state.selectedProvider);
+    let result: Result<StoredModel[], AppError>;
 
-    state.isFetching = false;
+    try {
+      result = await deps.fetchModels(state.selectedProvider);
+    } catch {
+      deps.toast.show({
+        type: 'error',
+        message: 'Could not fetch models',
+        description:
+          'The extension connection was interrupted. Try fetching models again.',
+      });
+
+      return;
+    } finally {
+      state.isFetching = false;
+    }
 
     if (result.success) {
       deps.toast.show({

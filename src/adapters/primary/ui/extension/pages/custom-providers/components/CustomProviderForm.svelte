@@ -29,7 +29,10 @@
     'px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary';
 </script>
 
-<div class="flex-1 flex flex-col gap-3 overflow-y-auto">
+<fieldset
+  disabled={isSaving}
+  class="flex-1 flex flex-col gap-3 overflow-y-auto min-w-0"
+>
   <p class="text-xs text-muted">
     Configure an OpenAI-compatible or Anthropic-compatible endpoint. API keys
     are managed under Manage API Keys.
@@ -118,4 +121,4 @@
       {isSaving ? 'Saving…' : 'Save Provider'}
     </button>
   </div>
-</div>
+</fieldset>

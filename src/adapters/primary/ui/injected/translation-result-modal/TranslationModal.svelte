@@ -4,6 +4,7 @@
   import ModalSection from './components/ModalSection.svelte';
   import TextSection from './components/TextSection.svelte';
   import DescriptionSection from './components/DescriptionSection.svelte';
+  import TranslationFailure from './components/TranslationFailure.svelte';
 
   interface Props {
     controller: TranslationModalController;
@@ -12,14 +13,9 @@
   const { controller: ctrl }: Props = $props();
 
   let backdropEl: HTMLDivElement;
-  let retryEl = $state<HTMLButtonElement>();
 
   $effect(() => {
     backdropEl?.focus();
-  });
-
-  $effect(() => {
-    if (ctrl.isUnsuccessful) retryEl?.focus({ preventScroll: true });
   });
 </script>
 
@@ -43,28 +39,23 @@
     aria-label={ctrl.isUnsuccessful ? ctrl.status : 'Translation Result'}
     aria-busy={ctrl.isBusy}
     tabindex="-1"
-    style:transform="translate({ctrl.posX}px, {ctrl.posY}px)"
+    style:transform="translate({ctrl.drag.x}px, {ctrl.drag.y}px)"
   >
     <ModalHeader
       title={ctrl.phase === 'failed' ? 'Translation failed' : 'Translation'}
-      status={ctrl.isUnsuccessful ? '' : ctrl.status}
+      status={ctrl.headerStatus}
       busy={ctrl.isBusy}
       onclose={ctrl.close}
-      ondragstart={ctrl.handleDragStart}
+      ondragstart={ctrl.drag.start}
     />
 
     <div class="modal-body">
       {#if ctrl.isUnsuccessful}
-        <h2 class="translation-error-title">{ctrl.status}</h2>
-        <p class="translation-error" role="alert">{ctrl.failureDescription}</p>
-        <button
-          class="translation-retry"
-          type="button"
-          onclick={ctrl.retry}
-          bind:this={retryEl}
-        >
-          Select area again
-        </button>
+        <TranslationFailure
+          title={ctrl.status}
+          description={ctrl.failureDescription}
+          onretry={ctrl.retry}
+        />
       {:else}
         {#if ctrl.phase === 'completed' && !ctrl.historySaved}
           <p class="translation-error">Could not save to history.</p>
@@ -72,8 +63,8 @@
         <ModalSection
           label="Original"
           labelTag={ctrl.displayedLangLabel}
-          copyState={ctrl.originalCopy}
-          oncopy={ctrl.copyOriginal}
+          copyState={ctrl.clipboard.states.original}
+          oncopy={() => ctrl.copy('original')}
           copyLabel="Copy original text"
           disabled={!ctrl.canCopy}
         >
@@ -91,8 +82,8 @@
         <ModalSection
           label="Translated"
           labelTag={ctrl.targetLanguageLabel}
-          copyState={ctrl.translatedCopy}
-          oncopy={ctrl.copyTranslated}
+          copyState={ctrl.clipboard.states.translated}
+          oncopy={() => ctrl.copy('translated')}
           copyLabel="Copy translated text"
           disabled={!ctrl.canCopy}
         >
@@ -110,8 +101,8 @@
         {#if ctrl.description}
           <ModalSection
             label="Description"
-            copyState={ctrl.descriptionCopy}
-            oncopy={ctrl.copyDescription}
+            copyState={ctrl.clipboard.states.description}
+            oncopy={() => ctrl.copy('description')}
             copyLabel="Copy description"
             disabled={!ctrl.canCopy}
           >
@@ -126,7 +117,7 @@
         type="button"
         class="modal-footer-drag"
         aria-label="Move modal"
-        onpointerdown={ctrl.handleDragStart}
+        onpointerdown={ctrl.drag.start}
       ></button>
     {/if}
   </div>

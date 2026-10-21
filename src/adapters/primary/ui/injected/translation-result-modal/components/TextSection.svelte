@@ -26,7 +26,7 @@
 
   let isResizing = $state(false);
 
-  function handleTextContentPointer(e: PointerEvent) {
+  function handleSegmentPointer(e: PointerEvent) {
     if (isResizing) return;
 
     const target = (e.target as HTMLElement).closest<HTMLElement>(
@@ -40,26 +40,7 @@
     onSegmentIndexHover?.(i);
   }
 
-  function handleTextContentLeave() {
-    if (isResizing) return;
-    onSegmentIndexHover?.(null);
-  }
-
-  function handleRomPointer(e: PointerEvent) {
-    if (isResizing) return;
-
-    const target = (e.target as HTMLElement).closest<HTMLElement>(
-      '[data-seg-index]',
-    );
-
-    if (!target) return;
-
-    const i = Number(target.dataset.segIndex);
-
-    onSegmentIndexHover?.(i);
-  }
-
-  function handleRomLeave() {
+  function handleSegmentLeave() {
     if (isResizing) return;
     onSegmentIndexHover?.(null);
   }
@@ -69,9 +50,9 @@
   <div
     class="text-content"
     role="group"
-    onpointerenter={handleTextContentPointer}
-    onpointermove={handleTextContentPointer}
-    onpointerleave={handleTextContentLeave}
+    onpointerenter={handleSegmentPointer}
+    onpointermove={handleSegmentPointer}
+    onpointerleave={handleSegmentLeave}
   >
     {#each blocks as block (block[0].rowKey ?? block[0].index)}
       <span class="text-block">
@@ -96,9 +77,9 @@
     <div
       class="text-romanization"
       role="group"
-      onpointerenter={handleRomPointer}
-      onpointermove={handleRomPointer}
-      onpointerleave={handleRomLeave}
+      onpointerenter={handleSegmentPointer}
+      onpointermove={handleSegmentPointer}
+      onpointerleave={handleSegmentLeave}
     >
       {#each blocks as block (block[0].rowKey ?? block[0].index)}
         {#if block.some((segment) => segment.romanization)}

@@ -5,7 +5,7 @@
     getModelsStateContext,
     getPreferencesStateContext,
     getPopupToastContext,
-  } from '../../../shared/context';
+  } from '../../context';
   import { Icon, PageShell } from '../../../shared/components';
   import {
     createCustomProvidersController,
@@ -41,19 +41,11 @@
   };
 
   const controller = createCustomProvidersController(deps);
-
-  const title = $derived(
-    controller.state.view === 'form'
-      ? controller.state.editingId
-        ? 'Edit Provider'
-        : 'New Provider'
-      : 'Custom Providers',
-  );
 </script>
 
 <PageShell
   onback={controller.state.view === 'form' ? controller.showList : onback}
-  {title}
+  title={controller.title}
   isDark={preferences.state.resolvedTheme === 'dark'}
   onToggleTheme={preferences.toggleTheme}
 >

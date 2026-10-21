@@ -5,14 +5,13 @@ import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySe
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import type { Result } from '../../../../../../shared/types/Result';
 import { ERROR_TITLES, type AppError } from '../../../../../../shared/errors';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 const UNDO_WINDOW_MS = 5000;
 
 class ManageKeysState {
   selectedProvider = $state<AnyProvider>('google');
   keyInput = $state('');
-  viewingKeyId = $state<string | null>(null);
   pendingDeleteId = $state<string | null>(null);
 }
 
@@ -67,16 +66,9 @@ export function createManageKeysController(
     return key !== '' && !allKeys.some((c) => c.apiKey.value === key);
   });
 
-  const viewingKey = $derived.by(() => {
-    if (!state.viewingKeyId) return null;
-
-    const match = allKeys.find((c) => c.id === state.viewingKeyId);
-
-    return match ? match.apiKey.value : null;
-  });
-
   async function addApiKey() {
     const trimmed = state.keyInput.trim();
+    const provider = state.selectedProvider;
 
     if (!trimmed) return;
 
@@ -90,7 +82,7 @@ export function createManageKeysController(
       return;
     }
 
-    const error = await deps.addApiKey(trimmed, state.selectedProvider);
+    const error = await deps.addApiKey(trimmed, provider);
 
     if (error) {
       deps.toast.show({
@@ -102,16 +94,33 @@ export function createManageKeysController(
       return;
     }
 
-    state.keyInput = '';
+    if (
+      state.selectedProvider === provider &&
+      state.keyInput.trim() === trimmed
+    )
+      state.keyInput = '';
     deps.toast.show({ type: 'success', message: 'API key added' });
 
-    if (deps.modelsFor(state.selectedProvider).length === 0) {
-      void autoFetchModels(state.selectedProvider);
+    if (deps.modelsFor(provider).length === 0) {
+      void autoFetchModels(provider);
     }
   }
 
   async function autoFetchModels(provider: AnyProvider) {
-    const result = await deps.fetchModels(provider);
+    let result: Result<StoredModel[], AppError>;
+
+    try {
+      result = await deps.fetchModels(provider);
+    } catch {
+      deps.toast.show({
+        type: 'error',
+        message: 'Could not fetch models',
+        description:
+          'Your API key was saved. Try Fetch Models under Manage Models.',
+      });
+
+      return;
+    }
 
     if (result.success) {
       deps.toast.show({
@@ -240,14 +249,6 @@ export function createManageKeysController(
     }
   }
 
-  function viewKey(credentialId: string) {
-    state.viewingKeyId = credentialId;
-  }
-
-  function closeViewer() {
-    state.viewingKeyId = null;
-  }
-
   function destroy() {
     void commitPendingDelete();
   }
@@ -266,17 +267,12 @@ export function createManageKeysController(
     get canAddKey() {
       return canAddKey;
     },
-    get viewingKey() {
-      return viewingKey;
-    },
     addApiKey,
     setProvider,
     requestDelete,
     commitPendingDelete,
     cancelPendingDelete,
     setActiveKey,
-    viewKey,
-    closeViewer,
     destroy,
   };
 }

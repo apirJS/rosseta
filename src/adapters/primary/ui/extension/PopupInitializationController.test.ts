@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { createPopupLifecycle } from './popup-lifecycle.svelte';
+import { createPopupInitializationController } from './PopupInitializationController.svelte';
 import { success, failure, type Result } from '../../../../shared/types/Result';
 import { StorageError, type AppError } from '../../../../shared/errors';
 
@@ -16,11 +16,10 @@ function deferred() {
 function participant() {
   return {
     hydrate: vi.fn().mockResolvedValue(success(undefined)),
-    dispose: vi.fn(),
   };
 }
 
-describe('UI: popup lifecycle', () => {
+describe('UI: popup initialization', () => {
   test('starts independent reads once and waits for provider identities before catalogs', async () => {
     const custom = deferred();
 
@@ -29,26 +28,25 @@ describe('UI: popup lifecycle', () => {
       preferences: participant(),
       customProviders: participant(),
       models: participant(),
-      disposeFeedback: vi.fn(),
     };
 
     deps.customProviders.hydrate.mockReturnValue(custom.promise);
 
-    const lifecycle = createPopupLifecycle(deps);
+    const controller = createPopupInitializationController(deps);
 
     expect(deps.auth.hydrate).not.toHaveBeenCalled();
 
-    const pending = lifecycle.initialize();
+    const pending = controller.initialize();
 
-    expect(lifecycle.initialize()).toBe(pending);
+    expect(controller.initialize()).toBe(pending);
     expect(deps.auth.hydrate).toHaveBeenCalledOnce();
     expect(deps.preferences.hydrate).toHaveBeenCalledOnce();
     expect(deps.models.hydrate).not.toHaveBeenCalled();
     custom.resolve(success(undefined));
     await pending;
     expect(deps.models.hydrate).toHaveBeenCalledOnce();
-    expect(lifecycle.state.initialized).toBe(true);
-    expect(lifecycle.state.failures).toEqual([]);
+    expect(controller.state.initialized).toBe(true);
+    expect(controller.state.failures).toEqual([]);
   });
 
   test('exposes partial failure, handles a thrown adapter error, and permits retry', async () => {
@@ -57,7 +55,6 @@ describe('UI: popup lifecycle', () => {
       preferences: participant(),
       customProviders: participant(),
       models: participant(),
-      disposeFeedback: vi.fn(),
     };
 
     deps.auth.hydrate.mockResolvedValueOnce(
@@ -68,20 +65,20 @@ describe('UI: popup lifecycle', () => {
       new Error('read failed'),
     );
 
-    const lifecycle = createPopupLifecycle(deps);
+    const controller = createPopupInitializationController(deps);
 
-    await lifecycle.initialize();
+    await controller.initialize();
 
     expect(
-      lifecycle.state.failures.map((entry) => entry.name).toSorted(),
+      controller.state.failures.map((entry) => entry.name).toSorted(),
     ).toEqual(['API keys', 'Custom providers']);
 
-    expect(lifecycle.state.initialized).toBe(true);
-    await lifecycle.initialize();
-    expect(lifecycle.state.failures).toEqual([]);
+    expect(controller.state.initialized).toBe(true);
+    await controller.initialize();
+    expect(controller.state.failures).toEqual([]);
   });
 
-  test('disposes resources once and suppresses unfinished initialization after close', async () => {
+  test('ignores unfinished initialization after unmount', async () => {
     const custom = deferred();
 
     const deps = {
@@ -89,27 +86,20 @@ describe('UI: popup lifecycle', () => {
       preferences: participant(),
       customProviders: participant(),
       models: participant(),
-      disposeFeedback: vi.fn(),
     };
 
     deps.customProviders.hydrate.mockReturnValue(custom.promise);
 
-    const lifecycle = createPopupLifecycle(deps);
-    const pending = lifecycle.initialize();
+    const controller = createPopupInitializationController(deps);
+    const pending = controller.initialize();
 
-    lifecycle.dispose();
-    lifecycle.dispose();
+    controller.dispose();
+    controller.dispose();
     custom.resolve(success(undefined));
     await pending;
     expect(deps.models.hydrate).not.toHaveBeenCalled();
-    expect(lifecycle.state.initialized).toBe(false);
-    for (const entry of [
-      deps.auth,
-      deps.preferences,
-      deps.customProviders,
-      deps.models,
-    ])
-      expect(entry.dispose).toHaveBeenCalledOnce();
-    expect(deps.disposeFeedback).toHaveBeenCalledOnce();
+    expect(controller.state.initialized).toBe(false);
+    await controller.initialize();
+    expect(deps.auth.hydrate).toHaveBeenCalledOnce();
   });
 });

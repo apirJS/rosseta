@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Button } from '../../../../shared/components';
-  import { getPreferencesStateContext } from '../../../../shared/context';
 
   interface Props {
     onclick?: () => void;
@@ -8,6 +7,7 @@
     isLoading?: boolean;
     shortcutSettingsUrl: string;
     onOpenShortcutSettings: () => void;
+    shortcutLabel: string | null;
   }
 
   const {
@@ -16,11 +16,8 @@
     isLoading = false,
     shortcutSettingsUrl,
     onOpenShortcutSettings,
+    shortcutLabel,
   }: Props = $props();
-
-  const preferences = getPreferencesStateContext();
-
-  const shortcutLabel = $derived(preferences.state.shortcut);
 </script>
 
 <div class="relative">

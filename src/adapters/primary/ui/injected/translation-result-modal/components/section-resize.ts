@@ -36,8 +36,11 @@ export function startSectionResize(options: {
   box: HTMLElement;
   minHeight: number;
   onEnd?: () => void;
-}): void {
+}): () => void {
   const { event, box, minHeight, onEnd } = options;
+
+  if (event.button !== 0) return () => {};
+
   const handle = event.currentTarget as HTMLElement;
 
   handle.setPointerCapture(event.pointerId);
@@ -61,14 +64,28 @@ export function startSectionResize(options: {
     }
   };
 
-  const onUp = (e: PointerEvent) => {
-    handle.releasePointerCapture(e.pointerId);
+  let active = true;
+
+  const stop = () => {
+    if (!active) return;
+    active = false;
+
+    if (handle.hasPointerCapture(event.pointerId)) {
+      handle.releasePointerCapture(event.pointerId);
+    }
+
     handle.removeEventListener('pointermove', onMove);
-    handle.removeEventListener('pointerup', onUp);
+    handle.removeEventListener('pointerup', stop);
+    handle.removeEventListener('pointercancel', stop);
+    handle.removeEventListener('lostpointercapture', stop);
     unfreezeSiblings();
     onEnd?.();
   };
 
   handle.addEventListener('pointermove', onMove);
-  handle.addEventListener('pointerup', onUp);
+  handle.addEventListener('pointerup', stop);
+  handle.addEventListener('pointercancel', stop);
+  handle.addEventListener('lostpointercapture', stop);
+
+  return stop;
 }

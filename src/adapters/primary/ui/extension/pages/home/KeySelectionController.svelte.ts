@@ -1,11 +1,11 @@
-import { maskApiKey } from '../../../../shared/utils';
-import type { Credential } from '../../../../../../../core/domain/credential/Credential';
-import type { Credentials } from '../../../../../../../core/domain/credential/Credentials';
-import type { AnyProvider } from '../../../../../../../core/domain/credential/Provider';
-import { KeySelectionMode } from '../../../../../../../core/domain/credential/KeySelectionMode';
-import type { PopupToastController } from '../../../../shared/toast/PopupToastController.svelte';
+import { maskApiKey } from '../../../shared/utils';
+import type { Credential } from '../../../../../../core/domain/credential/Credential';
+import type { Credentials } from '../../../../../../core/domain/credential/Credentials';
+import type { AnyProvider } from '../../../../../../core/domain/credential/Provider';
+import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
-export interface ActiveKeyIndicatorDeps {
+export interface KeySelectionDeps {
   getProvider: () => AnyProvider;
   getCredential: () => Credential | null;
   auth: {
@@ -19,7 +19,7 @@ export interface ActiveKeyIndicatorDeps {
   toast: Pick<PopupToastController, 'show'>;
 }
 
-class ActiveKeyIndicatorState {
+class KeySelectionState {
   isOpen = $state(false);
 }
 
@@ -27,10 +27,8 @@ function getDisplayLabel(credential: Credential): string {
   return maskApiKey(credential.apiKey.value);
 }
 
-export function createActiveKeyIndicatorController(
-  deps: ActiveKeyIndicatorDeps,
-) {
-  const state = new ActiveKeyIndicatorState();
+export function createKeySelectionController(deps: KeySelectionDeps) {
+  const state = new KeySelectionState();
 
   const providerCredentials = $derived.by(() =>
     (deps.auth.state.credentials?.items ?? []).filter(
@@ -69,6 +67,8 @@ export function createActiveKeyIndicatorController(
   function getTriggerLabel(): string {
     if (isAutoBalanceActive) return 'Auto ⟳';
     if (providerActive) return getDisplayLabel(providerActive);
+    if (providerCredentials.length === 1)
+      return getDisplayLabel(providerCredentials[0]);
 
     return '—';
   }

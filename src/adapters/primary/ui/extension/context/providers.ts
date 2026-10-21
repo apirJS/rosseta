@@ -13,7 +13,7 @@ export interface CustomProviderUseCases {
 }
 
 export type CustomProvidersStateContext = ReturnType<
-  typeof import('../hooks/useCustomProviders.svelte').useCustomProviders
+  typeof import('../state/useCustomProviders.svelte').useCustomProviders
 >;
 
 export function setCustomProvidersContext(

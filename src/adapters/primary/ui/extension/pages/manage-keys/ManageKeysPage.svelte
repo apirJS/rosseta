@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import {
     getAuthStateContext,
     getCustomProvidersStateContext,
     getModelsStateContext,
     getPreferencesStateContext,
     getPopupToastContext,
-  } from '../../../shared/context';
+  } from '../../context';
   import {
     AddItemBar,
     EmptyState,
@@ -13,16 +14,14 @@
     ProviderSelector,
     UndoBar,
   } from '../../../shared/components';
-  import {
-    PROVIDERS,
-    type AnyProvider,
-  } from '../../../../../../core/domain/credential/Provider';
+  import type { AnyProvider } from '../../../../../../core/domain/credential/Provider';
   import {
     createManageKeysController,
     type ManageKeysDeps,
   } from './ManageKeysController.svelte';
   import ApiKeyListItem from './components/ApiKeyListItem.svelte';
   import ApiKeyViewerModal from './components/ApiKeyViewerModal.svelte';
+  import { createApiKeyViewerController } from './ApiKeyViewerController.svelte';
 
   interface Props {
     onback: () => void;
@@ -37,11 +36,6 @@
   const customProviders = getCustomProvidersStateContext();
   const toast = getPopupToastContext();
 
-  const allProviderIds = $derived([
-    ...PROVIDERS,
-    ...customProviders.state.providers.map((p) => p.id),
-  ]);
-
   const deps: ManageKeysDeps = {
     credentials: () => auth.state.credentials,
     addApiKey: auth.addApiKey,
@@ -53,7 +47,7 @@
     fetchModels: models.fetchModels,
     clearAllModels: async () => {
       await Promise.all(
-        allProviderIds.map((provider) => models.clearModels(provider)),
+        customProviders.options.map(({ value }) => models.clearModels(value)),
       );
     },
     toast,
@@ -65,22 +59,26 @@
     initialProvider ?? 'google',
   );
 
-  $effect(() => {
-    return () => controller.destroy();
+  const viewer = createApiKeyViewerController({
+    copyText: (value) => navigator.clipboard.writeText(value),
+    toast,
+  });
+
+  onDestroy(() => {
+    controller.destroy();
+    viewer.close();
   });
 </script>
 
 <PageShell
-  onback={() => {
-    controller.commitPendingDelete();
-    onback();
-  }}
+  {onback}
   isDark={preferences.state.resolvedTheme === 'dark'}
   onToggleTheme={preferences.toggleTheme}
 >
   {#snippet start()}
     <div class="w-28 shrink-0">
       <ProviderSelector
+        options={customProviders.options}
         value={controller.state.selectedProvider}
         compact
         onchange={(value) => controller.setProvider(value as AnyProvider)}
@@ -107,7 +105,7 @@
           auth.state.credentials?.activeCredentialId === credential.id}
         onSetActive={() => controller.setActiveKey(credential)}
         onDelete={() => controller.requestDelete(credential.id)}
-        onView={() => controller.viewKey(credential.id)}
+        onView={() => viewer.open(credential.apiKey.value)}
       />
     {:else}
       {#if !controller.canAddKey}
@@ -130,9 +128,11 @@
   {/snippet}
 </PageShell>
 
-{#if controller.viewingKey}
+{#if viewer.state.apiKey}
   <ApiKeyViewerModal
-    apiKey={controller.viewingKey}
-    onclose={() => controller.closeViewer()}
+    apiKey={viewer.state.apiKey}
+    copied={viewer.state.copied}
+    oncopy={viewer.copy}
+    onclose={viewer.close}
   />
 {/if}

@@ -45,6 +45,16 @@ describe('UI Hook: useCustomProviders', () => {
 
     await providers.hydrate();
 
+    expect(providers.options).toContainEqual({
+      value: 'deepseek',
+      label: 'DeepSeek',
+    });
+
+    expect(providers.options).toContainEqual({
+      value: 'custom-deepseek',
+      label: 'Old DeepSeek',
+    });
+
     getProviders.mockResolvedValue(
       failure(StorageError.readFailed('customProviders')),
     );
@@ -54,6 +64,10 @@ describe('UI Hook: useCustomProviders', () => {
     expect(result.success).toBe(true);
     expect(providers.state.providers).toEqual([]);
     expect(providers.getProvider('custom-deepseek')).toBeNull();
+
+    expect(
+      providers.options.some((option) => option.value === 'custom-deepseek'),
+    ).toBe(false);
 
     expect(getProviders).toHaveBeenCalledOnce();
   });

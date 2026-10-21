@@ -14,7 +14,7 @@ export interface PreferencesUseCases {
 }
 
 export type PreferencesStateContext = ReturnType<
-  typeof import('../hooks/usePreferences.svelte').usePreferences
+  typeof import('../state/usePreferences.svelte').usePreferences
 >;
 
 export function setPreferencesContext(useCases: PreferencesUseCases): void {

@@ -1,10 +1,11 @@
 <script lang="ts">
   import {
     getAuthStateContext,
+    getCustomProvidersStateContext,
     getModelsStateContext,
     getPreferencesStateContext,
     getPopupToastContext,
-  } from '../../../shared/context';
+  } from '../../context';
   import type { AnyProvider } from '../../../../../../core/domain/credential/Provider';
   import {
     AddItemBar,
@@ -29,6 +30,7 @@
   const auth = getAuthStateContext();
   const preferences = getPreferencesStateContext();
   const models = getModelsStateContext();
+  const customProviders = getCustomProvidersStateContext();
   const toast = getPopupToastContext();
 
   const deps: ManageModelsDeps = {
@@ -66,6 +68,7 @@
   {#snippet start()}
     <div class="w-28 shrink-0">
       <ProviderSelector
+        options={customProviders.options}
         value={controller.state.selectedProvider}
         compact
         onchange={(value) => controller.setProvider(value)}

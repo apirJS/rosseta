@@ -9,8 +9,6 @@ export { default as Icon } from './Icon.svelte';
 export { default as Input } from './Input.svelte';
 export { default as Link } from './Link.svelte';
 export { default as PageShell } from './PageShell.svelte';
-export { default as PopupToast } from './PopupToast.svelte';
-export { default as PopupToastContainer } from './PopupToastContainer.svelte';
 export { default as ProviderSelector } from './ProviderSelector.svelte';
 export { default as Select } from './Select.svelte';
 export { default as ThemeToggle } from './ThemeToggle.svelte';

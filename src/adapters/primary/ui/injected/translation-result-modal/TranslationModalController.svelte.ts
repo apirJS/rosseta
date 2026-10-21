@@ -7,28 +7,15 @@ import {
   mapDraftSegments,
   type SegmentPayload,
 } from './translation-modal-segments';
-import { writeToClipboard } from './write-to-clipboard';
-
-type CopyState = 'idle' | 'copied';
-
-type CopyTarget = 'original' | 'translated' | 'description';
-
-const COPY_FEEDBACK_DURATION_MS = 2_000;
+import { ModalDragController } from './ModalDragController.svelte';
+import {
+  TranslationCopyController,
+  type CopyTarget,
+} from './TranslationCopyController.svelte';
 
 export class TranslationModalController {
-  public posX = $state(0);
-  public posY = $state(0);
-  private isDragging = false;
-  private dragStartX = 0;
-  private dragStartY = 0;
-
-  public originalCopy = $state<CopyState>('idle');
-  public translatedCopy = $state<CopyState>('idle');
-  public descriptionCopy = $state<CopyState>('idle');
-  private readonly copyTimers = new Map<
-    CopyTarget,
-    ReturnType<typeof setTimeout>
-  >();
+  public readonly drag = new ModalDragController();
+  public readonly clipboard = new TranslationCopyController();
 
   public original = $state<SegmentPayload[]>([]);
   public translated = $state<SegmentPayload[]>([]);
@@ -62,7 +49,11 @@ export class TranslationModalController {
   });
   private revision = 0;
   private disposed = false;
-  private dragCleanup: (() => void) | undefined;
+  private showStatus = $state(true);
+  private statusTimer?: ReturnType<typeof setTimeout>;
+  public readonly headerStatus = $derived(
+    this.isUnsuccessful || !this.showStatus ? '' : this.status,
+  );
   private readonly onretry?: () => void;
   private readonly detachModal: () => void;
 
@@ -187,7 +178,9 @@ export class TranslationModalController {
 
     if (props.live) {
       this.phase = 'preparing';
-      this.status = 'Preparing...';
+      this.setStatus('Preparing...');
+    } else {
+      this.hideCompletedStatus();
     }
   }
 
@@ -195,7 +188,7 @@ export class TranslationModalController {
     if (this.disposed) return;
     this.targetLanguage = language;
     this.phase = 'generating';
-    this.status = 'Translating...';
+    this.setStatus('Translating...');
   };
 
   public reset = () => {
@@ -204,7 +197,7 @@ export class TranslationModalController {
     this.clearContent();
     this.errorMessage = '';
     this.phase = 'generating';
-    this.status = this.revision > 1 ? 'Retrying...' : 'Translating...';
+    this.setStatus(this.revision > 1 ? 'Retrying...' : 'Translating...');
     this.resetFeedback();
   };
 
@@ -225,7 +218,7 @@ export class TranslationModalController {
   public committing = () => {
     if (this.disposed) return;
     this.phase = 'committing';
-    this.status = 'Finishing...';
+    this.setStatus('Finishing...');
   };
 
   public completed = (
@@ -238,9 +231,10 @@ export class TranslationModalController {
     this.description = translation.description;
     this.historySaved = historySaved;
     this.phase = 'completed';
-    this.status = 'Complete';
+    this.setStatus('Complete');
     this.errorMessage = '';
     this.resetFeedback();
+    this.hideCompletedStatus();
   };
 
   public failed = (error: SafeTranslationError) => {
@@ -255,14 +249,14 @@ export class TranslationModalController {
     }
 
     this.phase = 'failed';
-    this.status = error.title;
+    this.setStatus(error.title);
     this.errorMessage = error.userMessage;
   };
 
   public cancelled = () => {
     if (this.disposed) return;
     this.phase = 'cancelled';
-    this.status = 'Translation cancelled';
+    this.setStatus('Translation cancelled');
   };
 
   public retry = () => {
@@ -278,85 +272,41 @@ export class TranslationModalController {
   private resetFeedback(): void {
     this.hoveredSegmentIndex = null;
     this.hoveredSide = null;
-    this.originalCopy = 'idle';
-    this.translatedCopy = 'idle';
-    this.descriptionCopy = 'idle';
+    this.clipboard.reset();
   }
 
-  public handleDragStart = (e: PointerEvent) => {
-    if (e.button !== 0) return;
-    this.dragCleanup?.();
-    this.isDragging = true;
-    this.dragStartX = e.clientX - this.posX;
-    this.dragStartY = e.clientY - this.posY;
-
-    const onMove = (ev: PointerEvent) => {
-      if (!this.isDragging) return;
-      this.posX = ev.clientX - this.dragStartX;
-      this.posY = ev.clientY - this.dragStartY;
-    };
-
-    const onUp = () => {
-      this.isDragging = false;
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      this.dragCleanup = undefined;
-    };
-
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    this.dragCleanup = onUp;
-  };
-
-  public copyOriginal = async () => {
-    await this.copyToClipboard(this.originalText, 'original');
-  };
-
-  public copyTranslated = async () => {
-    await this.copyToClipboard(this.translatedText, 'translated');
-  };
-
-  public copyDescription = async () => {
-    await this.copyToClipboard(this.description, 'description');
-  };
-
-  private async copyToClipboard(
-    text: string,
-    target: CopyTarget,
-  ): Promise<void> {
+  public copy = async (target: CopyTarget): Promise<void> => {
     if (!this.canCopy || this.disposed) return;
 
-    const copied = await writeToClipboard(text);
+    const text =
+      target === 'original'
+        ? this.originalText
+        : target === 'translated'
+          ? this.translatedText
+          : this.description;
 
-    if (copied && !this.disposed) this.showCopyFeedback(target);
+    await this.clipboard.copy(target, text);
+  };
+
+  private setStatus(status: string): void {
+    if (this.statusTimer) clearTimeout(this.statusTimer);
+    this.statusTimer = undefined;
+    this.status = status;
+    this.showStatus = true;
   }
 
-  private showCopyFeedback(target: CopyTarget): void {
-    this.setCopyState(target, 'copied');
-
-    const existingTimer = this.copyTimers.get(target);
-
-    if (existingTimer) clearTimeout(existingTimer);
-
-    const timer = setTimeout(() => {
-      this.setCopyState(target, 'idle');
-      this.copyTimers.delete(target);
-    }, COPY_FEEDBACK_DURATION_MS);
-
-    this.copyTimers.set(target, timer);
-  }
-
-  private setCopyState(target: CopyTarget, state: CopyState): void {
-    if (target === 'original') this.originalCopy = state;
-    else if (target === 'translated') this.translatedCopy = state;
-    else this.descriptionCopy = state;
+  private hideCompletedStatus(): void {
+    this.statusTimer = setTimeout(() => {
+      this.showStatus = false;
+      this.statusTimer = undefined;
+    }, 1_000);
   }
 
   public dispose = () => {
     this.disposed = true;
-    this.dragCleanup?.();
-    for (const timer of this.copyTimers.values()) clearTimeout(timer);
-    this.copyTimers.clear();
+    this.drag.dispose();
+    this.clipboard.dispose();
+    if (this.statusTimer) clearTimeout(this.statusTimer);
   };
   public close = () => {
     if (this.disposed) return;

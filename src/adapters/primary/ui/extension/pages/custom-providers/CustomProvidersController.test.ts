@@ -9,7 +9,7 @@ import {
 } from '../../../../../../core/domain/provider/CustomProviderConfig';
 import { success, failure } from '../../../../../../shared/types/Result';
 import { StorageError } from '../../../../../../shared/errors';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 function makeConfig(
   overrides: Partial<CustomProviderConfigProps> = {},
@@ -17,6 +17,7 @@ function makeConfig(
   const result = CustomProviderConfig.create({
     id: overrides.id ?? 'custom-test-1',
     name: overrides.name ?? 'OpenRouter',
+    type: overrides.type,
     baseURL: overrides.baseURL ?? 'https://openrouter.ai/api/v1',
     headers: overrides.headers,
     queryParams: overrides.queryParams,
@@ -84,6 +85,19 @@ describe('UI Controller: CustomProvidersController', () => {
     expect(controller.state.editingId).toBeNull();
     expect(controller.state.name).toBe('');
     expect(controller.state.baseURL).toBe('');
+  });
+
+  test('owns the title for list, create and edit views', () => {
+    const { deps } = createDeps();
+    const controller = createCustomProvidersController(deps);
+
+    expect(controller.title).toBe('Custom Providers');
+    controller.showCreate();
+    expect(controller.title).toBe('New Provider');
+    controller.showEdit(makeConfig());
+    expect(controller.title).toBe('Edit Provider');
+    controller.showList();
+    expect(controller.title).toBe('Custom Providers');
   });
 
   test('showEdit populates the form from the provider', () => {
@@ -164,6 +178,85 @@ describe('UI Controller: CustomProvidersController', () => {
 
     expect(deps.save).not.toHaveBeenCalled();
     expect(controller.state.error).toContain('Query params');
+  });
+
+  test.each(['[]', 'null', 'true', '{"X-Test": 42}'])(
+    'rejects invalid header records: %s',
+    async (headers) => {
+      const { deps } = createDeps();
+      const controller = createCustomProvidersController(deps);
+
+      controller.showCreate();
+      controller.state.headers = headers;
+      await controller.save();
+
+      expect(deps.save).not.toHaveBeenCalled();
+
+      expect(controller.state.error).toBe(
+        'Headers must be a JSON object of strings.',
+      );
+    },
+  );
+
+  test('preserves Anthropic form configuration when saving an edit', async () => {
+    const { deps } = createDeps();
+    const controller = createCustomProvidersController(deps);
+
+    controller.showEdit(
+      makeConfig({
+        type: 'anthropic',
+        queryParams: { 'api-version': '2024-02-01' },
+      }),
+    );
+
+    await controller.save();
+
+    expect(deps.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'anthropic',
+        queryParams: { 'api-version': '2024-02-01' },
+      }),
+    );
+  });
+
+  test('keeps one save in flight and prevents changing its form view', async () => {
+    let finishSave!: (
+      result: Awaited<ReturnType<CustomProvidersDeps['save']>>,
+    ) => void;
+
+    const { deps } = createDeps({
+      save: vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishSave = resolve;
+          }),
+      ),
+    });
+
+    const controller = createCustomProvidersController(deps);
+
+    controller.showCreate();
+    controller.state.name = 'New endpoint';
+    controller.state.baseURL = 'https://api.example.com/v1';
+
+    const firstSave = controller.save();
+
+    await controller.save();
+    controller.showList();
+    controller.showEdit(makeConfig());
+
+    expect(deps.save).toHaveBeenCalledOnce();
+    expect(controller.state.isSaving).toBe(true);
+    expect(controller.title).toBe('New Provider');
+
+    finishSave(
+      success(makeConfig({ id: 'custom-created', name: 'New endpoint' })),
+    );
+
+    await firstSave;
+
+    expect(controller.state.isSaving).toBe(false);
+    expect(controller.title).toBe('Custom Providers');
   });
 
   test('save shows an error toast and stays on the form on failure', async () => {

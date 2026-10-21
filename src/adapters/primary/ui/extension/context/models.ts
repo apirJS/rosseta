@@ -15,7 +15,7 @@ export interface ModelUseCases {
 }
 
 export type ModelsStateContext = ReturnType<
-  typeof import('../hooks/useModels.svelte').useModels
+  typeof import('../state/useModels.svelte').useModels
 >;
 
 export function setModelsContext(useCases: ModelUseCases): void {

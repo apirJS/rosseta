@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Icon from './Icon.svelte';
-  import { cn } from '../utils';
-  import type { PopupToastItem } from '../toast/PopupToastController.svelte';
+  import Icon from '../../shared/components/Icon.svelte';
+  import { cn } from '../../shared/utils';
+  import type { PopupToastItem } from './PopupToastController.svelte';
 
   interface Props {
     toast: PopupToastItem;

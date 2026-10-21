@@ -9,8 +9,8 @@ import { Credentials } from '../../../../../../core/domain/credential/Credential
 import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import { success } from '../../../../../../shared/types/Result';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
-import { AuthState } from '../../../shared/hooks/useAuth.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
+import { AuthState } from '../../state/useAuth.svelte';
 
 function makeCredential(
   id: string,
@@ -204,6 +204,61 @@ describe('UI Controller: ManageKeysController', () => {
     await controller.addApiKey();
 
     expect(deps.fetchModels).not.toHaveBeenCalled();
+  });
+
+  test('a rejected automatic model fetch preserves the saved key and reports recovery', async () => {
+    const { deps, show } = createDeps({
+      fetchModels: vi
+        .fn()
+        .mockRejectedValue(new Error('The message port closed.')),
+    });
+
+    const controller = createManageKeysController(deps);
+
+    controller.state.keyInput = 'new-api-key';
+    await controller.addApiKey();
+    await flush();
+
+    expect(deps.addApiKey).toHaveBeenCalledWith('new-api-key', 'google');
+    expect(controller.state.keyInput).toBe('');
+
+    expect(show).toHaveBeenCalledWith({
+      type: 'success',
+      message: 'API key added',
+    });
+
+    expect(show).toHaveBeenLastCalledWith({
+      type: 'error',
+      message: 'Could not fetch models',
+      description:
+        'Your API key was saved. Try Fetch Models under Manage Models.',
+    });
+  });
+
+  test('adding a key keeps its original provider and preserves edits made while saving', async () => {
+    let finish!: (error: string | null) => void;
+
+    const { deps } = createDeps({
+      addApiKey: vi.fn().mockReturnValue(
+        new Promise<string | null>((resolve) => {
+          finish = resolve;
+        }),
+      ),
+    });
+
+    const controller = createManageKeysController(deps);
+
+    controller.state.keyInput = 'first-key';
+
+    const saving = controller.addApiKey();
+
+    controller.setProvider('groq');
+    controller.state.keyInput = 'next-key';
+    finish(null);
+    await saving;
+    expect(deps.addApiKey).toHaveBeenCalledWith('first-key', 'google');
+    expect(deps.fetchModels).toHaveBeenCalledWith('google');
+    expect(controller.state.keyInput).toBe('next-key');
   });
 
   test('search filters keys by key value within the selected provider', () => {
@@ -485,17 +540,6 @@ describe('UI Controller: ManageKeysController', () => {
 
       expect(deps.clearAllModels).not.toHaveBeenCalled();
     });
-  });
-
-  test('viewKey exposes the full key value', () => {
-    const { deps } = createDeps();
-    const controller = createManageKeysController(deps);
-
-    controller.viewKey('g1');
-    expect(controller.viewingKey).toBe('AIzaGoogleKeyValue123');
-
-    controller.closeViewer();
-    expect(controller.viewingKey).toBeNull();
   });
 
   describe('setActiveKey', () => {

@@ -5,7 +5,7 @@ import type {
   CustomProviderConfigProps,
   CustomProviderType,
 } from '../../../../../../core/domain/provider/CustomProviderConfig';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 export type CustomProvidersSubView = 'list' | 'form';
 
@@ -64,13 +64,25 @@ export function createCustomProvidersController(deps: CustomProvidersDeps) {
 
   const providers = $derived(deps.providers());
 
+  const title = $derived(
+    state.view === 'list'
+      ? 'Custom Providers'
+      : state.editingId
+        ? 'Edit Provider'
+        : 'New Provider',
+  );
+
   function showList() {
+    if (state.isSaving) return;
+
     state.view = 'list';
     state.editingId = null;
     state.error = null;
   }
 
   function showCreate() {
+    if (state.isSaving) return;
+
     state.view = 'form';
     state.editingId = null;
     state.name = '';
@@ -82,6 +94,8 @@ export function createCustomProvidersController(deps: CustomProvidersDeps) {
   }
 
   function showEdit(provider: CustomProviderConfig) {
+    if (state.isSaving) return;
+
     state.view = 'form';
     state.editingId = provider.id;
     state.name = provider.name;
@@ -100,6 +114,8 @@ export function createCustomProvidersController(deps: CustomProvidersDeps) {
   }
 
   async function save() {
+    if (state.isSaving) return;
+
     state.error = null;
 
     const headers = parseStringRecordJson(state.headers);
@@ -181,6 +197,9 @@ export function createCustomProvidersController(deps: CustomProvidersDeps) {
     state,
     get providers() {
       return providers;
+    },
+    get title() {
+      return title;
     },
     showList,
     showCreate,

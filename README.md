@@ -101,7 +101,7 @@ Built with Svelte 5 (runes), TypeScript (strict, no `any`), Tailwind CSS v4, and
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, architecture details, coding standards, and the pull request process.
 
-Start with the [maintainer guide](docs/MAINTAINER_GUIDE.md) for module ownership and the translation reading path. Use lint, type checks, the three test environments and production builds for both browsers to verify changes.
+Start with the [maintainer guide](docs/MAINTAINER_GUIDE.md) for module ownership, [UI ownership](src/adapters/primary/ui/README.md) for pages/controllers/components, and [FLOW.md](FLOW.md) for the full translation walkthrough. Use lint, type checks, the three test environments and production builds for both browsers to verify changes.
 
 ---
 

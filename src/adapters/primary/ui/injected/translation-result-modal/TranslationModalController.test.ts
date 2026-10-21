@@ -63,16 +63,44 @@ describe('UI Controller: TranslationModalController', () => {
   test('initial position is (0, 0)', () => {
     const ctrl = createController();
 
-    expect(ctrl.posX).toBe(0);
-    expect(ctrl.posY).toBe(0);
+    expect(ctrl.drag.x).toBe(0);
+    expect(ctrl.drag.y).toBe(0);
   });
 
   test('initial copy states are all idle', () => {
     const ctrl = createController();
 
-    expect(ctrl.originalCopy).toBe('idle');
-    expect(ctrl.translatedCopy).toBe('idle');
-    expect(ctrl.descriptionCopy).toBe('idle');
+    expect(ctrl.clipboard.states.original).toBe('idle');
+    expect(ctrl.clipboard.states.translated).toBe('idle');
+    expect(ctrl.clipboard.states.description).toBe('idle');
+  });
+
+  test('completed status hides after one second and a new attempt makes status visible again', () => {
+    const ctrl = createController();
+
+    expect(ctrl.headerStatus).toBe('Complete');
+    vi.advanceTimersByTime(1_000);
+    expect(ctrl.headerStatus).toBe('');
+    ctrl.started({ code: 'en-US', name: 'English' });
+    expect(ctrl.headerStatus).toBe('Translating...');
+    vi.advanceTimersByTime(1_000);
+    expect(ctrl.headerStatus).toBe('Translating...');
+    ctrl.dispose();
+  });
+
+  test('a failure keeps its title in the body instead of the header status', () => {
+    const ctrl = createController();
+
+    ctrl.failed({
+      code: 'TRANSLATION_NO_TEXT_FOUND',
+      title: 'No Text Found',
+      userMessage: 'No readable text was found.',
+    });
+
+    expect(ctrl.headerStatus).toBe('');
+    expect(ctrl.status).toBe('No Text Found');
+    expect(ctrl.failureDescription).toBe('No readable text was found.');
+    ctrl.dispose();
   });
 
   // ── Derived text ───────────────────────────────────────────
@@ -280,12 +308,12 @@ describe('UI Controller: TranslationModalController', () => {
 
     const ctrl = createController();
 
-    await ctrl.copyOriginal();
-    expect(ctrl.originalCopy).toBe('copied');
+    await ctrl.copy('original');
+    expect(ctrl.clipboard.states.original).toBe('copied');
     expect(writeTextMock).toHaveBeenCalledWith('こんにちは');
 
     vi.advanceTimersByTime(2000);
-    expect(ctrl.originalCopy).toBe('idle');
+    expect(ctrl.clipboard.states.original).toBe('idle');
   });
 
   test('copyTranslated sets translatedCopy to "copied"', async () => {
@@ -297,8 +325,8 @@ describe('UI Controller: TranslationModalController', () => {
 
     const ctrl = createController();
 
-    await ctrl.copyTranslated();
-    expect(ctrl.translatedCopy).toBe('copied');
+    await ctrl.copy('translated');
+    expect(ctrl.clipboard.states.translated).toBe('copied');
     expect(writeTextMock).toHaveBeenCalledWith('Hello');
   });
 
@@ -311,8 +339,8 @@ describe('UI Controller: TranslationModalController', () => {
 
     const ctrl = createController({ description: 'Test desc' });
 
-    await ctrl.copyDescription();
-    expect(ctrl.descriptionCopy).toBe('copied');
+    await ctrl.copy('description');
+    expect(ctrl.clipboard.states.description).toBe('copied');
     expect(writeTextMock).toHaveBeenCalledWith('Test desc');
   });
 
@@ -331,10 +359,10 @@ describe('UI Controller: TranslationModalController', () => {
 
     const ctrl = createController();
 
-    await ctrl.copyTranslated();
+    await ctrl.copy('translated');
 
     expect(execCommand).toHaveBeenCalledWith('copy');
-    expect(ctrl.translatedCopy).toBe('copied');
+    expect(ctrl.clipboard.states.translated).toBe('copied');
     expect(document.querySelector('textarea')).toBeNull();
     ctrl.dispose();
   });
@@ -356,9 +384,9 @@ describe('UI Controller: TranslationModalController', () => {
 
     const ctrl = createController();
 
-    await ctrl.copyTranslated();
+    await ctrl.copy('translated');
 
-    expect(ctrl.translatedCopy).toBe('idle');
+    expect(ctrl.clipboard.states.translated).toBe('idle');
     expect(document.querySelector('textarea')).toBeNull();
     ctrl.dispose();
   });
@@ -378,20 +406,20 @@ describe('UI Controller: TranslationModalController', () => {
     });
 
     const ctrl = createController();
-    const copying = ctrl.copyTranslated();
+    const copying = ctrl.copy('translated');
 
     ctrl.dispose();
     resolveCopy?.();
     await copying;
 
-    expect(ctrl.translatedCopy).toBe('idle');
+    expect(ctrl.clipboard.states.translated).toBe('idle');
     expect(vi.getTimerCount()).toBe(0);
   });
 
   test('disposing during a drag stops further position updates', () => {
     const ctrl = createController();
 
-    ctrl.handleDragStart({
+    ctrl.drag.start({
       button: 0,
       clientX: 10,
       clientY: 20,
@@ -401,8 +429,8 @@ describe('UI Controller: TranslationModalController', () => {
       new MouseEvent('pointermove', { clientX: 35, clientY: 47 }),
     );
 
-    expect(ctrl.posX).toBe(25);
-    expect(ctrl.posY).toBe(27);
+    expect(ctrl.drag.x).toBe(25);
+    expect(ctrl.drag.y).toBe(27);
 
     ctrl.dispose();
 
@@ -410,8 +438,8 @@ describe('UI Controller: TranslationModalController', () => {
       new MouseEvent('pointermove', { clientX: 70, clientY: 80 }),
     );
 
-    expect(ctrl.posX).toBe(25);
-    expect(ctrl.posY).toBe(27);
+    expect(ctrl.drag.x).toBe(25);
+    expect(ctrl.drag.y).toBe(27);
   });
 
   // ── Close ──────────────────────────────────────────────────
@@ -552,9 +580,9 @@ describe('UI Controller: TranslationModalController', () => {
         description: 'Draft',
       });
 
-      await ctrl.copyOriginal();
+      await ctrl.copy('original');
       ctrl.committing();
-      await ctrl.copyTranslated();
+      await ctrl.copy('translated');
 
       ctrl.failed({
         code,
@@ -562,7 +590,7 @@ describe('UI Controller: TranslationModalController', () => {
         userMessage: 'Try another area.',
       });
 
-      await ctrl.copyDescription();
+      await ctrl.copy('description');
       expect(ctrl.original).toEqual([]);
       expect(ctrl.translated).toEqual([]);
       expect(ctrl.description).toBe('');

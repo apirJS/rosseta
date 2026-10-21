@@ -6,7 +6,7 @@ import {
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import { success, failure } from '../../../../../../shared/types/Result';
 import { ValidationError } from '../../../../../../shared/errors';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 function createToastFake() {
   const show = vi.fn();
@@ -90,6 +90,31 @@ describe('UI Controller: ManageModelsController', () => {
 
     expect(deps.addModel).toHaveBeenCalledWith('google', 'new-model');
     expect(controller.state.modelInput).toBe('');
+  });
+
+  test('adding a model preserves provider changes and new input while the save is pending', async () => {
+    let finish!: (value: ReturnType<typeof success<StoredModel[]>>) => void;
+
+    const { deps } = createDeps({
+      addModel: vi.fn().mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      ),
+    });
+
+    const controller = createManageModelsController(deps);
+
+    controller.state.modelInput = 'first-model';
+
+    const saving = controller.addModel();
+
+    controller.setProvider('groq');
+    controller.state.modelInput = 'next-model';
+    finish(success([]));
+    await saving;
+    expect(deps.addModel).toHaveBeenCalledWith('google', 'first-model');
+    expect(controller.state.modelInput).toBe('next-model');
   });
 
   test('addModel with empty input does nothing', async () => {
@@ -224,6 +249,29 @@ describe('UI Controller: ManageModelsController', () => {
     expect(controller.state.isFetching).toBe(false);
   });
 
+  test('does not start a second catalog request while a fetch is pending', async () => {
+    let finish!: (value: ReturnType<typeof success<StoredModel[]>>) => void;
+
+    const { deps } = createDeps({
+      fetchModels: vi.fn().mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      ),
+    });
+
+    const controller = createManageModelsController(deps);
+    const fetching = controller.fetchModels();
+
+    controller.setProvider('groq');
+    await controller.fetchModels();
+    expect(deps.fetchModels).toHaveBeenCalledOnce();
+    expect(deps.fetchModels).toHaveBeenCalledWith('google');
+    finish(success([]));
+    await fetching;
+    expect(controller.state.isFetching).toBe(false);
+  });
+
   test('fetchModels failure shows an error toast', async () => {
     const { deps, show } = createDeps({
       fetchModels: vi
@@ -244,6 +292,43 @@ describe('UI Controller: ManageModelsController', () => {
         description: '401 Unauthorized',
       }),
     );
+  });
+
+  test('a closed runtime channel reports one error, clears loading, and allows retry', async () => {
+    const fetchModels = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error('The message port closed before a response was received.'),
+      )
+      .mockResolvedValue(
+        success<StoredModel[]>([
+          { id: 'm1', name: 'Model 1', source: 'fetched' },
+        ]),
+      );
+
+    const { deps, show } = createDeps({ fetchModels });
+    const controller = createManageModelsController(deps);
+
+    await expect(controller.fetchModels()).resolves.toBeUndefined();
+
+    expect(controller.state.isFetching).toBe(false);
+
+    expect(show).toHaveBeenCalledExactlyOnceWith({
+      type: 'error',
+      message: 'Could not fetch models',
+      description:
+        'The extension connection was interrupted. Try fetching models again.',
+    });
+
+    await controller.fetchModels();
+
+    expect(fetchModels).toHaveBeenCalledTimes(2);
+    expect(controller.state.isFetching).toBe(false);
+
+    expect(show).toHaveBeenLastCalledWith({
+      type: 'success',
+      message: 'Loaded 1 models',
+    });
   });
 
   test('resetModels delegates to clearModels', async () => {

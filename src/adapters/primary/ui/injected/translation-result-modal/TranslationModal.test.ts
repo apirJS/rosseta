@@ -54,7 +54,7 @@ describe('UI: live translation modal', () => {
       ).length,
     ).toBeGreaterThan(0);
 
-    await controller.copyTranslated();
+    await controller.copy('translated');
     expect(writeText).not.toHaveBeenCalled();
 
     flushSync(() =>
@@ -105,7 +105,7 @@ describe('UI: live translation modal', () => {
     );
 
     expect(container.textContent).toContain('Could not save to history.');
-    await controller.copyTranslated();
+    await controller.copy('translated');
     expect(writeText).toHaveBeenCalledWith('Hello');
     controller.dispose();
   });
@@ -348,8 +348,8 @@ describe('UI: live translation modal', () => {
     dialog.style.height = '700px';
 
     flushSync(() => {
-      controller.posX = 43;
-      controller.posY = -27;
+      controller.drag.x = 43;
+      controller.drag.y = -27;
       controller.started({ code: 'en-US', name: 'English' });
       controller.reset();
 

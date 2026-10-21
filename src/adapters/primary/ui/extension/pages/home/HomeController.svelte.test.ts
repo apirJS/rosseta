@@ -1,13 +1,11 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { flushSync } from 'svelte';
-import {
-  createMainPageController,
-  type MainPageDeps,
-} from './MainPageController.svelte';
+import { PopupNavigationState } from '../../PopupNavigationController.svelte';
+import { createHomeController, type HomeDeps } from './HomeController.svelte';
 import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
 import { getProviderDefaultModelId } from '../../../../../../core/domain/provider/provider-definitions';
 import { CustomProviderConfig } from '../../../../../../core/domain/provider/CustomProviderConfig';
-import { CustomProvidersState } from '../../../shared/hooks/useCustomProviders.svelte';
+import { CustomProvidersState } from '../../state/useCustomProviders.svelte';
 import type { Credential } from '../../../../../../core/domain/credential/Credential';
 import type { Credentials } from '../../../../../../core/domain/credential/Credentials';
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
@@ -71,22 +69,27 @@ function createDeps() {
 
   const toast = { show: vi.fn() };
 
-  const deps: MainPageDeps = {
+  const deps: HomeDeps = {
     auth,
     preferences,
     models,
     customProviders,
     toast,
+    providerSelection: new PopupNavigationState(),
+    startCapture: vi.fn().mockResolvedValue(undefined),
+    closePopup: vi.fn(),
+    openShortcutSettings: vi.fn().mockResolvedValue(undefined),
+    shortcutSettingsUrl: 'chrome://extensions/shortcuts',
   };
 
   return { deps, auth, preferences, models, customProviders, toast };
 }
 
-function createController(deps: MainPageDeps) {
-  let controller!: ReturnType<typeof createMainPageController>;
+function createController(deps: HomeDeps) {
+  let controller!: ReturnType<typeof createHomeController>;
 
   const cleanup = $effect.root(() => {
-    controller = createMainPageController(deps);
+    controller = createHomeController(deps);
   });
 
   flushSync();
@@ -94,7 +97,7 @@ function createController(deps: MainPageDeps) {
   return { controller, cleanup };
 }
 
-describe('UI Controller: MainPageController', () => {
+describe('UI Controller: HomeController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -157,7 +160,7 @@ describe('UI Controller: MainPageController', () => {
     const { deps } = createDeps();
     const { controller, cleanup } = createController(deps);
 
-    controller.state.selectedProvider = 'groq';
+    deps.providerSelection.selectedProvider = 'groq';
     expect(controller.effectiveProvider).toBe('groq');
 
     cleanup();
@@ -169,7 +172,7 @@ describe('UI Controller: MainPageController', () => {
 
     await controller.changeProvider('groq');
 
-    expect(controller.state.selectedProvider).toBe('groq');
+    expect(deps.providerSelection.selectedProvider).toBe('groq');
     expect(auth.setActiveKey).toHaveBeenCalledWith('rk1');
 
     cleanup();
@@ -199,7 +202,7 @@ describe('UI Controller: MainPageController', () => {
 
     await controller.changeProvider('not-a-provider');
 
-    expect(controller.state.selectedProvider).toBeNull();
+    expect(deps.providerSelection.selectedProvider).toBeNull();
     expect(auth.setActiveKey).not.toHaveBeenCalled();
 
     cleanup();
@@ -211,7 +214,7 @@ describe('UI Controller: MainPageController', () => {
 
     await controller.changeProvider('xai');
 
-    expect(controller.state.selectedProvider).toBe('xai');
+    expect(deps.providerSelection.selectedProvider).toBe('xai');
     expect(auth.setActiveKey).not.toHaveBeenCalled();
 
     cleanup();
@@ -226,7 +229,7 @@ describe('UI Controller: MainPageController', () => {
 
     await controller.changeProvider('groq');
 
-    expect(controller.state.selectedProvider).toBeNull();
+    expect(deps.providerSelection.selectedProvider).toBeNull();
 
     expect(toast.show).toHaveBeenCalledWith({
       type: 'error',
@@ -247,7 +250,7 @@ describe('UI Controller: MainPageController', () => {
 
     await controller.changeProvider('groq');
 
-    expect(controller.state.selectedProvider).toBeNull();
+    expect(deps.providerSelection.selectedProvider).toBeNull();
 
     expect(toast.show).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -369,9 +372,9 @@ describe('UI Controller: MainPageController', () => {
 
   test('auto-activates the first key when the active key belongs to another provider', () => {
     const { deps, auth } = createDeps();
-    const { controller, cleanup } = createController(deps);
+    const { cleanup } = createController(deps);
 
-    controller.state.selectedProvider = 'groq';
+    deps.providerSelection.selectedProvider = 'groq';
     flushSync();
 
     expect(auth.setActiveKey).toHaveBeenCalledWith('rk1');
@@ -389,10 +392,10 @@ describe('UI Controller: MainPageController', () => {
 
     const { controller, cleanup } = createController(deps);
 
-    controller.state.selectedProvider = 'custom-gone';
+    deps.providerSelection.selectedProvider = 'custom-gone';
     flushSync();
 
-    expect(controller.state.selectedProvider).toBe('deepseek');
+    expect(deps.providerSelection.selectedProvider).toBe('deepseek');
     expect(controller.effectiveProvider).toBe('deepseek');
     expect(controller.canTranslate).toBe(false);
 
@@ -410,7 +413,7 @@ describe('UI Controller: MainPageController', () => {
     const { controller, cleanup } = createController(deps);
 
     expect(controller.effectiveProvider).toBe('deepseek');
-    expect(controller.state.selectedProvider).toBe('deepseek');
+    expect(deps.providerSelection.selectedProvider).toBe('deepseek');
 
     cleanup();
   });
@@ -422,17 +425,17 @@ describe('UI Controller: MainPageController', () => {
 
     const { controller, cleanup } = createController(deps);
 
-    controller.state.selectedProvider = 'custom-pending';
+    deps.providerSelection.selectedProvider = 'custom-pending';
     flushSync();
 
     expect(controller.effectiveProvider).toBe('custom-pending');
-    expect(controller.state.selectedProvider).toBe('custom-pending');
+    expect(deps.providerSelection.selectedProvider).toBe('custom-pending');
 
     customProviders.state.hydrated = true;
     flushSync();
 
     expect(controller.effectiveProvider).toBe('deepseek');
-    expect(controller.state.selectedProvider).toBe('deepseek');
+    expect(deps.providerSelection.selectedProvider).toBe('deepseek');
 
     cleanup();
   });
@@ -451,7 +454,7 @@ describe('UI Controller: MainPageController', () => {
 
     const { controller, cleanup } = createController(deps);
 
-    controller.state.selectedProvider = 'custom-deepseek';
+    deps.providerSelection.selectedProvider = 'custom-deepseek';
     flushSync();
     expect(controller.effectiveProvider).toBe('custom-deepseek');
 
@@ -459,7 +462,7 @@ describe('UI Controller: MainPageController', () => {
     flushSync();
 
     expect(controller.effectiveProvider).toBe('deepseek');
-    expect(controller.state.selectedProvider).toBe('deepseek');
+    expect(deps.providerSelection.selectedProvider).toBe('deepseek');
 
     cleanup();
   });
@@ -474,11 +477,146 @@ describe('UI Controller: MainPageController', () => {
 
     const { controller, cleanup } = createController(deps);
 
-    controller.state.selectedProvider = 'groq';
+    deps.providerSelection.selectedProvider = 'groq';
     flushSync();
 
     expect(controller.effectiveProvider).toBe('groq');
-    expect(controller.state.selectedProvider).toBe('groq');
+    expect(deps.providerSelection.selectedProvider).toBe('groq');
+
+    cleanup();
+  });
+
+  test('provides display options from the effective provider catalog', () => {
+    const { deps, models } = createDeps();
+
+    models.modelsFor.mockReturnValue([
+      { id: 'model-v1', name: 'Friendly model', source: 'manual' },
+    ]);
+
+    const { controller, cleanup } = createController(deps);
+
+    expect(controller.modelOptions).toEqual([
+      { value: 'model-v1', label: 'Friendly model (model-v1)' },
+    ]);
+
+    cleanup();
+  });
+
+  test('starts capture and closes the popup after the request succeeds', async () => {
+    const { deps } = createDeps();
+    const { controller, cleanup } = createController(deps);
+
+    await controller.startTranslation();
+
+    expect(deps.startCapture).toHaveBeenCalledOnce();
+
+    expect(deps.closePopup).toHaveBeenCalledOnce();
+    cleanup();
+  });
+
+  test('keeps the popup open and reports a capture request failure', async () => {
+    const { deps, toast } = createDeps();
+
+    vi.mocked(deps.startCapture).mockRejectedValueOnce(
+      new Error('unavailable'),
+    );
+
+    const { controller, cleanup } = createController(deps);
+
+    await controller.startTranslation();
+    expect(deps.closePopup).not.toHaveBeenCalled();
+
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        message: 'Could not start translation',
+      }),
+    );
+
+    cleanup();
+  });
+
+  test('opens shortcut settings without starting translation', async () => {
+    const { deps } = createDeps();
+    const { controller, cleanup } = createController(deps);
+
+    await controller.openShortcutSettings();
+    expect(deps.openShortcutSettings).toHaveBeenCalledOnce();
+    expect(deps.startCapture).not.toHaveBeenCalled();
+
+    expect(controller.shortcutSettingsUrl).toBe(
+      'chrome://extensions/shortcuts',
+    );
+
+    cleanup();
+  });
+
+  test('reports a shortcut navigation failure with the manual destination', async () => {
+    const { deps, toast } = createDeps();
+
+    vi.mocked(deps.openShortcutSettings).mockRejectedValueOnce(
+      new Error('blocked'),
+    );
+
+    const { controller, cleanup } = createController(deps);
+
+    await controller.openShortcutSettings();
+
+    expect(toast.show).toHaveBeenCalledWith({
+      type: 'error',
+      message: 'Could not open shortcut settings',
+      description:
+        'Open chrome://extensions/shortcuts to configure the translation shortcut.',
+    });
+
+    cleanup();
+  });
+
+  test('owns one provider switch at a time and suspends automatic key reconciliation', async () => {
+    let finish!: (error: string | null) => void;
+    const { deps, auth } = createDeps();
+
+    auth.setActiveKey.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+
+    const { controller, cleanup } = createController(deps);
+
+    const switching = controller.changeProvider('groq');
+
+    flushSync();
+    expect(controller.changingProvider).toBe(true);
+    expect(controller.canTranslate).toBe(false);
+    expect(auth.setActiveKey).toHaveBeenCalledTimes(1);
+
+    await controller.changeProvider('deepseek');
+    expect(deps.providerSelection.selectedProvider).toBe('groq');
+    expect(auth.setActiveKey).toHaveBeenCalledTimes(1);
+
+    finish('Could not save');
+    await switching;
+    expect(controller.changingProvider).toBe(false);
+    expect(controller.effectiveProvider).toBe('google');
+    cleanup();
+  });
+
+  test('recovers a rejected provider write and releases the switch guard', async () => {
+    const { deps, auth, toast } = createDeps();
+
+    auth.setActiveKey.mockRejectedValueOnce(new Error('storage closed'));
+
+    const { controller, cleanup } = createController(deps);
+
+    await controller.changeProvider('groq');
+    expect(controller.changingProvider).toBe(false);
+    expect(controller.effectiveProvider).toBe('google');
+
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Could not switch provider' }),
+    );
 
     cleanup();
   });

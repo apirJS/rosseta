@@ -70,7 +70,7 @@ Run `bun run format` before submitting changes. Prettier owns formatting, includ
 - Give a class one purpose. Extract a function when it owns a meaningful rule, transformation or resource. Share actual repetition; avoid speculative frameworks and forwarding-only classes.
 - Use one use-case file per coherent public action. Internal retry, parser, transport and rendering steps do not each need an application action.
 - Keep port interfaces `I`-prefixed. Prefer contract tests with the in-memory fakes in `tests/fakes`.
-- Use Svelte 5 runes, a `Props` interface, typed component context and controller-owned reactive logic. Keep components presentational and async initialization/disposal explicit.
+- Use Svelte 5 runes, a `Props` interface and tested controllers for behavior. Smart pages wire typed context and browser dependencies; presentational children receive props and callbacks. Keep simple DOM event adaptation in components. Popup-wide snapshots belong to `ui/extension/state`; reusable controls belong to `ui/shared/components`. See [UI ownership](src/adapters/primary/ui/README.md).
 - Use Tailwind semantic tokens (`bg-background`, `text-foreground`, `border-border`). Verify both themes for UI changes. Inject page UI through the Shadow DOM host.
 - Keep one canonical implementation of queues, journals, leases and other resource owners. Remove temporary migration shims after callers move.
 

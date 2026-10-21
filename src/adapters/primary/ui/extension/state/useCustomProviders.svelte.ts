@@ -8,6 +8,8 @@ import {
   type Result,
 } from '../../../../../shared/types/Result';
 import type { AppError } from '../../../../../shared/errors';
+import { PROVIDERS } from '../../../../../core/domain/credential/Provider';
+import { getProviderDefinition } from '../../../../../core/domain/provider/provider-definitions';
 
 export class CustomProvidersState {
   providers = $state<CustomProviderConfig[]>([]);
@@ -19,6 +21,17 @@ export function useCustomProviders() {
   const useCases = getCustomProvidersContext();
   const state = new CustomProvidersState();
   const lifetime = createHydrationLifetime();
+
+  const options = $derived([
+    ...PROVIDERS.map((id) => ({
+      value: id,
+      label: getProviderDefinition(id)!.name,
+    })),
+    ...state.providers.map((provider) => ({
+      value: provider.id,
+      label: provider.name,
+    })),
+  ]);
 
   function applySnapshot(providers: CustomProviderConfig[]) {
     state.providers = providers;
@@ -75,6 +88,9 @@ export function useCustomProviders() {
 
   return {
     state,
+    get options() {
+      return options;
+    },
     hydrate,
     save,
     remove,

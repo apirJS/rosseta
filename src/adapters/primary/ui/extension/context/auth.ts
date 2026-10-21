@@ -19,7 +19,7 @@ export interface AuthUseCases {
 }
 
 export type AuthStateContext = ReturnType<
-  typeof import('../hooks/useAuth.svelte').useAuth
+  typeof import('../state/useAuth.svelte').useAuth
 >;
 
 export function setAuthContext(useCases: AuthUseCases): void {

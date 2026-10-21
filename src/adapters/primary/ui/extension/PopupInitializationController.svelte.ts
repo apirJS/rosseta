@@ -1,17 +1,15 @@
 import { AppError } from '../../../../shared/errors';
 import type { Result } from '../../../../shared/types/Result';
 
-interface PopupParticipant {
+interface PopupDataSource {
   hydrate(): Promise<Result<void, AppError>>;
-  dispose(): void;
 }
 
-export interface PopupLifecycleDeps {
-  auth: PopupParticipant;
-  preferences: PopupParticipant;
-  customProviders: PopupParticipant;
-  models: PopupParticipant;
-  disposeFeedback(): void;
+export interface PopupInitializationDeps {
+  auth: PopupDataSource;
+  preferences: PopupDataSource;
+  customProviders: PopupDataSource;
+  models: PopupDataSource;
 }
 
 class PopupInitializationState {
@@ -20,15 +18,17 @@ class PopupInitializationState {
   failures = $state<Array<{ name: string; message: string }>>([]);
 }
 
-/** Own popup initialization ordering and teardown; hooks own their snapshots. */
-export function createPopupLifecycle(deps: PopupLifecycleDeps) {
+/** Load popup data in order, expose failures, and share an in-flight retry. */
+export function createPopupInitializationController(
+  deps: PopupInitializationDeps,
+) {
   const state = new PopupInitializationState();
   let disposed = false;
   let pending: Promise<void> | undefined;
 
   async function hydrate(
     name: string,
-    participant: PopupParticipant,
+    participant: PopupDataSource,
   ): Promise<void> {
     try {
       const result = await participant.hydrate();
@@ -78,16 +78,7 @@ export function createPopupLifecycle(deps: PopupLifecycleDeps) {
   }
 
   function dispose(): void {
-    if (disposed) return;
     disposed = true;
-    for (const participant of [
-      deps.auth,
-      deps.preferences,
-      deps.models,
-      deps.customProviders,
-    ])
-      participant.dispose();
-    deps.disposeFeedback();
   }
 
   return { state, initialize, dispose };

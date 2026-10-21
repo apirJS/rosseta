@@ -1,14 +1,12 @@
 <script lang="ts">
-  import browser from 'webextension-polyfill';
-  import type { MenuDestination } from '../HomeController.svelte';
+  import type { MenuDestination } from '../../../PopupNavigationController.svelte';
 
   interface Props {
     onnavigate: (destination: MenuDestination) => void;
+    version: string;
   }
 
-  const { onnavigate }: Props = $props();
-
-  const version = browser.runtime.getManifest().version;
+  const { onnavigate, version }: Props = $props();
 </script>
 
 <div

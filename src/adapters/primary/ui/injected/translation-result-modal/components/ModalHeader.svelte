@@ -18,26 +18,12 @@
   const statusLabel = $derived(
     busy ? status.replace(/(?:\.{3}|…)$/, '') : status,
   );
-
-  let showStatus = $state<boolean>(true);
-
-  $effect(() => {
-    if (status.toLocaleLowerCase() === 'complete') {
-      const timer = setTimeout(() => {
-        showStatus = false;
-      }, 1_000);
-
-      return () => clearTimeout(timer);
-    } else {
-      showStatus = true;
-    }
-  });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-header flex items-end gap-x-1" onpointerdown={ondragstart}>
   <span class="modal-header-title">{title}</span>
-  {#if status && showStatus}
+  {#if status}
     <span
       class={`translation-status`}
       role="status"

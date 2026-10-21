@@ -1,12 +1,12 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import {
-  createActiveKeyIndicatorController,
-  type ActiveKeyIndicatorDeps,
-} from './ActiveKeyIndicatorController.svelte';
-import { maskApiKey } from '../../../../shared/utils';
-import { KeySelectionMode } from '../../../../../../../core/domain/credential/KeySelectionMode';
-import type { Credential } from '../../../../../../../core/domain/credential/Credential';
-import type { Credentials } from '../../../../../../../core/domain/credential/Credentials';
+  createKeySelectionController,
+  type KeySelectionDeps,
+} from './KeySelectionController.svelte';
+import { maskApiKey } from '../../../shared/utils';
+import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySelectionMode';
+import type { Credential } from '../../../../../../core/domain/credential/Credential';
+import type { Credentials } from '../../../../../../core/domain/credential/Credentials';
 
 function makeCredential(
   provider: string,
@@ -28,7 +28,7 @@ function makeCredentials(items: Credential[]): Credentials {
   } as unknown as Credentials;
 }
 
-function createDeps(overrides: Partial<ActiveKeyIndicatorDeps> = {}) {
+function createDeps(overrides: Partial<KeySelectionDeps> = {}) {
   const first = makeCredential('google', 'k1', 'sk-aaaaaaaaaaaaaaaa');
   const second = makeCredential('google', 'k2', 'sk-bbbbbbbbbbbbbbbb');
 
@@ -43,7 +43,7 @@ function createDeps(overrides: Partial<ActiveKeyIndicatorDeps> = {}) {
 
   const toast = { show: vi.fn() };
 
-  const deps: ActiveKeyIndicatorDeps = {
+  const deps: KeySelectionDeps = {
     getProvider: () => 'google',
     getCredential: () => first,
     auth,
@@ -54,14 +54,14 @@ function createDeps(overrides: Partial<ActiveKeyIndicatorDeps> = {}) {
   return { deps, auth, toast, first, second };
 }
 
-describe('UI Controller: ActiveKeyIndicatorController', () => {
+describe('UI Controller: KeySelectionController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   test('lists the credentials that belong to the provider', () => {
     const { deps } = createDeps();
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     expect(controller.providerCredentials).toHaveLength(2);
     expect(controller.hasMultiple).toBe(true);
@@ -72,7 +72,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
     deps.auth.state.credentials = makeCredentials([first]);
 
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     expect(controller.hasMultiple).toBe(false);
     expect(controller.autoBalanceProviders).toEqual([]);
@@ -80,7 +80,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('offers auto-balance only with two or more keys', () => {
     const { deps } = createDeps();
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     expect(controller.autoBalanceProviders).toEqual(['google']);
   });
@@ -91,14 +91,14 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
     deps.getCredential = () =>
       makeCredential('groq', 'other', 'sk-cccccccccccccccc');
 
-    const otherProvider = createActiveKeyIndicatorController(deps);
+    const otherProvider = createKeySelectionController(deps);
 
     expect(otherProvider.providerActive).toBeNull();
     expect(otherProvider.getTriggerLabel()).toBe('—');
 
     deps.getCredential = () => first;
 
-    const sameProvider = createActiveKeyIndicatorController(deps);
+    const sameProvider = createKeySelectionController(deps);
 
     expect(sameProvider.providerActive).toBe(first);
 
@@ -112,7 +112,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
 
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     expect(controller.getTriggerLabel()).toBe('Auto ⟳');
   });
@@ -123,7 +123,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
     deps.auth.state.credentials = makeCredentials([first]);
 
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     // ResolveActiveCredentialUseCase already falls back to manual below two
     // keys, so advertising "Auto ⟳" here would misreport what actually runs.
@@ -134,7 +134,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('toggle and close manage the dropdown state', () => {
     const { deps } = createDeps();
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     expect(controller.state.isOpen).toBe(false);
 
@@ -150,7 +150,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
 
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     controller.toggle();
 
@@ -166,7 +166,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('selectKey skips the mode switch when already manual', async () => {
     const { deps, auth, second } = createDeps();
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     await controller.selectKey(second);
 
@@ -176,7 +176,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
   test('selectAutoBalance updates the key selection mode', async () => {
     const { deps, auth } = createDeps();
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     controller.toggle();
 
@@ -194,7 +194,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
     auth.setKeySelectionMode = vi.fn().mockResolvedValue('Mode broken');
 
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     await controller.selectAutoBalance('google');
 
@@ -212,7 +212,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
 
     auth.setActiveKey = vi.fn().mockResolvedValue('Storage broken');
 
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     controller.toggle();
 
@@ -233,7 +233,7 @@ describe('UI Controller: ActiveKeyIndicatorController', () => {
     deps.auth.state.keySelectionMode = KeySelectionMode.autoBalance('google');
     auth.setKeySelectionMode = vi.fn().mockResolvedValue('Mode broken');
 
-    const controller = createActiveKeyIndicatorController(deps);
+    const controller = createKeySelectionController(deps);
 
     controller.toggle();
 

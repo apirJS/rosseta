@@ -1,28 +1,21 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import TranslateButton from './TranslateButton.svelte';
 
-const preferences = vi.hoisted(() => ({
-  state: { shortcut: null as string | null },
-}));
-
-vi.mock('../../../../shared/context', () => ({
-  getPreferencesStateContext: () => preferences,
-}));
-
 afterEach(cleanup);
 
-beforeEach(() => {
-  preferences.state.shortcut = null;
-});
-
-function setup(disabled = false, isLoading = false) {
+function setup(
+  disabled = false,
+  isLoading = false,
+  shortcutLabel: string | null = null,
+) {
   const onclick = vi.fn();
   const onOpenShortcutSettings = vi.fn();
 
   return {
     ...render(TranslateButton, {
       onclick,
+      shortcutLabel,
       onOpenShortcutSettings,
       disabled,
       isLoading,
@@ -58,9 +51,7 @@ describe('UI: translation shortcut link', () => {
   });
 
   test('shows an assigned shortcut without a setup link', () => {
-    preferences.state.shortcut = 'Ctrl+Shift+Y';
-
-    const view = setup();
+    const view = setup(false, false, 'Ctrl+Shift+Y');
 
     expect(view.getByText('(Ctrl+Shift+Y)')).toBeDefined();
     expect(view.queryByRole('link')).toBeNull();

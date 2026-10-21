@@ -131,10 +131,9 @@ export class TranslationModalController {
   });
 
   private hoveredSegmentIndex = $state<number | null>(null);
-  private hoveredSide = $state<'original' | 'translated' | null>(null);
 
   public readonly displayedLangLabel = $derived.by(() => {
-    if (this.hoveredSide === 'original' && this.isMultiLang) {
+    if (this.hoveredSegmentIndex !== null && this.isMultiLang) {
       const segment = this.original.find(
         (value, index) => (value.index ?? index) === this.hoveredSegmentIndex,
       );
@@ -152,14 +151,8 @@ export class TranslationModalController {
 
   public readonly highlightedSegmentIndex = $derived(this.hoveredSegmentIndex);
 
-  public hoverOriginalSegment = (index: number | null) => {
+  public hoverSegment = (index: number | null) => {
     this.hoveredSegmentIndex = index;
-    this.hoveredSide = index != null ? 'original' : null;
-  };
-
-  public hoverTranslatedSegment = (index: number | null) => {
-    this.hoveredSegmentIndex = index;
-    this.hoveredSide = index != null ? 'translated' : null;
   };
 
   constructor(props: {
@@ -271,7 +264,6 @@ export class TranslationModalController {
 
   private resetFeedback(): void {
     this.hoveredSegmentIndex = null;
-    this.hoveredSide = null;
     this.clipboard.reset();
   }
 

@@ -11,6 +11,7 @@ function makeSegments(
     text: string;
     romanization?: string | null;
     blockIndex?: number;
+    index?: number;
   }[],
 ): SegmentPayload[] {
   return items.map((i) => ({
@@ -18,6 +19,7 @@ function makeSegments(
     text: i.text,
     romanization: i.romanization ?? null,
     blockIndex: i.blockIndex ?? 0,
+    index: i.index,
   }));
 }
 
@@ -267,6 +269,65 @@ describe('UI Controller: TranslationModalController', () => {
     expect(ctrl.isMultiLang).toBe(true);
   });
 
+  test('hover uses the paired source index for the label and resets to Mixed on leave', () => {
+    const original = makeSegments([
+      { code: 'ja-JP', name: 'Japanese', text: 'Japanese source', index: 10 },
+      { code: 'ko-KR', name: 'Korean', text: 'Korean source', index: 20 },
+    ]);
+
+    const ctrl = createController({
+      original,
+      translated: makeSegments([
+        {
+          code: 'en-US',
+          name: 'English',
+          text: 'First translation',
+          index: 10,
+        },
+        {
+          code: 'en-US',
+          name: 'English',
+          text: 'Second translation',
+          index: 20,
+        },
+      ]),
+    });
+
+    expect(ctrl.displayedLangLabel).toBe('Mixed');
+    ctrl.hoverSegment(10);
+    expect(ctrl.displayedLangLabel).toBe('Japanese (ja-JP)');
+    expect(ctrl.highlightedSegmentIndex).toBe(10);
+    ctrl.hoverSegment(20);
+    expect(ctrl.displayedLangLabel).toBe('Korean (ko-KR)');
+    expect(ctrl.targetLanguageLabel).toBe('English (en-US)');
+    ctrl.hoverSegment(99);
+    expect(ctrl.displayedLangLabel).toBe('Mixed');
+    ctrl.hoverSegment(null);
+    expect(ctrl.displayedLangLabel).toBe('Mixed');
+    expect(ctrl.highlightedSegmentIndex).toBeNull();
+    ctrl.dispose();
+  });
+
+  test.each(['number', 'symbol', 'unknown'])(
+    'hovering a %s segment keeps the Mixed source label',
+    (code) => {
+      const ctrl = createController({
+        original: makeSegments([
+          { code: 'ja-JP', name: 'Japanese', text: 'Japanese source' },
+          { code: 'ko-KR', name: 'Korean', text: 'Korean source' },
+          { code, name: code, text: '42' },
+        ]),
+      });
+
+      ctrl.hoverSegment(0);
+      expect(ctrl.displayedLangLabel).toBe('Japanese (ja-JP)');
+      ctrl.hoverSegment(2);
+      expect(ctrl.displayedLangLabel).toBe('Mixed');
+      expect(ctrl.highlightedSegmentIndex).toBe(2);
+      ctrl.dispose();
+    },
+  );
+
   test('isMultiLang is false with one real language + non-lang codes', () => {
     const ctrl = createController({
       original: makeSegments([
@@ -510,7 +571,7 @@ describe('UI Controller: TranslationModalController', () => {
 
     const originalKey = ctrl.original[1].rowKey;
 
-    ctrl.hoverOriginalSegment(1);
+    ctrl.hoverSegment(1);
 
     ctrl.snapshot({
       segments: [

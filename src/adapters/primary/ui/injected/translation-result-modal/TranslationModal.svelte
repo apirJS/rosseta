@@ -74,7 +74,7 @@
             isMultiLang={ctrl.isMultiLang}
             hasRomanization={ctrl.originalHasRomanization}
             highlightIndex={ctrl.highlightedSegmentIndex}
-            onSegmentIndexHover={ctrl.hoverOriginalSegment}
+            onSegmentIndexHover={ctrl.hoverSegment}
             pending={ctrl.isBusy}
           />
         </ModalSection>
@@ -93,7 +93,7 @@
             isMultiLang={false}
             hasRomanization={ctrl.translatedHasRomanization}
             highlightIndex={ctrl.highlightedSegmentIndex}
-            onSegmentIndexHover={ctrl.hoverTranslatedSegment}
+            onSegmentIndexHover={ctrl.hoverSegment}
             pending={ctrl.isBusy}
           />
         </ModalSection>

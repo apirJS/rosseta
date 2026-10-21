@@ -7,6 +7,107 @@ import { TranslationModalController } from './TranslationModalController.svelte'
 afterEach(cleanup);
 
 describe('UI: live translation modal', () => {
+  test('shows the paired source language when hovering either side of a mixed result', async () => {
+    const controller = new TranslationModalController({
+      original: [
+        {
+          index: 7,
+          text: 'Japanese source',
+          language: { code: 'ja-JP', name: 'Japanese' },
+          romanization: 'Japanese pronunciation',
+          blockIndex: 0,
+        },
+        {
+          index: 19,
+          text: 'Korean source',
+          language: { code: 'ko-KR', name: 'Korean' },
+          romanization: null,
+          blockIndex: 1,
+        },
+      ],
+      translated: [
+        {
+          index: 7,
+          text: 'Japanese translation',
+          language: { code: 'en-US', name: 'English' },
+          romanization: null,
+          blockIndex: 0,
+        },
+        {
+          index: 19,
+          text: 'Korean translation',
+          language: { code: 'en-US', name: 'English' },
+          romanization: null,
+          blockIndex: 1,
+        },
+      ],
+      description: '',
+      detachModal: vi.fn(),
+    });
+
+    const { container, getByText } = render(TranslationModal, { controller });
+    const sections = container.querySelectorAll('.section');
+    const originalLabel = sections[0].querySelector('.section-label-tag');
+    const translatedLabel = sections[1].querySelector('.section-label-tag');
+    const translatedContent = sections[1].querySelector('.text-content');
+    const originalContent = sections[0].querySelector('.text-content');
+
+    if (!translatedContent || !originalContent)
+      throw new Error('Missing text content');
+
+    expect(originalLabel?.textContent).toContain('Mixed');
+
+    await fireEvent.pointerMove(getByText('Japanese translation'));
+    expect(originalLabel?.textContent).toContain('Japanese (ja-JP)');
+    expect(translatedLabel?.textContent).toContain('English (en-US)');
+    expect(container.querySelectorAll('.seg-highlight')).toHaveLength(2);
+
+    expect(
+      getByText('Japanese source').classList.contains('seg-highlight'),
+    ).toBe(true);
+
+    expect(
+      getByText('Japanese translation').classList.contains('seg-highlight'),
+    ).toBe(true);
+
+    expect(
+      getByText('Japanese pronunciation').classList.contains('rom-highlight'),
+    ).toBe(true);
+
+    await fireEvent.pointerMove(getByText('Korean translation'));
+    expect(originalLabel?.textContent).toContain('Korean (ko-KR)');
+    expect(translatedLabel?.textContent).toContain('English (en-US)');
+    expect(container.querySelectorAll('.seg-highlight')).toHaveLength(2);
+
+    expect(getByText('Korean source').classList.contains('seg-highlight')).toBe(
+      true,
+    );
+
+    expect(
+      getByText('Korean translation').classList.contains('seg-highlight'),
+    ).toBe(true);
+
+    expect(container.querySelector('.rom-highlight')).toBeNull();
+
+    await fireEvent.pointerLeave(translatedContent);
+    expect(originalLabel?.textContent).toContain('Mixed');
+    expect(container.querySelector('.seg-highlight')).toBeNull();
+
+    await fireEvent.pointerMove(getByText('Japanese source'));
+    expect(originalLabel?.textContent).toContain('Japanese (ja-JP)');
+    expect(translatedLabel?.textContent).toContain('English (en-US)');
+
+    expect(
+      getByText('Japanese translation').classList.contains('seg-highlight'),
+    ).toBe(true);
+
+    await fireEvent.pointerLeave(originalContent);
+    expect(originalLabel?.textContent).toContain('Mixed');
+    expect(container.querySelector('.seg-highlight')).toBeNull();
+    expect(container.querySelector('.rom-highlight')).toBeNull();
+    controller.dispose();
+  });
+
   test('updates one mounted modal, preserves resized node, and enables Copy only on final', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
+import { buildPlainPrompt } from './prompt-base';
 import {
   createTranslationDataSchema,
   translationDataSchema,
@@ -11,6 +12,7 @@ import {
 } from '../../../../../tests/test-fixtures';
 
 interface JsonSchemaNode {
+  description?: string;
   properties?: Record<string, JsonSchemaNode>;
   required?: string[];
   items?: JsonSchemaNode;
@@ -89,20 +91,68 @@ describe('Adapter: translation schema', () => {
   });
 
   test('wire schema includes description when requested', () => {
-    const json = JSON.stringify(
-      z.toJSONSchema(createTranslationDataSchema(true)),
+    const dataSchema = z.toJSONSchema(
+      createTranslationDataSchema(true).shape.data.unwrap(),
     );
 
-    expect(json).toContain('"description"');
+    expect(dataSchema.properties).toHaveProperty('description');
+    expect(dataSchema.required).toContain('description');
   });
 
   test('wire schema omits description entirely when not requested', () => {
-    const json = JSON.stringify(
-      z.toJSONSchema(createTranslationDataSchema(false)),
+    const dataSchema = z.toJSONSchema(
+      createTranslationDataSchema(false).shape.data.unwrap(),
     );
 
-    expect(json).not.toContain('"description"');
+    expect(dataSchema.properties).not.toHaveProperty('description');
+    expect(dataSchema.required).not.toContain('description');
   });
+
+  test.each([true, false])(
+    'exports field guidance in the schema and plain prompt with description %s',
+    (includeDescription) => {
+      const schema = z.toJSONSchema(
+        createTranslationDataSchema(includeDescription),
+        { target: 'draft-07', io: 'input' },
+      ) as JsonSchemaNode;
+
+      const prompt = buildPlainPrompt({
+        targetLanguageCode: 'en-US',
+        targetLanguageName: 'English',
+        includeDescription,
+      });
+
+      const marker = '\nJSON Schema:\n';
+
+      expect(prompt).toContain(marker);
+
+      const inlineSchema = JSON.parse(
+        prompt.slice(prompt.indexOf(marker) + marker.length),
+      ) as JsonSchemaNode;
+
+      expect(inlineSchema).toEqual(schema);
+
+      const data = inlineSchema.properties?.data?.anyOf?.find(
+        (branch) => branch.properties?.segments,
+      );
+
+      const fields = data?.properties?.segments?.items?.properties;
+
+      for (const field of [
+        'blockIndex',
+        'originalText',
+        'translatedText',
+        'originalLanguageBcp47Code',
+        'romanization',
+      ]) {
+        expect(fields?.[field]?.description).toEqual(expect.any(String));
+      }
+
+      expect(fields?.translatedText?.description).not.toBe(
+        fields?.romanization?.description,
+      );
+    },
+  );
 
   test('wire schema accepts a fully-formed response', () => {
     const result = translationDataSchema.safeParse(

@@ -1,30 +1,79 @@
 import { z } from 'zod';
 import type { TranslationData } from './translation-response-mapper';
 
-const blockIndexSchema = z.number().int().nonnegative();
+const blockIndexSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .describe(
+    'Zero-based visual block index. Segments in the same block share the index; each new block increases it by one.',
+  );
 
 const segmentSchema = z
   .object({
     blockIndex: blockIndexSchema,
-    originalText: z.string(),
-    translatedText: z.string(),
-    originalLanguageBcp47Code: z.string(),
-    romanization: z.string().nullable(),
+    originalText: z
+      .string()
+      .describe(
+        'Exact visible source content, including text, emoji, symbols and punctuation. Do not reconstruct missing or unreadable content.',
+      ),
+    translatedText: z
+      .string()
+      .describe(
+        'Complete translation of originalText into the requested target language using natural wording. Translate titles by meaning. Source-language pronunciation belongs only in romanization.',
+      ),
+    originalLanguageBcp47Code: z
+      .string()
+      .describe(
+        'Regional BCP47 tag of the source language, or number for digits only, symbol for symbols/emoji only, unknown when unidentified.',
+      ),
+    romanization: z
+      .string()
+      .nullable()
+      .describe(
+        'Latin-script transcription of the source-language pronunciation of originalText. This field contains pronunciation, not translation. Use null for Latin-script text, numbers or symbols.',
+      ),
   })
   .strict();
 
 export function createTranslationDataSchema(includeDescription = true) {
-  const shape = { segments: z.array(segmentSchema) };
+  const shape = {
+    segments: z
+      .array(segmentSchema)
+      .describe(
+        'Ordered source/translation pairs covering all visible text, emoji and symbols, with each region captured once.',
+      ),
+  };
 
   const data = includeDescription
-    ? z.object({ ...shape, description: z.string() }).strict()
+    ? z
+        .object({
+          ...shape,
+          description: z
+            .string()
+            .describe(
+              'Compact, factual explanation in the target language of relevant meaning, context and nuance needed to interpret the selected image. Exclude repeated translations, unrelated details and unverified claims. Use an empty string when no explanation is needed.',
+            ),
+        })
+        .strict()
     : z.object(shape).strict();
 
   return z
     .object({
-      success: z.boolean(),
-      error: z.string().nullable(),
-      data: data.nullable(),
+      success: z
+        .boolean()
+        .describe(
+          'True when text, emoji or symbols were captured and translated; false when none could be identified.',
+        ),
+      error: z
+        .string()
+        .nullable()
+        .describe(
+          'Machine-readable error code on failure, such as NO_TEXT_FOUND; null on success.',
+        ),
+      data: data
+        .nullable()
+        .describe('The translation result on success; null on failure.'),
     })
     .strict();
 }

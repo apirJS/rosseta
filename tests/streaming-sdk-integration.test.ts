@@ -282,6 +282,59 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
   });
 
   test.each(['structured-stream', 'plain-stream'] as const)(
+    '%s does not promote complete JSON from an unterminated provider stream to success',
+    async (mode) => {
+      const image = EncodedImage.create('data:image/png;base64,AQ==');
+
+      if (!image.success) throw image.error;
+
+      const text = JSON.stringify({
+        success: true,
+        error: null,
+        data: {
+          segments: [
+            {
+              blockIndex: 0,
+              originalText: 'Hello',
+              translatedText: 'Hello',
+              originalLanguageBcp47Code: 'en-US',
+              romanization: null,
+            },
+          ],
+          description: '',
+        },
+      });
+
+      const model = modelFor([
+        { type: 'text-start', id: 't' },
+        { type: 'text-delta', id: 't', delta: text },
+        { type: 'text-end', id: 't' },
+      ]);
+
+      const generated = await new AiSdkGenerationTransport(model).generate(
+        {
+          mode,
+          image: image.data,
+          instructions: 'Return JSON',
+          userText: 'test',
+          schema: createTranslationDataSchema(),
+          signal: new AbortController().signal,
+        },
+        async () => {},
+      );
+
+      expect(generated.text).toBe(text);
+      expect(generated.finishReason).not.toBe('stop');
+
+      expect(inspectTranslationCompletion(generated, text, true).kind).not.toBe(
+        'accepted',
+      );
+
+      expect(model.doStreamCalls).toHaveLength(1);
+    },
+  );
+
+  test.each(['structured-stream', 'plain-stream'] as const)(
     '%s rejects cleanly in a browser runtime without leaking SDK telemetry promises',
     async (mode) => {
       const nodeProcess = process;

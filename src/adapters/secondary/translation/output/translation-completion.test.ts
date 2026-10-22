@@ -110,6 +110,30 @@ describe('Adapter: inspectTranslationCompletion', () => {
     expect(result.kind).toBe('accepted');
   });
 
+  test('tries complete text after an unserializable SDK object', () => {
+    const cyclic: Record<string, unknown> = {};
+
+    cyclic.self = cyclic;
+
+    for (const output of [cyclic, { sdkMetadata: 1n }]) {
+      expect(
+        inspectTranslationCompletion(generated({ output }), '', false).kind,
+      ).toBe('accepted');
+    }
+  });
+
+  test('retains nonempty accumulated text for repair when final text is whitespace', () => {
+    const streamedText = '{"success":true,"data":';
+
+    expect(
+      inspectTranslationCompletion(
+        generated({ text: ' \n ' }),
+        streamedText,
+        false,
+      ),
+    ).toEqual({ kind: 'incomplete', text: streamedText, finishReason: 'stop' });
+  });
+
   test.each(['length', 'error', 'unknown', 'tool-calls'])(
     'does not accept balanced JSON after a %s finish',
     (finishReason) => {
@@ -154,6 +178,19 @@ describe('Adapter: inspectTranslationCompletion', () => {
     );
 
     expect(result).toMatchObject({
+      kind: 'failed',
+      error: { code: ErrorCode.TRANSLATION_EMPTY_RESPONSE },
+    });
+  });
+
+  test('treats null SDK output without any text as an empty generation', () => {
+    expect(
+      inspectTranslationCompletion(
+        generated({ text: '', output: null }),
+        ' ',
+        false,
+      ),
+    ).toMatchObject({
       kind: 'failed',
       error: { code: ErrorCode.TRANSLATION_EMPTY_RESPONSE },
     });

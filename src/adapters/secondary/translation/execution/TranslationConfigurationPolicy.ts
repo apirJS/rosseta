@@ -3,12 +3,13 @@ import type { TranslationCapabilitySupport } from '../../../../core/ports/outbou
 
 /** Choose a request configuration without owning generation or persistence. */
 export class TranslationConfigurationPolicy {
-  private readonly rejected = new Set<string>();
+  private readonly visited = new Set<string>();
   private selected: GenerationConfiguration | undefined;
 
   constructor(
     private readonly configurations: readonly GenerationConfiguration[],
     private readonly support: (id: string) => TranslationCapabilitySupport,
+    private readonly hasEligibleMode: (id: string) => boolean,
   ) {
     this.selected = this.choose();
   }
@@ -17,8 +18,8 @@ export class TranslationConfigurationPolicy {
     return this.selected;
   }
 
-  rejectCurrent(): GenerationConfiguration | undefined {
-    if (this.selected) this.rejected.add(this.selected.id);
+  advance(): GenerationConfiguration | undefined {
+    if (this.selected) this.visited.add(this.selected.id);
     this.selected = this.choose();
 
     return this.selected;
@@ -27,8 +28,9 @@ export class TranslationConfigurationPolicy {
   private choose(): GenerationConfiguration | undefined {
     const eligible = this.configurations.filter(
       (configuration) =>
-        !this.rejected.has(configuration.id) &&
-        this.support(configuration.id) !== 'unsupported',
+        !this.visited.has(configuration.id) &&
+        this.support(configuration.id) !== 'unsupported' &&
+        this.hasEligibleMode(configuration.id),
     );
 
     return (

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { APICallError, StreamProviderError } from 'ai';
+import { z } from 'zod';
 import {
   FakeStreamingGeneration,
   type ScriptedGeneration,
@@ -17,10 +18,16 @@ import { executeTranslation } from '../execute-translation';
 import type { GenerationConfiguration } from '../transports/generation-configurations';
 import type {
   GenerationEvent,
+  GenerationMode,
   GenerationRequest,
   GenerationResult,
 } from '../transports/GenerationTransport';
-import { modelScopeKey } from '../compatibility/translation-capability-key';
+import {
+  capabilityDigest,
+  modelScopeKey,
+} from '../compatibility/translation-capability-key';
+import { TranslationCapabilityState } from '../compatibility/TranslationCapabilityState';
+import { createTranslationDataSchema } from '../output/translation-schema';
 
 const OFF = 'thinking.fixture-off.v1';
 const MINIMUM = 'thinking.fixture-minimum.v1';
@@ -159,6 +166,28 @@ const run = (
 
 const facts = async (storage: FakeTranslationCapabilityStorage) =>
   storage.records.get(await modelScopeKey(context))!.facts;
+
+async function cacheModeConflict(
+  storage: FakeTranslationCapabilityStorage,
+  mode: GenerationMode,
+  profile: string,
+) {
+  const schemaScope = await capabilityDigest(
+    z.toJSONSchema(createTranslationDataSchema(true), {
+      target: 'draft-07',
+      io: 'input',
+    }),
+  );
+
+  const state = new TranslationCapabilityState(
+    await modelScopeKey(context),
+    schemaScope,
+    storage,
+  );
+
+  await state.load();
+  await state.rejectedConfigurationMode(mode, profile);
+}
 
 describe('Adapter: translation configuration compatibility fallback', () => {
   afterEach(() => mock.restore());
@@ -527,6 +556,28 @@ describe('Adapter: translation configuration compatibility fallback', () => {
     expect(transport.requests[6].configurationId).toBe(OMIT);
   });
 
+  test('retains malformed-response failure when the sixth generation cannot be repaired', async () => {
+    const transport = new ConfiguredGeneration([
+      { error: rejectedThinking() },
+      { error: rejectedThinking() },
+      { error: api('streaming is unsupported') },
+      { error: new TypeError('network disconnected') },
+      { error: api('response_format is unsupported') },
+      { result: malformed },
+      { result: plain },
+    ]);
+
+    const result = await run(transport);
+
+    expect(result.success).toBe(false);
+
+    if (!result.success)
+      expect(result.error.code).toBe(ErrorCode.TRANSLATION_MALFORMED_RESPONSE);
+
+    expect(transport.requests).toHaveLength(6);
+    expect(transport.scripts).toHaveLength(1);
+  });
+
   test('cancellation before start prevents configuration discovery requests', async () => {
     const token = new AbortCancellationToken();
 
@@ -763,13 +814,85 @@ describe('Adapter: translation configuration compatibility fallback', () => {
     );
   });
 
-  test('conditional streaming conflict changes mode while retaining the thinking profile', async () => {
+  test.each([undefined, 'stream', 'response_format.json_schema'])(
+    'conditional streaming conflict retains the thinking profile with parameter %s',
+    async (param) => {
+      const storage = new FakeTranslationCapabilityStorage();
+
+      const transport = new ConfiguredGeneration([
+        {
+          error: api(
+            'reasoning_effort none is not supported in streaming',
+            400,
+            param,
+          ),
+        },
+        { result: valid },
+        { result: valid },
+      ]);
+
+      expect((await run(transport, storage)).success).toBe(true);
+
+      expect(
+        transport.requests.map((request) => [
+          request.mode,
+          request.configurationId,
+        ]),
+      ).toEqual([
+        ['structured-stream', OFF],
+        ['structured-buffered', OFF],
+      ]);
+
+      const stored = await facts(storage);
+
+      expect(stored['feature.stream'].support).toBe('unknown');
+      expect(stored[`configuration.${OFF}`].support).toBe('supported');
+
+      const defaultProfile = new ConfiguredGeneration(
+        [{ result: valid }],
+        [{ id: OMIT, rejectionFields: [] }],
+      );
+
+      defaultProfile.supportedModes = ['structured-stream'];
+
+      expect((await run(defaultProfile, storage)).success).toBe(true);
+      expect(defaultProfile.requests[0].mode).toBe('structured-stream');
+
+      // The same OFF conflict is skipped even after another profile streams.
+      expect((await run(transport, storage)).success).toBe(true);
+      expect(transport.requests).toHaveLength(3);
+      expect(transport.requests[2].mode).toBe('structured-buffered');
+    },
+  );
+
+  test('skips a profile whose locally allowed modes all have cached conflicts', async () => {
     const storage = new FakeTranslationCapabilityStorage();
 
+    await cacheModeConflict(storage, 'plain-buffered', OFF);
+
+    const transport = new ConfiguredGeneration([{ result: plain }]);
+
+    transport.supportedModes = ['plain-buffered'];
+
+    expect((await run(transport, storage)).success).toBe(true);
+    expect(profileIds(transport)).toEqual([MINIMUM]);
+
+    expect((await facts(storage))[`configuration.${OFF}`].support).toBe(
+      'unknown',
+    );
+  });
+
+  test("a control change skips the next profile's cached current-mode conflict", async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+
+    await cacheModeConflict(storage, 'plain-stream', MINIMUM);
+
     const transport = new ConfiguredGeneration([
-      { error: api('reasoning_effort none is not supported in streaming') },
-      { result: valid },
+      { error: rejectedThinking() },
+      { result: plain },
     ]);
+
+    transport.supportedModes = ['plain-stream', 'plain-buffered'];
 
     expect((await run(transport, storage)).success).toBe(true);
 
@@ -779,13 +902,70 @@ describe('Adapter: translation configuration compatibility fallback', () => {
         request.configurationId,
       ]),
     ).toEqual([
-      ['structured-stream', OFF],
-      ['structured-buffered', OFF],
+      ['plain-stream', OFF],
+      ['plain-buffered', MINIMUM],
+    ]);
+  });
+
+  test('a repair can use another profile when its buffered mode has a cached conflict', async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+
+    await cacheModeConflict(storage, 'plain-buffered', OFF);
+
+    const transport = new ConfiguredGeneration([
+      { result: malformed },
+      { result: plain },
     ]);
 
-    const stored = await facts(storage);
+    transport.supportedModes = ['plain-stream', 'plain-buffered'];
 
-    expect(stored['feature.stream'].support).toBe('unsupported');
-    expect(stored[`configuration.${OFF}`].support).toBe('supported');
+    expect((await run(transport, storage)).success).toBe(true);
+
+    expect(
+      transport.requests.map((request) => [
+        request.mode,
+        request.configurationId,
+      ]),
+    ).toEqual([
+      ['plain-stream', OFF],
+      ['plain-buffered', MINIMUM],
+    ]);
+
+    expect(transport.requests[1].userText).toContain(
+      'untrusted_previous_response',
+    );
+
+    expect((await facts(storage))[`configuration.${OFF}`].support).toBe(
+      'unknown',
+    );
+  });
+
+  test('conditional feature wording can advance profiles without globally rejecting the control or mode', async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+
+    const transport = new ConfiguredGeneration(
+      [
+        { error: api('thinking cannot be used in streaming') },
+        { result: plain },
+        { result: plain },
+      ],
+      [
+        { id: OFF, rejectionFields: ['thinking'] },
+        { id: OMIT, rejectionFields: [] },
+      ],
+    );
+
+    transport.supportedModes = ['plain-stream'];
+
+    expect((await run(transport, storage)).success).toBe(true);
+    expect(profileIds(transport)).toEqual([OFF, OMIT]);
+
+    expect((await facts(storage))[`configuration.${OFF}`].support).toBe(
+      'unknown',
+    );
+
+    expect((await facts(storage))['feature.stream'].support).toBe('supported');
+    expect((await run(transport, storage)).success).toBe(true);
+    expect(profileIds(transport)).toEqual([OFF, OMIT, OMIT]);
   });
 });

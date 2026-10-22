@@ -36,6 +36,7 @@ interface FailureContext extends GenerationErrorDetails {
 }
 
 const TRANSIENT_APPLICATION_ERRORS = new Set([
+  ErrorCode.NETWORK_TIMEOUT,
   ErrorCode.NETWORK_CONNECTION_FAILED,
   ErrorCode.NETWORK_PROVIDER_UNAVAILABLE,
   ErrorCode.NETWORK_INVALID_RESPONSE,
@@ -82,8 +83,12 @@ export function classifyGenerationError(
 function createFailureContext(error: unknown): FailureContext {
   const details = readGenerationErrorDetails(error);
   const { status, message, code } = details;
-  const combined = code + '\n' + message;
-  const capabilityText = code.replace(/[_-]+/g, ' ') + '\n' + message;
+  const sdkUnsupported = UnsupportedFunctionalityError.isInstance(error);
+
+  const combined =
+    code + '\n' + message + (sdkUnsupported ? '\n' + error.functionality : '');
+
+  const capabilityText = combined.replace(/[_-]+/g, ' ');
 
   const namesStructuredFeature =
     /json[_\s-]*schema|response[_\s-]*format|structured[_\s-]+output/i.test(
@@ -93,8 +98,13 @@ function createFailureContext(error: unknown): FailureContext {
   return {
     ...details,
     combined,
-    allowsCapabilityEvidence: status === 0 || [400, 422, 501].includes(status),
+    allowsCapabilityEvidence:
+      !(StreamProviderError.isInstance(error) && error.isRetryable) &&
+      (status === 0 ||
+        [400, 422, 501].includes(status) ||
+        (status >= 200 && status < 300 && isProviderErrorEnvelope(error))),
     explicitlyUnsupported:
+      sdkUnsupported ||
       /\b(?:unsupported|unavailable|unimplemented|not[_\s]+(?:yet[_\s]+)?(?:supported|available|implemented)|does(?:\s+not|n't)\s+support|isn't\s+(?:supported|available))\b/i.test(
         capabilityText,
       ),
@@ -104,7 +114,7 @@ function createFailureContext(error: unknown): FailureContext {
       /stream(?:ing)?|image|vision|multimodal/i.test(combined),
     invalidApplicationSchema:
       /invalid (?:json[_\s-]*)?schema|schema(?:\s+(?:is|was))?\s+invalid|schema.{0,30}(required|additionalProperties)|required.{0,30}schema|unsupported (?:json[_\s-]*)?schema (?:keyword|property)|schema.{0,30}(?:keyword|property|properties|syntax|definition).{0,30}(?:unsupported|not supported|invalid)/i.test(
-        combined,
+        capabilityText,
       ),
   };
 }
@@ -112,11 +122,14 @@ function createFailureContext(error: unknown): FailureContext {
 function classifyRequestFailure(
   context: FailureContext,
 ): GenerationFailure | null {
-  const { status, code, message, combined } = context;
+  const { status, code, message } = context;
+  const combined = context.combined.replace(/[_-]+/g, ' ');
 
   if (
     status === 401 ||
-    /invalid_token|token_auth_failed|unauthorized|invalid_api_key/.test(code) ||
+    /invalid_token|token_auth_failed|unauthorized|invalid_api_key|unauthenticated|authentication_(?:error|failed|required)/.test(
+      code,
+    ) ||
     /\b(?:invalid|incorrect|expired) (?:api[ -]?)?(?:key|token)\b|unauthori[sz]ed|authentication failed/i.test(
       message,
     )
@@ -130,10 +143,15 @@ function classifyRequestFailure(
   if (status === 402 || /payment_required/.test(code))
     return failure(AuthError.paymentRequired());
 
-  if (status === 403) return failure(AuthError.accessDenied());
+  if (
+    status === 403 ||
+    /permission_denied|access_denied|(?:^|\n)forbidden(?:\n|$)/.test(code) ||
+    /\b(?:permission|access) denied\b/i.test(message)
+  )
+    return failure(AuthError.accessDenied());
 
   if (
-    /insufficient.{0,20}(quota|credit|balance|funds)|(?:quota|credit|balance).{0,30}(exceed|exhaust|deplet)|usage_limited|usage_limit|billing/i.test(
+    /insufficient.{0,20}(quota|credit|balance|funds)|(?:quota|credit|balance).{0,30}(exceed|exhaust|deplet)|usage limit|billing/i.test(
       combined,
     )
   ) {
@@ -166,7 +184,7 @@ function classifyRequestFailure(
 
   if (
     status === 413 ||
-    /image.{0,30}too large|image.{0,30}(size|dimensions).{0,30}(exceed|limit)|payload too large/i.test(
+    /image.{0,30}too large|image[^\n]{0,80}(?:size|dimensions?)[^\n]{0,80}(?:exceed|limit)|payload too large/i.test(
       combined,
     )
   ) {
@@ -174,7 +192,7 @@ function classifyRequestFailure(
   }
 
   if (
-    /invalid_image|invalid image|bad_image|unsupported image (?:type|format|mime|media)/i.test(
+    /(?:invalid|bad) image|unsupported image(?: input)? (?:type|format|mime|media)/i.test(
       combined,
     )
   ) {
@@ -192,7 +210,7 @@ function classifyModelOrCapabilityFailure(
   const { status, code, message, combined } = context;
 
   const hasFeatureRejection =
-    context.allowsCapabilityEvidence &&
+    isCapabilityError(error, context) &&
     !context.invalidApplicationSchema &&
     context.explicitlyUnsupported &&
     context.namesFeature;
@@ -200,7 +218,7 @@ function classifyModelOrCapabilityFailure(
   // Account-specific access and temporary outages are not model-wide evidence.
   if (
     hasFeatureRejection &&
-    /\b(?:account|api[_ -]?key|credential|subscription|plan|organization)\b/i.test(
+    /\b(?:account|api[_ -]?key|credential|subscription|plan|organization|project|tier)\b/i.test(
       combined,
     )
   ) {
@@ -217,7 +235,7 @@ function classifyModelOrCapabilityFailure(
   }
 
   if (
-    context.allowsCapabilityEvidence &&
+    isCapabilityError(error, context) &&
     /does not support (?:image|vision|multimodal)|not (?:a )?(?:multimodal|vision)|only supports text|text.only model|image(?: input)? (?:is )?(?:unsupported|not supported)|unsupported image input/i.test(
       combined,
     )
@@ -267,19 +285,22 @@ function classifyModelOrCapabilityFailure(
 function isCapabilityError(error: unknown, context: FailureContext): boolean {
   if (!context.allowsCapabilityEvidence) return false;
 
-  const typedErrorChunk =
-    typeof error === 'object' &&
-    error !== null &&
-    'type' in error &&
-    error.type === 'error';
-
   return (
     APICallError.isInstance(error) ||
-    StreamProviderError.isInstance(error) ||
     UnsupportedFunctionalityError.isInstance(error) ||
-    typedErrorChunk ||
+    isProviderErrorEnvelope(error) ||
     [400, 422, 501].includes(context.status) ||
     /unsupported|not_supported/.test(context.code)
+  );
+}
+
+function isProviderErrorEnvelope(error: unknown): boolean {
+  return (
+    StreamProviderError.isInstance(error) ||
+    (typeof error === 'object' &&
+      error !== null &&
+      'type' in error &&
+      error.type === 'error')
   );
 }
 
@@ -294,7 +315,7 @@ function classifyTransportFailure(
     status === 504 ||
     (error instanceof Error && /AbortError|TimeoutError/.test(error.name))
   ) {
-    return failure(NetworkError.timeout(url));
+    return failure(NetworkError.timeout(url), true);
   }
 
   if (
@@ -311,6 +332,8 @@ function classifyTransportFailure(
   }
 
   if (status >= 500)
+    return failure(NetworkError.providerUnavailable(status, url), true);
+  if (StreamProviderError.isInstance(error) && error.isRetryable)
     return failure(NetworkError.providerUnavailable(status, url), true);
   if ([400, 409, 422].includes(status))
     return failure(TranslationError.requestRejected());

@@ -5,7 +5,10 @@ import {
   StreamProviderError,
   UnsupportedFunctionalityError,
 } from 'ai';
-import { isConfigurationRejection } from './generation-configuration-error';
+import {
+  isConfigurationModeConflict,
+  isConfigurationRejection,
+} from './generation-configuration-error';
 
 function api(message: string, statusCode = 400, param?: string): APICallError {
   return new APICallError({
@@ -256,6 +259,20 @@ describe('Adapter: generation configuration rejection evidence', () => {
     ).toBe(false);
   });
 
+  test('explicit retryability takes precedence over contradictory HTTP 400 control evidence', () => {
+    expect(
+      isConfigurationRejection(
+        new StreamProviderError({
+          statusCode: 400,
+          code: 'invalid_request_error',
+          message: 'reasoning_effort is unsupported',
+          isRetryable: true,
+        }),
+        ['reasoning_effort'],
+      ),
+    ).toBe(false);
+  });
+
   test('matches provider spelling variants without confusing unrelated fields', () => {
     expect(
       isConfigurationRejection(
@@ -301,6 +318,8 @@ describe('Adapter: generation configuration rejection evidence', () => {
     'Invalid API key; reasoning_effort is unsupported',
     'reasoning_effort is unavailable for your account',
     'reasoning_effort is not supported on this subscription plan',
+    'reasoning_effort is unavailable for this project',
+    'reasoning_effort is unsupported on this tier',
     'Rate limit exceeded; reasoning_effort is unsupported',
     'Insufficient credits; reasoning_effort is unsupported',
     'reasoning_effort is temporarily unavailable; try again',
@@ -327,6 +346,8 @@ describe('Adapter: generation configuration rejection evidence', () => {
     'permission_denied',
     'email_must_be_confirmed',
     'authentication_error',
+    'unauthenticated',
+    'forbidden',
   ])('does not learn from nested terminal error code %s', (code) => {
     expect(
       isConfigurationRejection(
@@ -370,6 +391,13 @@ describe('Adapter: generation configuration rejection evidence', () => {
     'leaves conditional schema/stream conflicts to generation-mode fallback: %s',
     (message) => {
       expect(
+        isConfigurationModeConflict(api(message), [
+          'reasoning_effort',
+          'thinking',
+        ]),
+      ).toBe(true);
+
+      expect(
         isConfigurationRejection(api(message), [
           'reasoning_effort',
           'thinking',
@@ -381,6 +409,77 @@ describe('Adapter: generation configuration rejection evidence', () => {
       ).toBe(false);
     },
   );
+
+  test('mode conflicts require active controls and trustworthy provider rejection evidence', () => {
+    const message = 'Streaming is not supported when reasoning_effort is none';
+
+    expect(isConfigurationModeConflict(api(message), [])).toBe(false);
+    expect(isConfigurationModeConflict(api(message), ['thinking'])).toBe(false);
+
+    expect(
+      isConfigurationModeConflict(new Error(message), ['reasoning_effort']),
+    ).toBe(false);
+
+    expect(
+      isConfigurationModeConflict(api(message, 429), ['reasoning_effort']),
+    ).toBe(false);
+
+    expect(
+      isConfigurationModeConflict(api('reasoning_effort is unsupported'), [
+        'reasoning_effort',
+      ]),
+    ).toBe(false);
+
+    expect(
+      isConfigurationModeConflict(api('Rate limit exceeded; ' + message), [
+        'reasoning_effort',
+      ]),
+    ).toBe(false);
+  });
+
+  test.each(['stream', 'response_format', 'response_format.json_schema'])(
+    'recognizes a control-mode conflict reported against feature parameter %s',
+    (parameter) => {
+      const error = api(
+        'Streaming is not supported when reasoning_effort is none',
+        400,
+        parameter,
+      );
+
+      expect(isConfigurationModeConflict(error, ['reasoning_effort'])).toBe(
+        true,
+      );
+
+      expect(isConfigurationRejection(error, ['reasoning_effort'])).toBe(false);
+    },
+  );
+
+  test('a feature parameter alone cannot establish a control-mode conflict', () => {
+    expect(
+      isConfigurationModeConflict(
+        api('Streaming is unsupported', 400, 'stream'),
+        ['reasoning_effort'],
+      ),
+    ).toBe(false);
+
+    expect(
+      isConfigurationModeConflict(
+        api(
+          'Streaming is not supported when reasoning_effort is none',
+          400,
+          'temperature',
+        ),
+        ['reasoning_effort'],
+      ),
+    ).toBe(false);
+
+    expect(
+      isConfigurationRejection(
+        api('reasoning_effort is unsupported', 400, 'response_format'),
+        ['reasoning_effort'],
+      ),
+    ).toBe(false);
+  });
 
   test('requires explicit rejection and active-field evidence outside submitted requests', () => {
     expect(

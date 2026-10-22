@@ -159,6 +159,138 @@ describe('Adapter: AiSdkGenerationTransport', () => {
     expect(result.validationError).toBe(rejection);
   });
 
+  test('schema rejection without a finish reason does not invent successful termination', async () => {
+    const rejection = new NoObjectGeneratedError({
+      text: JSON.stringify(VALID_PAIRED_TRANSLATION_RESPONSE),
+      finishReason: undefined as never,
+      response: { id: 'fixture', timestamp: new Date(), modelId: 'fixture' },
+      usage: {} as never,
+    });
+
+    generateTextMock.mockRejectedValueOnce(rejection);
+
+    const result = await new AiSdkGenerationTransport(model).generate(
+      request('structured-buffered'),
+      async () => {},
+    );
+
+    expect(result.finishReason).toBe('unknown');
+    expect(result.validationError).toBe(rejection);
+  });
+
+  test('an already cancelled request never invokes the SDK', async () => {
+    const input = request('plain-stream');
+    const reason = new Error('closed before generation');
+
+    input.signal = AbortSignal.abort(reason);
+
+    await expect(
+      new AiSdkGenerationTransport(model).generate(input, async () => {}),
+    ).rejects.toBe(reason);
+
+    expect(generateTextMock).not.toHaveBeenCalled();
+    expect(streamTextMock).not.toHaveBeenCalled();
+  });
+
+  test('buffered cancellation does not wait for an uncooperative native request', async () => {
+    let settle!: (value: unknown) => void;
+
+    generateTextMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        }),
+    );
+
+    const controller = new AbortController();
+    const input = request('structured-buffered');
+
+    input.signal = controller.signal;
+
+    const pending = new AiSdkGenerationTransport(model).generate(
+      input,
+      async () => {},
+    );
+
+    const reason = new Error('cancel buffered request');
+
+    controller.abort(reason);
+
+    try {
+      await expect(pending).rejects.toBe(reason);
+    } finally {
+      settle({
+        text: '{}',
+        output: {},
+        finishReason: 'stop',
+      });
+    }
+  });
+
+  test('a falsy in-band error is not ignored when a later finish reports stop', async () => {
+    streamTextMock.mockReturnValueOnce({
+      stream: (async function* () {
+        yield { type: 'text-delta', text: '{}' };
+        yield { type: 'error', error: null };
+      })(),
+      finishReason: Promise.resolve('stop'),
+    } as never);
+
+    await expect(
+      new AiSdkGenerationTransport(model).generate(
+        request('plain-stream'),
+        async () => {},
+      ),
+    ).rejects.toBeNull();
+  });
+
+  test('cancellation covers final validation after both stream branches have ended', async () => {
+    let finishPump!: () => void;
+
+    const pumped = new Promise<void>((resolve) => {
+      finishPump = resolve;
+    });
+
+    let settleOutput!: (value: unknown) => void;
+
+    const output = new Promise((resolve) => {
+      settleOutput = resolve;
+    });
+
+    streamTextMock.mockReturnValueOnce({
+      stream: (async function* () {
+        yield { type: 'text-delta', text: '{}' };
+        finishPump();
+      })(),
+      partialOutputStream: (async function* () {})(),
+      finishReason: Promise.resolve('stop'),
+      output,
+    } as never);
+
+    const controller = new AbortController();
+    const input = request('structured-stream');
+
+    input.signal = controller.signal;
+
+    const pending = new AiSdkGenerationTransport(model).generate(
+      input,
+      async () => {},
+    );
+
+    await pumped;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const reason = new Error('cancel final validation');
+
+    controller.abort(reason);
+
+    try {
+      await expect(pending).rejects.toBe(reason);
+    } finally {
+      settleOutput({});
+    }
+  });
+
   test('observer rejection stops native stream and propagates the original failure', async () => {
     const reason = new Error('display receiver closed');
     const input = request('structured-stream');

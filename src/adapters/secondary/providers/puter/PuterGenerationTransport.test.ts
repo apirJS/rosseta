@@ -103,6 +103,48 @@ describe('Adapter: PuterGenerationTransport', () => {
     });
   });
 
+  test('preserves a native control/stream conflict for pair-specific compatibility', async () => {
+    const error = {
+      status: 400,
+      code: 'invalid_request_error',
+      message: 'reasoning_effort cannot be used in streaming',
+    };
+
+    chat.mockRejectedValueOnce(error);
+
+    await expect(
+      new PuterGenerationTransport('token-fixture', 'gpt-5.2').generate(
+        request('plain-stream'),
+        async () => {},
+      ),
+    ).rejects.toBe(error);
+  });
+
+  test.each([
+    [
+      'Unsupported image input format: image/bmp',
+      ErrorCode.TRANSLATION_INVALID_IMAGE,
+    ],
+    [
+      'Image input is unsupported because its dimensions exceed the limit',
+      ErrorCode.TRANSLATION_IMAGE_TOO_LARGE,
+    ],
+  ])('native image rejection stays terminal: %s', async (message, code) => {
+    chat.mockRejectedValueOnce({
+      status: 400,
+      error: { code: 'invalid_request_error', message },
+    });
+
+    await expect(
+      new PuterGenerationTransport('token-fixture', 'native-model').generate(
+        request('plain-stream'),
+        async () => {},
+      ),
+    ).rejects.toMatchObject({ code });
+
+    expect(chat).toHaveBeenCalledTimes(1);
+  });
+
   test('extracts normalized buffered text parts while preserving image and repair prompt', async () => {
     chat.mockResolvedValueOnce({
       message: {
@@ -168,6 +210,40 @@ describe('Adapter: PuterGenerationTransport', () => {
     ).generate(request('plain-buffered'), async () => {});
 
     expect(result.finishReason).toBe('content-filter');
+  });
+
+  test('a normalized native refusal remains blocked even when finish reason is stop', async () => {
+    chat.mockResolvedValueOnce({
+      message: {
+        role: 'assistant',
+        content: '{}',
+        refusal: 'This request cannot be completed.',
+      },
+      finish_reason: 'stop',
+    } as never);
+
+    await expect(
+      new PuterGenerationTransport('token-fixture', 'native-model').generate(
+        request('plain-buffered'),
+        async () => {},
+      ),
+    ).rejects.toMatchObject({ code: ErrorCode.TRANSLATION_CONTENT_BLOCKED });
+
+    expect(chat).toHaveBeenCalledTimes(1);
+  });
+
+  test('empty native refusal metadata does not reject a completed response', async () => {
+    chat.mockResolvedValueOnce({
+      message: { role: 'assistant', content: '{}', refusal: null },
+      finish_reason: 'stop',
+    } as never);
+
+    const result = await new PuterGenerationTransport(
+      'token-fixture',
+      'native-model',
+    ).generate(request('plain-buffered'), async () => {});
+
+    expect(result).toMatchObject({ text: '{}', finishReason: 'stop' });
   });
 
   test('authentication and usage errors remain terminal application errors', async () => {

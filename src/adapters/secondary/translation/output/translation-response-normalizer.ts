@@ -92,6 +92,21 @@ function normalizeDescriptionPlacement(raw: unknown): unknown {
   return { ...rest, data: { ...data, description } };
 }
 
+function omitDescriptions(raw: unknown): unknown {
+  const envelope = record(raw);
+
+  if (!envelope) return raw;
+
+  const { description: _rootDescription, ...rest } = envelope;
+  const data = record(envelope.data);
+
+  if (!data) return rest;
+
+  const { description: _dataDescription, ...translationData } = data;
+
+  return { ...rest, data: translationData };
+}
+
 function parseResponseEnvelope(
   raw: unknown,
 ): Result<TranslationResponse, AppError> {
@@ -143,10 +158,18 @@ export function normalizeTranslationResponse(
   raw: unknown,
   includeDescription?: boolean,
 ): Result<TranslationResponse, AppError> {
-  if (exceedsResponseLimits(raw))
-    return failure(TranslationError.responseLimit());
+  try {
+    if (exceedsResponseLimits(raw))
+      return failure(TranslationError.responseLimit());
+  } catch {
+    // SDK output is unknown at this boundary. An unserializable object is an
+    // invalid representation; callers can still inspect the completed text.
+    return failure(TranslationError.malformedResponse());
+  }
 
-  const parsed = parseResponseEnvelope(raw);
+  const parsed = parseResponseEnvelope(
+    includeDescription === false ? omitDescriptions(raw) : raw,
+  );
 
   if (!parsed.success) return parsed;
 
@@ -168,6 +191,12 @@ export function normalizeTranslationResponse(
     typeof response.data.description !== 'string'
   ) {
     return failure(TranslationError.malformedResponse());
+  }
+
+  if (includeDescription === false) {
+    const { description: _description, ...data } = response.data;
+
+    return success({ ...response, data });
   }
 
   return success(response);

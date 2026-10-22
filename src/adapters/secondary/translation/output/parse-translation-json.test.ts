@@ -5,6 +5,7 @@ import {
   parseTranslationResponse,
 } from './parse-translation-json';
 import { ErrorCode } from '../../../../shared/errors';
+import { MAX_TRANSLATION_BYTES } from '../preview/translation-response-limits';
 
 const VALID_PAYLOAD = `{"success":true,"data":{"originalText":{"contents":[{"text":"Where to Find Your Likes","languageBcp47Code":"en-US","language":"English","romanization":null}]},"translatedText":{"contents":[{"text":"Cara Menemukan Suka Anda","languageBcp47Code":"id-ID","language":"Indonesian","romanization":null}]},"description":""}}`;
 
@@ -126,6 +127,107 @@ describe('Adapter: parseTranslationResponse', () => {
     );
 
     expect(result.success).toBe(true);
+  });
+
+  test('ignores unmatched quotation marks in prose before a complete payload', () => {
+    const result = parseTranslationResponse(
+      'The requested "translation follows:\n' + VALID_PAYLOAD,
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  test('recovers a complete envelope inside a non-response wrapper', () => {
+    const result = parseTranslationResponse(
+      JSON.stringify({ result: JSON.parse(VALID_PAYLOAD) }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  test.each([
+    { success: true },
+    { originalText: 'Diagnostic source' },
+    { translatedText: 'Diagnostic translation' },
+    {
+      originalText: 'Diagnostic source',
+      translatedText: 'Diagnostic translation',
+    },
+    { segments: 'Diagnostic segments' },
+  ])('recovers a response inside a diagnostic wrapper: %j', (diagnostics) => {
+    const result = parseTranslationResponse(
+      JSON.stringify({ ...diagnostics, result: JSON.parse(VALID_PAYLOAD) }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  test('does not confuse response-field words in source strings with wrapper keys', () => {
+    const result = parseTranslationResponse(
+      JSON.stringify({
+        trace: 'The keys are "success", "error" and "data".',
+        result: JSON.parse(VALID_PAYLOAD),
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  test('does not let nested trace objects consume the budget for a later result', () => {
+    const trace =
+      '{"nested":'.repeat(100) +
+      JSON.stringify({ trace: 'x'.repeat(100_000) }) +
+      '}'.repeat(100);
+
+    const result = parseTranslationResponse(trace + '\n' + VALID_PAYLOAD);
+
+    expect(result.success).toBe(true);
+  });
+
+  test.each([
+    `{"success":false,"error":"NO_TEXT_FOUND","data":{"answer":${VALID_PAYLOAD}}}`,
+    `{"success":false,"error":"NO_TEXT_FOUND","data":{"answer":${VALID_PAYLOAD}`,
+    `{"data":{"answer":${VALID_PAYLOAD}},"error":"NO_TEXT_FOUND"`,
+    `{"segments":[{"answer":${VALID_PAYLOAD}}]}`,
+    `{"segments":[{"answer":${VALID_PAYLOAD}}`,
+    `{"originalText":{},"translatedText":{},"result":${VALID_PAYLOAD}}`,
+    `{"originalText":{},"translatedText":{},"result":${VALID_PAYLOAD}`,
+  ])(
+    'does not mine nested success from an invalid response envelope: %s',
+    (text) => {
+      const result = parseTranslationResponse(text);
+
+      expect(result.success).toBe(false);
+      if (!result.success)
+        expect(result.error.code).toBe(
+          ErrorCode.TRANSLATION_MALFORMED_RESPONSE,
+        );
+    },
+  );
+
+  test('preserves the first complete response when multiple envelopes exist', () => {
+    const result = parseTranslationResponse(
+      '{"success":false,"error":"NO_TEXT_FOUND","data":null}\n' + VALID_PAYLOAD,
+    );
+
+    expect(result).toEqual({
+      success: true,
+      data: { success: false, error: 'NO_TEXT_FOUND', data: null },
+    });
+  });
+
+  test('does not bypass an oversized response with a complete nested envelope', () => {
+    const result = parseTranslationResponse(
+      JSON.stringify({
+        success: true,
+        data: { result: JSON.parse(VALID_PAYLOAD) },
+        description: 'x'.repeat(MAX_TRANSLATION_BYTES),
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.code).toBe(ErrorCode.TRANSLATION_RESPONSE_LIMIT);
   });
 
   test('fails with malformedResponse for non-JSON text', () => {

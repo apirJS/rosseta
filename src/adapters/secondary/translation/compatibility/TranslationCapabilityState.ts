@@ -44,7 +44,10 @@ export class TranslationCapabilityState {
     return this.applicable('feature.image') === 'unsupported';
   }
 
-  support(mode: GenerationMode): TranslationCapabilitySupport {
+  support(
+    mode: GenerationMode,
+    configurationId?: string,
+  ): TranslationCapabilitySupport {
     if (this.imageUnsupported()) return 'unsupported';
     if (
       isStructured(mode) &&
@@ -54,6 +57,12 @@ export class TranslationCapabilityState {
     if (isStreamed(mode) && this.applicable('feature.stream') === 'unsupported')
       return 'unsupported';
     if (this.allowedModes && !this.allowedModes.has(mode)) return 'unsupported';
+    if (
+      configurationId &&
+      this.applicable(this.configurationModeKey(mode, configurationId)) ===
+        'unsupported'
+    )
+      return 'unsupported';
 
     return this.applicable(this.modeKey(mode));
   }
@@ -105,14 +114,32 @@ export class TranslationCapabilityState {
     });
   }
 
+  async rejectedConfigurationMode(
+    mode: GenerationMode,
+    configurationId: string,
+  ): Promise<void> {
+    await this.journal.record({
+      [this.configurationModeKey(mode, configurationId)]: this.fact(
+        'unsupported',
+        'explicit-provider',
+        this.modeScope(mode),
+      ),
+    });
+  }
+
   private configurationKey(id: string): string {
     return `configuration.${id}`;
+  }
+
+  private configurationModeKey(mode: GenerationMode, id: string): string {
+    return `${this.modeKey(mode)}:configuration.${id}`;
   }
 
   async accepted(
     mode: GenerationMode,
     schemaValidated: boolean,
     imageAccepted = true,
+    configurationId?: string,
   ): Promise<void> {
     const facts: CapabilityFacts = {};
 
@@ -122,6 +149,13 @@ export class TranslationCapabilityState {
         'observed-completion',
         this.modeScope(mode),
       );
+
+      if (configurationId)
+        facts[this.configurationModeKey(mode, configurationId)] = this.fact(
+          'supported',
+          'observed-completion',
+          this.modeScope(mode),
+        );
     }
 
     if (isStreamed(mode))

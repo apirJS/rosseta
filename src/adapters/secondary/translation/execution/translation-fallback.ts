@@ -64,28 +64,39 @@ export class TranslationAttemptPolicy {
     this.visited.add(mode);
   }
 
+  afterConfigurationChange(mode: GenerationMode): GenerationMode | null {
+    if (!this.hasBudget) return null;
+
+    // A new native configuration is a different request combination.
+    this.visited.clear();
+
+    return this.supportForAttempt(mode) !== 'unsupported'
+      ? mode
+      : selectGenerationMode(
+          (candidate) => this.supportForAttempt(candidate),
+          this.visited,
+        );
+  }
+
   repair(text: string): GenerationMode | null {
-    if (this.repaired) return null;
+    if (this.repaired || !this.hasBudget) return null;
 
-    const mode =
-      this.support('plain-buffered') !== 'unsupported'
-        ? 'plain-buffered'
-        : this.support('structured-buffered') !== 'unsupported'
-          ? 'structured-buffered'
-          : null;
-
-    if (!mode) return null;
     this.repaired = true;
     this.previousResponse = text;
+    this.visited.clear();
 
-    return mode;
+    return selectGenerationMode(
+      (candidate) => this.supportForAttempt(candidate),
+      this.visited,
+      'plain-buffered',
+    );
   }
 
   afterFailure(
     mode: GenerationMode,
     failure: GenerationFailure,
   ): GenerationMode | null {
-    if (this.repaired || failure.unsupported === 'vision') return null;
+    if (!this.hasBudget || failure.unsupported === 'vision') return null;
 
     if (failure.unsupported) {
       const preferred =
@@ -95,12 +106,22 @@ export class TranslationAttemptPolicy {
             ? 'plain-stream'
             : 'plain-buffered';
 
-      return selectGenerationMode(this.support, this.visited, preferred);
+      return selectGenerationMode(
+        (candidate) => this.supportForAttempt(candidate),
+        this.visited,
+        preferred,
+      );
     }
 
     if (!failure.transient || this.restarted) return null;
 
     return this.restartBuffered(mode);
+  }
+
+  private supportForAttempt(mode: GenerationMode): ModeSupport {
+    return this.repaired && isStreamed(mode)
+      ? 'unsupported'
+      : this.support(mode);
   }
 
   private restartBuffered(mode: GenerationMode): GenerationMode | null {

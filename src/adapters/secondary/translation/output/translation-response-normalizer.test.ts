@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { ErrorCode } from '../../../../shared/errors';
 import { normalizeTranslationResponse } from './translation-response-normalizer';
+import { MAX_TRANSLATION_BYTES } from '../preview/translation-response-limits';
 
 function pair(blockIndex = 0) {
   return {
@@ -153,6 +154,59 @@ describe('Adapter: complete translation response normalization', () => {
     ['paired', paired],
     ['legacy', legacy],
   ] as const) {
+    test(`omits unsolicited descriptions from a complete ${format} response when disabled`, () => {
+      const response = makeResponse();
+      const { description: _description, ...data } = response.data;
+
+      const variants = [
+        response,
+        { ...response, data, description: 'A contextual summary.' },
+        { ...response, description: response.data.description },
+      ];
+
+      for (const variant of variants) {
+        const before = JSON.stringify(variant);
+        const result = normalizeTranslationResponse(variant, false);
+
+        expect(result.success).toBe(true);
+        if (!result.success) throw result.error;
+
+        expect(result.data.data?.originalText.contents).toHaveLength(1);
+        expect(result.data.data?.translatedText.contents).toHaveLength(1);
+        expect(Object.hasOwn(result.data.data!, 'description')).toBe(false);
+        expect(JSON.stringify(variant)).toBe(before);
+      }
+    });
+
+    test(`ignores only unsolicited invalid descriptions in ${format} responses when disabled`, () => {
+      const response = makeResponse();
+
+      const variants = [
+        { ...response, description: 'A conflicting root description.' },
+        { ...response, data: { ...response.data, description: null } },
+        { ...response, description: null },
+        {
+          ...response,
+          description: false,
+          data: { ...response.data, description: { unexpected: true } },
+        },
+      ];
+
+      for (const variant of variants) {
+        const before = JSON.stringify(variant);
+        const result = normalizeTranslationResponse(variant, false);
+
+        expect(result.success).toBe(true);
+        if (!result.success) throw result.error;
+
+        expect(result.data.data?.originalText.contents).toHaveLength(1);
+        expect(result.data.data?.translatedText.contents).toHaveLength(1);
+        expect(Object.hasOwn(result.data.data!, 'description')).toBe(false);
+        expect(normalizeTranslationResponse(variant, true).success).toBe(false);
+        expect(JSON.stringify(variant)).toBe(before);
+      }
+    });
+
     test(`recovers a root description in a complete ${format} response without changing the input`, () => {
       const response = makeResponse();
       const { description: _description, ...data } = response.data;
@@ -349,6 +403,15 @@ describe('Adapter: complete translation response normalization', () => {
     });
   });
 
+  test('rejects unserializable SDK output without throwing', () => {
+    const cyclic: Record<string, unknown> = {};
+
+    cyclic.self = cyclic;
+
+    expectMalformed(cyclic);
+    expectMalformed({ ...paired(), sdkMetadata: 1n });
+  });
+
   test('enforces the segment limit for paired and either legacy side', () => {
     expect(
       normalizeTranslationResponse(
@@ -374,6 +437,18 @@ describe('Adapter: complete translation response normalization', () => {
     response.data.segments[0]!.originalText = '\u3053'.repeat(350_000);
 
     const result = normalizeTranslationResponse(response);
+
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.code).toBe(ErrorCode.TRANSLATION_RESPONSE_LIMIT);
+  });
+
+  test('enforces raw response limits before omitting disabled descriptions', () => {
+    const response = paired();
+
+    response.data.description = 'x'.repeat(MAX_TRANSLATION_BYTES);
+
+    const result = normalizeTranslationResponse(response, false);
 
     expect(result.success).toBe(false);
     if (!result.success)

@@ -59,11 +59,16 @@ function errorDetails(error: unknown): PuterErrorDetails {
   const root = asRecord(error);
   const nested = asRecord(root?.error);
 
+  const rootStatus = numberValue(root?.statusCode) ?? numberValue(root?.status);
+
+  const nestedStatus =
+    numberValue(nested?.statusCode) ?? numberValue(nested?.status);
+
   const status =
-    numberValue(root?.status) ??
-    numberValue(nested?.status) ??
-    numberValue(root?.statusCode) ??
-    0;
+    rootStatus === null ||
+    (rootStatus >= 200 && rootStatus < 300 && (nestedStatus ?? 0) >= 400)
+      ? (nestedStatus ?? 0)
+      : rootStatus;
 
   const code = stringValue(root?.code) ?? stringValue(nested?.code) ?? '';
 
@@ -73,13 +78,13 @@ function errorDetails(error: unknown): PuterErrorDetails {
     stringValue(root?.reason) ??
     (error instanceof Error ? error.message : String(error));
 
-  const metadata = asRecord(root?.metadata) ?? asRecord(nested?.metadata);
-
   return {
     status,
     code: code.toLowerCase(),
     message,
-    usageLimited: metadata?.usage_limited === true,
+    usageLimited:
+      asRecord(root?.metadata)?.usage_limited === true ||
+      asRecord(nested?.metadata)?.usage_limited === true,
   };
 }
 
@@ -91,10 +96,19 @@ export function mapPuterError(
     return TranslationError.cancelled();
   }
 
+  if (error instanceof AppError) return error;
+
   const details = errorDetails(error);
   const { status, code, message, usageLimited } = details;
 
-  if (status === 401 || /auth|token|unauthori[sz]|reauth/.test(code)) {
+  if (
+    status === 401 ||
+    /auth|unauthori[sz]|reauth/.test(code) ||
+    /(?:invalid|expired|missing|bad|no)[_-]+(?:access[_-]+)?token|token[_-]+(?:invalid|expired|missing|revoked)/.test(
+      code,
+    ) ||
+    /(?:invalid|expired|missing)[_-]+api[_-]+key/.test(code)
+  ) {
     return new AuthError({
       code: ErrorCode.AUTH_INVALID_API_KEY,
       userMessage:
@@ -134,6 +148,10 @@ export function mapPuterError(
     return TranslationError.rateLimited();
   }
 
+  if (status === 408 || status === 504) return NetworkError.timeout();
+  if (status >= 500) return NetworkError.providerUnavailable(status);
+  if (status === 413) return TranslationError.imageTooLarge();
+
   if (
     status === 404 ||
     /model.*(?:not_found|not_supported)|unknown_model/.test(code) ||
@@ -143,18 +161,7 @@ export function mapPuterError(
   }
 
   if (
-    /vision|image_input|multimodal|no_image|image.*(?:unsupported|not supported)/.test(
-      code,
-    ) ||
-    /vision|image input|multimodal|does not support images|text.only model/i.test(
-      message,
-    )
-  ) {
-    return TranslationError.modelNoVision(message);
-  }
-
-  if (
-    /content_policy|safety|moderation/.test(code) ||
+    /content_policy|content_filter|safety|moderation/.test(code) ||
     /content.*(?:blocked|rejected)|safety policy|moderation/i.test(message)
   ) {
     return TranslationError.contentBlocked();
@@ -169,16 +176,32 @@ export function mapPuterError(
 
   if (
     /image.*(?:large|size)|payload.*large/.test(code) ||
-    /image.*too large|payload.*too large/i.test(message)
+    /image.{0,80}(?:too large|(?:size|dimensions).{0,40}(?:exceed|limit))|payload.*too large/i.test(
+      message,
+    )
   ) {
     return TranslationError.imageTooLarge();
   }
 
   if (
-    /invalid_image|image.*invalid|bad_image/.test(code) ||
-    /invalid image|image payload/i.test(message)
+    /invalid_image|image.*invalid|bad_image|unsupported_image_(?:input_)?(?:type|format|mime|media)/.test(
+      code,
+    ) ||
+    /invalid image|image payload|unsupported image (?:input )?(?:type|format|mime|media)/i.test(
+      message,
+    )
   ) {
     return TranslationError.invalidImage();
+  }
+
+  const featureText = (code + '\n' + message).replace(/[_-]+/g, ' ');
+
+  if (
+    /does not support (?:images?|vision|multimodal)|not (?:a )?(?:multimodal|vision) model|only supports text|supports text only|text.only model|(?:image(?: input)?|vision|multimodal) (?:is )?(?:unsupported|not supported)|unsupported (?:image input|vision|multimodal)|no vision/i.test(
+      featureText,
+    )
+  ) {
+    return TranslationError.modelNoVision(message);
   }
 
   if (
@@ -188,11 +211,12 @@ export function mapPuterError(
     return TranslationError.emptyResponse();
   }
 
-  if (/invalid_request|bad_request|unsupported/.test(code)) {
+  if (
+    [400, 409, 422].includes(status) ||
+    /invalid_request|bad_request|unsupported/.test(code)
+  ) {
     return TranslationError.requestRejected(message);
   }
-
-  if (status >= 500) return NetworkError.providerUnavailable(status);
 
   if (
     (error instanceof Error && /abort|timeout/i.test(error.name)) ||

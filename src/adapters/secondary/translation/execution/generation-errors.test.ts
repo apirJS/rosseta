@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { APICallError } from 'ai';
+import {
+  APICallError,
+  StreamProviderError,
+  UnsupportedFunctionalityError,
+} from 'ai';
 import { classifyGenerationError } from './generation-errors';
-import { ErrorCode } from '../../../../shared/errors';
+import { ErrorCode, NetworkError } from '../../../../shared/errors';
 import { UNAVAILABLE_RESPONSE_FORMAT_ERROR } from '../../../../../tests/fixtures/captured-provider-errors';
 
 function api(message: string, statusCode = 400) {
@@ -14,6 +18,148 @@ function api(message: string, statusCode = 400) {
 }
 
 describe('Adapter: provider failure evidence', () => {
+  test('an adapter timeout preserves its error and allows a transport restart', () => {
+    const error = NetworkError.timeout();
+    const result = classifyGenerationError(error, 'plain-stream');
+
+    expect(result.error).toBe(error);
+    expect(result.transient).toBe(true);
+  });
+
+  test('reads SDK functionality metadata even when a custom message omits it', () => {
+    const error = new UnsupportedFunctionalityError({
+      functionality: 'json_schema',
+      message: 'Request rejected',
+    });
+
+    expect(
+      classifyGenerationError(error, 'structured-stream').unsupported,
+    ).toBe('structured');
+  });
+
+  test('recognizes explicit feature rejection in a typed successful-HTTP stream error', () => {
+    const error = new StreamProviderError({
+      statusCode: 200,
+      type: 'invalid_request_error',
+      message: 'response_format is unsupported',
+    });
+
+    expect(
+      classifyGenerationError(error, 'structured-stream').unsupported,
+    ).toBe('structured');
+  });
+
+  test('retryable in-band errors restart without teaching model incompatibility', () => {
+    const error = new StreamProviderError({
+      type: 'invalid_request_error',
+      message: 'response_format is unsupported',
+      isRetryable: true,
+    });
+
+    const result = classifyGenerationError(error, 'structured-stream');
+
+    expect(result.unsupported).toBeUndefined();
+    expect(result.transient).toBe(true);
+  });
+
+  test('plain untyped error prose cannot establish no-vision compatibility', () => {
+    const result = classifyGenerationError(
+      new Error('This model does not support images'),
+      'plain-stream',
+    );
+
+    expect(result.unsupported).toBeUndefined();
+  });
+
+  test.each(['permission_denied', 'access_denied', 'authentication_error'])(
+    'keeps terminal nested %s codes ahead of feature evidence',
+    (code) => {
+      const result = classifyGenerationError(
+        {
+          status: 400,
+          error: { code, message: 'response_format is unsupported' },
+        },
+        'structured-stream',
+      );
+
+      expect(result.unsupported).toBeUndefined();
+      expect(result.error.isCategory('AUTH')).toBe(true);
+    },
+  );
+
+  test('an invalid_json_schema code cannot teach structured-output incompatibility', () => {
+    const result = classifyGenerationError(
+      {
+        status: 400,
+        error: {
+          code: 'invalid_json_schema',
+          message: 'response_format is unsupported for this schema',
+        },
+      },
+      'structured-stream',
+    );
+
+    expect(result.unsupported).toBeUndefined();
+  });
+
+  test.each([
+    ['context_length_exceeded', ErrorCode.TRANSLATION_CONTEXT_LIMIT],
+    ['image_too_large', ErrorCode.TRANSLATION_IMAGE_TOO_LARGE],
+    ['payload_too_large', ErrorCode.TRANSLATION_IMAGE_TOO_LARGE],
+    ['forbidden', ErrorCode.AUTH_ACCESS_DENIED],
+  ])(
+    'keeps nested input/access code %s ahead of feature evidence',
+    (code, expected) => {
+      const result = classifyGenerationError(
+        {
+          status: 400,
+          error: { code, message: 'response_format is unsupported' },
+        },
+        'structured-stream',
+      );
+
+      expect(result.unsupported).toBeUndefined();
+      expect(result.error.code).toBe(expected);
+    },
+  );
+
+  test.each([
+    [
+      'bad_image',
+      'Unsupported image input',
+      ErrorCode.TRANSLATION_INVALID_IMAGE,
+    ],
+    [
+      'usage_limited',
+      'Streaming is unsupported',
+      ErrorCode.TRANSLATION_PROVIDER_QUOTA_EXCEEDED,
+    ],
+  ])(
+    'retains terminal normalized code %s ahead of compatibility evidence',
+    (code, message, expected) => {
+      const result = classifyGenerationError(
+        { status: 400, code, message },
+        'plain-stream',
+      );
+
+      expect(result.error.code).toBe(expected);
+      expect(result.unsupported).toBeUndefined();
+    },
+  );
+
+  test.each([408, 504])(
+    'transport HTTP %i timeouts can restart once',
+    (status) => {
+      const result = classifyGenerationError(
+        api('Request timed out', status),
+        'plain-stream',
+      );
+
+      expect(result.error.code).toBe(ErrorCode.NETWORK_TIMEOUT);
+      expect(result.transient).toBe(true);
+    },
+  );
+
   test.each([
     'Structured streaming is not supported',
     'streaming is not supported with response_format',
@@ -65,6 +211,45 @@ describe('Adapter: provider failure evidence', () => {
       classifyGenerationError(api('Invalid image payload'), 'plain-stream')
         .unsupported,
     ).toBeUndefined();
+  });
+
+  test.each([
+    [
+      'Unsupported image input format: image/bmp',
+      ErrorCode.TRANSLATION_INVALID_IMAGE,
+    ],
+    [
+      'Unsupported image input media type: image/bmp',
+      ErrorCode.TRANSLATION_INVALID_IMAGE,
+    ],
+    [
+      'Image input is unsupported because its dimensions exceed the limit',
+      ErrorCode.TRANSLATION_IMAGE_TOO_LARGE,
+    ],
+  ])(
+    'keeps image input rejection terminal before no-vision evidence: %s',
+    (message, expected) => {
+      const errors = [
+        api(message),
+        { status: 400, error: { code: 'invalid_request_error', message } },
+      ];
+
+      for (const error of errors) {
+        const result = classifyGenerationError(error, 'plain-stream');
+
+        expect(result.error.code).toBe(expected);
+        expect(result.unsupported).toBeUndefined();
+      }
+    },
+  );
+
+  test.each([
+    'This model does not support image input',
+    'Image input is unsupported by this text-only model',
+  ])('retains genuine model no-vision evidence: %s', (message) => {
+    expect(
+      classifyGenerationError(api(message), 'plain-stream').unsupported,
+    ).toBe('vision');
   });
 
   test('duplicated JSON error metadata does not misidentify unsupported schema as an invalid application schema', () => {
@@ -221,6 +406,8 @@ describe('Adapter: provider failure evidence', () => {
     'Streaming is unavailable on your plan',
     'Your account does not support image input',
     'Vision is unavailable for your subscription',
+    'response_format is unavailable for this project',
+    'Streaming is not supported on this tier',
   ])(
     'does not share credential access restrictions with other accounts: %s',
     (message) => {

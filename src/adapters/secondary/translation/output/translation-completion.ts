@@ -20,7 +20,7 @@ export function inspectTranslationCompletion(
   streamedText: string,
   includeDescription: boolean,
 ): TranslationCompletion {
-  const raw = generated.text || streamedText;
+  const raw = generated.text.trim() ? generated.text : streamedText;
   const texts = [...new Set([generated.text, streamedText])];
 
   if (
@@ -36,7 +36,7 @@ export function inspectTranslationCompletion(
     return { kind: 'failed', error: TranslationError.contentBlocked() };
   }
 
-  if (texts.every((text) => !text.trim()) && generated.output === undefined) {
+  if (texts.every((text) => !text.trim()) && generated.output == null) {
     return { kind: 'failed', error: TranslationError.emptyResponse() };
   }
 

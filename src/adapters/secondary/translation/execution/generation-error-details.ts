@@ -47,7 +47,12 @@ export function readGenerationErrorDetails(
 
     const record = decoded as Record<string, unknown>;
 
-    status ||= readStatus(record);
+    const nestedStatus = readStatus(record);
+
+    // A 2xx transport can carry a failed provider envelope (especially SSE).
+    // Keep an actual HTTP failure authoritative over contradictory body fields.
+    if (!status || (status >= 200 && status < 300 && nestedStatus >= 400))
+      status = nestedStatus;
 
     if (!url && typeof record.url === 'string') url = record.url;
     if (typeof record.message === 'string' && record.message.trim())

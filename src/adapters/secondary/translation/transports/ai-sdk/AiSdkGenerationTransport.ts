@@ -13,7 +13,10 @@ import type {
   ITranslationGenerationTransport,
 } from '../GenerationTransport';
 import { isStreamed, isStructured } from '../../execution/translation-fallback';
-import { raceAbort } from '../../execution/translation-execution';
+import {
+  raceAbort,
+  throwIfAborted,
+} from '../../execution/translation-execution';
 import { unwrapGenerationError } from '../../execution/generation-errors';
 import {
   PROVIDER_DEFAULT_CONFIGURATION,
@@ -63,6 +66,8 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
     request: GenerationRequest,
     onEvent: GenerationObserver,
   ): Promise<GenerationResult> {
+    throwIfAborted(request.signal);
+
     const controller = new AbortController();
     const signal = AbortSignal.any([request.signal, controller.signal]);
     const configuration = this.configurationFor(request.configurationId);
@@ -101,7 +106,12 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
     structured: boolean,
   ): Promise<GenerationResult> {
     try {
-      const generated = await generateText(options);
+      const generated = await raceAbort(
+        generateText(options),
+        options.abortSignal,
+      );
+
+      throwIfAborted(options.abortSignal);
 
       return {
         text: generated.text,
@@ -110,6 +120,8 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
         schemaValidated: structured,
       };
     } catch (error) {
+      throwIfAborted(options.abortSignal);
+
       const recovered = recoverSchemaRejection(unwrapGenerationError(error));
 
       if (recovered) return recovered;
@@ -124,10 +136,10 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
     onEvent: GenerationObserver,
     controller: AbortController,
   ): Promise<GenerationResult> {
-    let firstError: unknown;
+    let firstFailure: { error: unknown } | undefined;
 
     const recordError = (error: unknown) => {
-      firstError ??= error;
+      firstFailure ??= { error };
     };
 
     const result = streamText({
@@ -147,7 +159,11 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
     );
 
     const partialPump = structured
-      ? consumePartialOutput(result.partialOutputStream, onEvent)
+      ? consumePartialOutput(
+          result.partialOutputStream,
+          options.abortSignal,
+          onEvent,
+        )
       : Promise.resolve();
 
     try {
@@ -156,10 +172,14 @@ export class AiSdkGenerationTransport implements ITranslationGenerationTransport
         options.abortSignal,
       );
 
-      if (firstError) throw firstError;
+      if (firstFailure) throw firstFailure.error;
 
-      const finishReason = await result.finishReason;
-      const final = await finalOutput;
+      const finishReason = await raceAbort(
+        result.finishReason,
+        options.abortSignal,
+      );
+
+      const final = await raceAbort(finalOutput, options.abortSignal);
 
       if ('error' in final) {
         const error = unwrapGenerationError(final.error);
@@ -271,6 +291,8 @@ async function consumeTextStream(
   let text = '';
 
   for await (const part of stream) {
+    throwIfAborted(signal);
+
     switch (part.type) {
       case 'error':
         recordError(part.error);
@@ -295,9 +317,13 @@ async function consumeTextStream(
 
 async function consumePartialOutput(
   stream: SdkStreamResult['partialOutputStream'],
+  signal: AbortSignal,
   onEvent: GenerationObserver,
 ): Promise<void> {
-  for await (const value of stream) await onEvent({ type: 'partial', value });
+  for await (const value of stream) {
+    throwIfAborted(signal);
+    await onEvent({ type: 'partial', value });
+  }
 }
 
 function recoverSchemaRejection(
@@ -309,7 +335,7 @@ function recoverSchemaRejection(
 
   return {
     text: accumulated || error.text || '',
-    finishReason: finishReason ?? error.finishReason ?? 'stop',
+    finishReason: finishReason ?? error.finishReason ?? 'unknown',
     schemaValidated: false,
     validationError: error,
   };

@@ -30,19 +30,24 @@ import {
 import { TranslationCapabilityState } from './compatibility/TranslationCapabilityState';
 import { TranslationAttemptPreview } from './preview/TranslationAttemptPreview';
 import { TranslationConfigurationPolicy } from './execution/TranslationConfigurationPolicy';
-import { isConfigurationRejection } from './execution/generation-configuration-error';
+import {
+  isConfigurationModeConflict,
+  isConfigurationRejection,
+} from './execution/generation-configuration-error';
 import { classifyGenerationError } from './execution/generation-errors';
 import { inspectTranslationCompletion } from './output/translation-completion';
 import {
+  bufferedMode,
   isStructured,
   TranslationAttemptPolicy,
 } from './execution/translation-fallback';
-import type {
-  GenerationMode,
-  GenerationRequest,
-  GenerationResult,
-  ITranslationGenerationTransport,
-  TranslationProviderContext,
+import {
+  GENERATION_MODES,
+  type GenerationMode,
+  type GenerationRequest,
+  type GenerationResult,
+  type ITranslationGenerationTransport,
+  type TranslationProviderContext,
 } from './transports/GenerationTransport';
 
 export type { TranslationProviderContext } from './transports/GenerationTransport';
@@ -101,13 +106,15 @@ export async function executeTranslation(
 async function runTranslation(
   job: TranslationJob,
 ): Promise<Result<Translation, AppError>> {
+  throwIfAborted(job.scope.signal);
+
   const prepared = await prepareTranslation(job);
 
   if (prepared.state.imageUnsupported())
     return failure(TranslationError.modelNoVision());
 
   const policy = new TranslationAttemptPolicy((mode) =>
-    prepared.state.support(mode),
+    prepared.state.support(mode, prepared.configurations?.current?.id),
   );
 
   return runAttempts(prepared, policy);
@@ -122,6 +129,8 @@ async function prepareTranslation(
   const schemaScope = await capabilityDigest(
     z.toJSONSchema(schema, { target: 'draft-07', io: 'input' }),
   );
+
+  throwIfAborted(job.scope.signal);
 
   const state = new TranslationCapabilityState(
     identity,
@@ -153,6 +162,10 @@ async function prepareTranslation(
     configurations = new TranslationConfigurationPolicy(
       job.transport.configurations,
       (id) => state.configurationSupport(id),
+      (id) =>
+        GENERATION_MODES.some(
+          (mode) => state.support(mode, id) !== 'unsupported',
+        ),
     );
   }
 
@@ -168,7 +181,9 @@ async function runAttempts(
   while (mode && policy.hasBudget) {
     throwIfAborted(job.scope.signal);
 
-    if (job.state.support(mode) === 'unsupported')
+    if (
+      job.state.support(mode, job.configurations?.current?.id) === 'unsupported'
+    )
       return failure(TranslationError.requestRejected());
     if (job.configurations && !job.configurations.current)
       return failure(TranslationError.requestRejected());
@@ -206,16 +221,22 @@ async function runAttempts(
         );
       }
 
-      const repairMode = policy.repair(completion.text);
-
-      if (!repairMode) return failure(TranslationError.malformedResponse());
-
       if (
         completion.finishReason !== 'stop' &&
         completion.finishReason !== 'length'
       ) {
         return failure(TranslationError.interrupted());
       }
+
+      const firstRepair = policy.repairText === undefined;
+
+      const repairMode =
+        policy.repair(completion.text) ??
+        (firstRepair
+          ? advanceConfigurationMode(job, policy, bufferedMode(mode))
+          : null);
+
+      if (!repairMode) return failure(TranslationError.malformedResponse());
 
       mode = repairMode;
     } catch (error) {
@@ -292,7 +313,13 @@ async function acceptTranslation(
 
   if (configuration) await job.state.acceptedConfiguration(configuration.id);
 
-  await job.state.accepted(mode, generated.schemaValidated, imageAccepted);
+  await job.state.accepted(
+    mode,
+    generated.schemaValidated,
+    imageAccepted,
+    configuration?.id,
+  );
+
   throwIfAborted(job.scope.signal);
 
   if (!response.success || !response.data) {
@@ -328,9 +355,25 @@ async function fallbackAfterFailure(
     await job.state.rejectedConfiguration(configuration.id);
     throwIfAborted(job.scope.signal);
 
-    return job.configurations?.rejectCurrent()
-      ? success(mode)
-      : failure(classified.error);
+    const nextMode = advanceConfigurationMode(job, policy, mode);
+
+    return nextMode ? success(nextMode) : failure(classified.error);
+  }
+
+  if (
+    configuration &&
+    isConfigurationModeConflict(error, configuration.rejectionFields)
+  ) {
+    await job.state.rejectedConfigurationMode(mode, configuration.id);
+    throwIfAborted(job.scope.signal);
+
+    const nextMode =
+      policy.afterFailure(mode, {
+        ...classified,
+        unsupported: classified.unsupported ?? 'combination',
+      }) ?? advanceConfigurationMode(job, policy, mode);
+
+    return nextMode ? success(nextMode) : failure(classified.error);
   }
 
   if (classified.unsupported) {
@@ -341,6 +384,22 @@ async function fallbackAfterFailure(
   const nextMode = policy.afterFailure(mode, classified);
 
   return nextMode ? success(nextMode) : failure(classified.error);
+}
+
+function advanceConfigurationMode(
+  job: PreparedTranslationJob,
+  policy: TranslationAttemptPolicy,
+  previousMode: GenerationMode,
+): GenerationMode | null {
+  if (!policy.hasBudget) return null;
+
+  while (job.configurations?.advance()) {
+    const mode = policy.afterConfigurationChange(previousMode);
+
+    if (mode) return mode;
+  }
+
+  return null;
 }
 
 function executionError(

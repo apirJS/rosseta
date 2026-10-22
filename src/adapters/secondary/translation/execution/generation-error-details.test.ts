@@ -2,6 +2,24 @@ import { describe, expect, test } from 'bun:test';
 import { readGenerationErrorDetails } from './generation-error-details';
 
 describe('Adapter: generation error details', () => {
+  test('prefers a nested error status over a successful HTTP envelope', () => {
+    const details = readGenerationErrorDetails({
+      statusCode: 200,
+      error: { status: 429, message: 'Too many requests' },
+    });
+
+    expect(details.status).toBe(429);
+  });
+
+  test('retains a failed HTTP status over nested contradictory error metadata', () => {
+    const details = readGenerationErrorDetails({
+      statusCode: 503,
+      error: { status: 400, message: 'response_format is unsupported' },
+    });
+
+    expect(details.status).toBe(503);
+  });
+
   test('collects rejected parameter names from known nested provider envelopes', () => {
     const details = readGenerationErrorDetails({
       statusCode: 400,

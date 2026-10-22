@@ -10,6 +10,22 @@ export function isConfigurationRejection(
   error: unknown,
   fields: readonly string[],
 ): boolean {
+  return matchesConfigurationRejection(error, fields, false);
+}
+
+/** A control/mode conflict says nothing about either feature in isolation. */
+export function isConfigurationModeConflict(
+  error: unknown,
+  fields: readonly string[],
+): boolean {
+  return matchesConfigurationRejection(error, fields, true);
+}
+
+function matchesConfigurationRejection(
+  error: unknown,
+  fields: readonly string[],
+  modeConflict: boolean,
+): boolean {
   if (!fields.length) return false;
 
   const unwrapped = unwrapGenerationError(error);
@@ -27,12 +43,6 @@ export function isConfigurationRejection(
 
   const parameterNames = details.parameters;
 
-  if (
-    parameterNames.length &&
-    !parameterNames.some((name) => namesActiveField(name, activeFields))
-  )
-    return false;
-
   const text = (
     details.code +
     '\n' +
@@ -40,6 +50,22 @@ export function isConfigurationRejection(
     '\n' +
     (sdkUnsupported ? unwrapped.functionality : '')
   ).replace(/[_-]+/g, ' ');
+
+  if (isConditionalModeRejection(text) !== modeConflict) return false;
+
+  if (
+    parameterNames.length &&
+    !parameterNames.some((name) => namesActiveField(name, activeFields))
+  ) {
+    // Providers may attribute a control/stream conflict to the stream or schema
+    // parameter. The message must still explicitly identify our active control.
+    if (
+      !modeConflict ||
+      !parameterNames.some(isModeParameter) ||
+      !namesActiveField(text, activeFields)
+    )
+      return false;
+  }
 
   if (!parameterNames.length && !namesActiveField(text, activeFields))
     return false;
@@ -52,6 +78,7 @@ function permitsConfigurationEvidence(
   details: GenerationErrorDetails,
   sdkUnsupported: boolean,
 ): boolean {
+  if (StreamProviderError.isInstance(error) && error.isRetryable) return false;
   if ([400, 422, 501].includes(details.status)) return true;
   if (details.status !== 0 && (details.status < 200 || details.status >= 300))
     return false;
@@ -89,6 +116,12 @@ function namesActiveField(text: string, fields: readonly RegExp[]): boolean {
   return fields.some((field) => field.test(text));
 }
 
+function isModeParameter(name: string): boolean {
+  return /(?:^|[.[])(?:stream|response[_-]?format|json[_-]?schema)(?=$|[.\]])/i.test(
+    name,
+  );
+}
+
 function fieldPattern(value: string): RegExp | null {
   const words = value
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -111,7 +144,7 @@ function explicitlyRejectsConfiguration(text: string): boolean {
     /\b(?:invalid|incorrect|unacceptable|illegal)\s+(?:value|parameter|argument|option|setting)\b/i.test(
       text,
     ) ||
-    /\b(?:only\s+(?:supports?|allows?)|must\s+(?:not\s+)?(?:be|equal|have|enable|include)|input should be|(?:is|are)\s+(?:required|mandatory)|cannot\s+(?:be\s+)?disable(?:d)?)\b/i.test(
+    /\b(?:only\s+(?:supports?|supported|allows?)|must\s+(?:not\s+)?(?:be|equal|have|enable|include)|input should be|(?:is|are)\s+(?:required|mandatory)|cannot\s+(?:be\s+)?(?:disable(?:d)?|used|combined))\b/i.test(
       text,
     )
   );
@@ -124,10 +157,7 @@ function hasUnrelatedFailure({
   const text = (code + '\n' + message).replace(/[_-]+/g, ' ');
 
   return (
-    isAccessFailure(text) ||
-    isTemporaryFailure(text) ||
-    isInputFailure(text) ||
-    isConditionalModeRejection(text)
+    isAccessFailure(text) || isTemporaryFailure(text) || isInputFailure(text)
   );
 }
 
@@ -136,10 +166,10 @@ function isAccessFailure(text: string): boolean {
     /invalid token|token auth failed|unauthorized|payment required|unknown model|model not found|model not supported/i.test(
       text,
     ) ||
-    /permission denied|access denied|email must be confirmed|email confirmation required|authentication (?:failed|error|required)/i.test(
+    /permission denied|access denied|forbidden|unauthenticated|email must be confirmed|email confirmation required|authentication (?:failed|error|required)/i.test(
       text,
     ) ||
-    /\b(?:account|api[ -]?key|credential|subscription|organization|plan)\b|unauthori[sz]ed|authentication failed|\b(?:invalid|incorrect|expired) (?:api[ -]?)?(?:key|token)\b/i.test(
+    /\b(?:account|api[ -]?key|credential|subscription|organization|plan|project|tier)\b|unauthori[sz]ed|authentication failed|\b(?:invalid|incorrect|expired) (?:api[ -]?)?(?:key|token)\b/i.test(
       text,
     ) ||
     /insufficient.{0,20}(?:quota|credit|balance|funds)|(?:quota|credit|balance).{0,30}(?:exceed|exhaust|deplet)|usage limited|usage limit|billing|\brate limit|too many requests\b/i.test(

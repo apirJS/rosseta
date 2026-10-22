@@ -7,13 +7,16 @@ import type {
   ITranslationGenerationTransport,
 } from '../../translation/transports/GenerationTransport';
 import { classifyGenerationError } from '../../translation/execution/generation-errors';
-import { isConfigurationRejection } from '../../translation/execution/generation-configuration-error';
+import {
+  isConfigurationModeConflict,
+  isConfigurationRejection,
+} from '../../translation/execution/generation-configuration-error';
 import { throwIfAborted } from '../../translation/execution/translation-execution';
 import { withPuterSession } from './PuterSdkSession';
 import { responseText, mapPuterError } from './puter-errors';
 import { thinkingConfigurations } from '../thinking/thinking-configurations';
 import type { ThinkingConfiguration } from '../../translation/transports/ai-sdk/sdk-generation-configurations';
-import { ErrorCode } from '../../../../shared/errors';
+import { ErrorCode, TranslationError } from '../../../../shared/errors';
 
 type GenerationObserver = (event: GenerationEvent) => Promise<void>;
 
@@ -65,12 +68,22 @@ export class PuterGenerationTransport implements ITranslationGenerationTransport
 
       const mapped = mapPuterError(error);
 
-      // Puter may report usage limits only in native metadata.
-      if (mapped.code === ErrorCode.TRANSLATION_PROVIDER_QUOTA_EXCEEDED)
+      // Native input/usage failures remain terminal even if their message also
+      // contains unsupported control or capability terminology.
+      if (
+        [
+          ErrorCode.TRANSLATION_PROVIDER_QUOTA_EXCEEDED,
+          ErrorCode.TRANSLATION_CONTENT_BLOCKED,
+          ErrorCode.TRANSLATION_CONTEXT_LIMIT,
+          ErrorCode.TRANSLATION_IMAGE_TOO_LARGE,
+          ErrorCode.TRANSLATION_INVALID_IMAGE,
+        ].includes(mapped.code)
+      )
         throw mapped;
       if (
         classifyGenerationError(error, request.mode).unsupported ||
-        isConfigurationRejection(error, configuration.rejectionFields)
+        isConfigurationRejection(error, configuration.rejectionFields) ||
+        isConfigurationModeConflict(error, configuration.rejectionFields)
       )
         throw error;
 
@@ -94,6 +107,9 @@ export class PuterGenerationTransport implements ITranslationGenerationTransport
     });
 
     throwIfAborted(request.signal);
+
+    if (response.message?.refusal?.trim())
+      throw TranslationError.contentBlocked();
 
     return {
       text: responseText(response),

@@ -660,6 +660,23 @@ describe('Adapter: shared streaming execution', () => {
     ]);
   });
 
+  test.each([408, 504])(
+    'a per-attempt HTTP %i timeout can restart within the shared deadline',
+    async (status) => {
+      const transport = new FakeStreamingGeneration([
+        { error: api('Provider request timed out', status) },
+        { result: valid },
+      ]);
+
+      expect((await run(transport)).success).toBe(true);
+
+      expect(transport.requests.map((request) => request.mode)).toEqual([
+        'structured-stream',
+        'structured-buffered',
+      ]);
+    },
+  );
+
   test('persistent no-vision stops repeated requests locally', async () => {
     const storage = new FakeTranslationCapabilityStorage();
 
@@ -715,6 +732,111 @@ describe('Adapter: shared streaming execution', () => {
 
     expect((await run(transport)).success).toBe(false);
     expect(transport.requests.length).toBe(2);
+  });
+
+  test.each(['unknown', 'other', 'error', 'tool-calls'])(
+    'reports an unfinished %s generation as interrupted even when no repair mode exists',
+    async (finishReason) => {
+      const transport = new FakeStreamingGeneration([
+        { result: { ...plain, finishReason } },
+      ]);
+
+      transport.supportedModes = ['plain-stream'];
+
+      const result = await run(transport);
+
+      expect(result.success).toBe(false);
+
+      if (!result.success)
+        expect(result.error.code).toBe(ErrorCode.TRANSLATION_INTERRUPTED);
+
+      expect(transport.requests).toHaveLength(1);
+    },
+  );
+
+  test('retries a transient repair transport failure without requesting another repair', async () => {
+    const transport = new FakeStreamingGeneration([
+      {
+        result: {
+          text: 'bad JSON',
+          schemaValidated: false,
+          finishReason: 'stop',
+        },
+      },
+      { error: new TypeError('network disconnected') },
+      { result: plain },
+    ]);
+
+    expect((await run(transport)).success).toBe(true);
+
+    expect(transport.requests.map((request) => request.mode)).toEqual([
+      'structured-stream',
+      'plain-buffered',
+      'plain-buffered',
+    ]);
+
+    expect(transport.requests[1].userText).toContain(
+      'untrusted_previous_response',
+    );
+
+    expect(transport.requests[2].userText).toBe(transport.requests[1].userText);
+    expect(transport.requests[2].image).toBe(VALID_IMAGE);
+  });
+
+  test('stops after the single transport restart is exhausted during repair', async () => {
+    const transport = new FakeStreamingGeneration([
+      {
+        result: {
+          text: 'bad JSON',
+          schemaValidated: false,
+          finishReason: 'stop',
+        },
+      },
+      { error: new TypeError('network disconnected') },
+      { error: new TypeError('network disconnected again') },
+      { result: plain },
+    ]);
+
+    const result = await run(transport);
+
+    expect(result.success).toBe(false);
+
+    if (!result.success)
+      expect(result.error.code).toBe(ErrorCode.NETWORK_CONNECTION_FAILED);
+
+    expect(transport.requests).toHaveLength(3);
+    expect(transport.scripts).toHaveLength(1);
+  });
+
+  test('reuses a known working buffered mode for repair instead of probing plain output', async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+
+    const transport = new FakeStreamingGeneration([
+      { result: valid },
+      {
+        result: {
+          text: 'bad JSON',
+          schemaValidated: false,
+          finishReason: 'stop',
+        },
+      },
+      { result: valid },
+    ]);
+
+    transport.supportedModes = ['structured-buffered', 'plain-buffered'];
+
+    expect((await run(transport, storage)).success).toBe(true);
+    expect((await run(transport, storage)).success).toBe(true);
+
+    expect(transport.requests.map((request) => request.mode)).toEqual([
+      'structured-buffered',
+      'structured-buffered',
+      'structured-buffered',
+    ]);
+
+    expect(transport.requests[2].userText).toContain(
+      'untrusted_previous_response',
+    );
   });
 
   test('empty output does not discover other modes', async () => {
@@ -810,19 +932,24 @@ describe('Adapter: shared streaming execution', () => {
     }
   });
 
-  test('cancel before start does not invoke transport', async () => {
+  test('cancel before start does not invoke transport or compatibility storage', async () => {
     const token = new AbortCancellationToken();
 
     token.cancel();
 
     const transport = new FakeStreamingGeneration([]);
+    const storage = new FakeTranslationCapabilityStorage();
+    const read = spyOn(storage, 'read');
 
-    const result = await run(transport, undefined, {
+    const result = await run(transport, storage, {
       cancellationToken: token,
     });
 
     expect(result.success).toBe(false);
     expect(transport.requests.length).toBe(0);
+    expect(read).not.toHaveBeenCalled();
+    expect(storage.records.size).toBe(0);
+    read.mockRestore();
   });
 
   test.each([401, 402, 403, 404, 429, 413])(

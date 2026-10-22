@@ -7,6 +7,130 @@ import { GENERATION_MODES } from '../transports/GenerationTransport';
 describe('Adapter: TranslationCapabilityState', () => {
   afterEach(() => mock.restore());
 
+  test('control conflicts only reject the observed profile and generation mode', async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+    const state = new TranslationCapabilityState('model', 'schema', storage);
+
+    await state.load();
+    await state.rejectedConfigurationMode('structured-stream', 'thinking-off');
+
+    const reloaded = new TranslationCapabilityState('model', 'schema', storage);
+
+    await reloaded.load();
+
+    expect(reloaded.support('structured-stream', 'thinking-off')).toBe(
+      'unsupported',
+    );
+
+    expect(reloaded.support('structured-stream', 'default')).toBe('unknown');
+    expect(reloaded.support('structured-stream')).toBe('unknown');
+    expect(reloaded.support('plain-stream', 'thinking-off')).toBe('unknown');
+    expect(reloaded.configurationSupport('thinking-off')).toBe('unknown');
+
+    expect(storage.records.get('model')?.facts['feature.stream']?.support).toBe(
+      'unknown',
+    );
+
+    expect(
+      storage.records.get('model')?.facts['feature.structured']?.support,
+    ).toBe('unknown');
+
+    const changedSchema = new TranslationCapabilityState(
+      'model',
+      'new-schema',
+      storage,
+    );
+
+    await changedSchema.load();
+
+    expect(changedSchema.support('structured-stream', 'thinking-off')).toBe(
+      'unknown',
+    );
+
+    await reloaded.rejectedConfigurationMode('plain-stream', 'thinking-off');
+    await changedSchema.load();
+
+    expect(changedSchema.support('plain-stream', 'thinking-off')).toBe(
+      'unsupported',
+    );
+  });
+
+  test('profile-mode conflicts expire and respect explicit compatibility resets', async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+    let now = 1_000_000;
+    const context = { namespace: 'provider', refreshAfterMs: 1000 };
+
+    spyOn(Date, 'now').mockImplementation(() => now);
+
+    const first = new TranslationCapabilityState(
+      'model',
+      'schema',
+      storage,
+      context,
+    );
+
+    await first.load();
+    await first.rejectedConfigurationMode('plain-stream', 'thinking-off');
+    now += context.refreshAfterMs;
+
+    const expired = new TranslationCapabilityState(
+      'model',
+      'schema',
+      storage,
+      context,
+    );
+
+    await expired.load();
+    expect(expired.support('plain-stream', 'thinking-off')).toBe('unknown');
+    await expired.rejectedConfigurationMode('plain-stream', 'thinking-off');
+    await storage.reset('model');
+
+    await expired.rejectedConfigurationMode(
+      'structured-stream',
+      'thinking-off',
+    );
+
+    const reset = new TranslationCapabilityState(
+      'model',
+      'schema',
+      storage,
+      context,
+    );
+
+    await reset.load();
+    expect(reset.support('plain-stream', 'thinking-off')).toBe('unknown');
+    expect(reset.support('structured-stream', 'thinking-off')).toBe('unknown');
+  });
+
+  test('a newer validated completion supersedes the same profile-mode conflict only', async () => {
+    const storage = new FakeTranslationCapabilityStorage();
+    let now = 1000;
+
+    spyOn(Date, 'now').mockImplementation(() => now);
+
+    const state = new TranslationCapabilityState('model', 'schema', storage);
+
+    await state.load();
+    await state.rejectedConfigurationMode('structured-stream', 'thinking-off');
+    await state.rejectedConfigurationMode('structured-stream', 'thinking-low');
+    now++;
+    await state.accepted('structured-stream', false, true, 'thinking-off');
+
+    expect(state.support('structured-stream', 'thinking-off')).toBe(
+      'unsupported',
+    );
+
+    await state.accepted('structured-stream', true, true, 'thinking-off');
+
+    expect(state.support('structured-stream', 'thinking-off')).toBe(
+      'supported',
+    );
+
+    expect(state.support('structured-stream', 'thinking-low')).toBe(
+      'unsupported',
+    );
+  });
+
   test('fresh durable evidence outranks an older session cache after a failed write', async () => {
     const storage = new FakeTranslationCapabilityStorage();
     const first = new TranslationCapabilityState('model', 'schema', storage);

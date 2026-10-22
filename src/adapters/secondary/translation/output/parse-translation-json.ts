@@ -9,21 +9,76 @@ import {
 import { MAX_TRANSLATION_BYTES } from '../preview/translation-response-limits';
 
 const MAX_OBJECT_OPENINGS = 8192;
-const MAX_CANDIDATE_CHARACTERS = 8 * MAX_TRANSLATION_BYTES;
+
+interface ObjectFrame {
+  start: number;
+  end?: number;
+  parent?: ObjectFrame;
+  fields: Map<string, string>;
+  insideResponse: boolean;
+  insideCompleteObject: boolean;
+}
+
+const RESPONSE_FIELDS = new Set([
+  'success',
+  'error',
+  'data',
+  'segments',
+  'originalText',
+  'translatedText',
+]);
+
+function responseField(
+  text: string,
+  start: number,
+  end: number,
+): { key: string; valueStart: string } | null {
+  let next = end + 1;
+
+  while (/\s/.test(text[next] ?? '') && next < text.length) next++;
+  if (text[next] !== ':') return null;
+
+  try {
+    const key: unknown = JSON.parse(text.slice(start, end + 1));
+
+    if (typeof key !== 'string' || !RESPONSE_FIELDS.has(key)) return null;
+
+    next++;
+    while (/\s/.test(text[next] ?? '') && next < text.length) next++;
+
+    return { key, valueStart: text[next] ?? '' };
+  } catch {
+    return null;
+  }
+}
+
+function isResponseEnvelope(frame: ObjectFrame): boolean {
+  const fields = frame.fields;
+  const booleanSuccess = ['t', 'f'].includes(fields.get('success') ?? '');
+
+  return (
+    (booleanSuccess && (fields.has('error') || fields.has('data'))) ||
+    (fields.has('error') && fields.has('data')) ||
+    fields.get('segments') === '[' ||
+    (fields.get('originalText') === '{' && fields.get('translatedText') === '{')
+  );
+}
 
 /**
- * Returns every balanced JSON object candidate in the response.
+ * Returns complete JSON object candidates in the response.
  *
  * LLMs sometimes put an example object, a tool trace, or explanatory prose
- * before the actual response. A single string-aware pass also finds balanced
- * children of incomplete wrappers without repeatedly rescanning their contents.
+ * before the actual response. Translation envelopes inside non-response wrappers
+ * can be recovered, but never from another complete or incomplete response.
+ * Only outer objects and response envelopes are sliced, keeping scans bounded.
  */
 export function extractJsonObjects(text: string): string[] {
-  const openings: number[] = [];
-  const ranges: { start: number; end: number }[] = [];
+  const openings: ObjectFrame[] = [];
+  const frames: ObjectFrame[] = [];
   let inString = false;
   let escaped = false;
   let openingCount = 0;
+  let stringStart = 0;
 
   for (let index = 0; index < text.length; index++) {
     const char = text[index];
@@ -41,6 +96,17 @@ export function extractJsonObjects(text: string): string[] {
     }
 
     if (char === '"') {
+      // Quotes in surrounding prose are not JSON string delimiters.
+      if (!openings.length) continue;
+
+      if (!inString) stringStart = index;
+      else {
+        const field = responseField(text, stringStart, index);
+
+        if (field !== null)
+          openings.at(-1)!.fields.set(field.key, field.valueStart);
+      }
+
       inString = !inString;
 
       continue;
@@ -50,21 +116,41 @@ export function extractJsonObjects(text: string): string[] {
 
     if (char === '{') {
       if (++openingCount > MAX_OBJECT_OPENINGS) return [];
-      openings.push(index);
+
+      const frame: ObjectFrame = {
+        start: index,
+        parent: openings.at(-1),
+        fields: new Map(),
+        insideResponse: false,
+        insideCompleteObject: false,
+      };
+
+      openings.push(frame);
+      frames.push(frame);
     } else if (char === '}' && openings.length) {
-      ranges.push({ start: openings.pop()!, end: index + 1 });
+      const frame = openings.pop()!;
+
+      frame.end = index + 1;
     }
   }
 
   const candidates: string[] = [];
-  let budget = MAX_CANDIDATE_CHARACTERS;
 
-  for (const range of ranges.toSorted((a, b) => a.start - b.start)) {
-    const length = range.end - range.start;
+  // Parents precede children, so inherited state is resolved once per object,
+  // including parents whose closing brace never arrived.
+  for (const frame of frames) {
+    if (frame.parent) {
+      frame.insideResponse =
+        frame.parent.insideResponse || isResponseEnvelope(frame.parent);
 
-    if (length > budget) break;
-    budget -= length;
-    candidates.push(text.slice(range.start, range.end));
+      frame.insideCompleteObject =
+        frame.parent.insideCompleteObject || frame.parent.end !== undefined;
+    }
+
+    if (frame.end === undefined || frame.insideResponse) continue;
+    if (!isResponseEnvelope(frame) && frame.insideCompleteObject) continue;
+
+    candidates.push(text.slice(frame.start, frame.end));
   }
 
   return candidates;

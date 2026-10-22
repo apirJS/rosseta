@@ -1,4 +1,4 @@
-import type { TranslationResponse } from './translation-schema';
+import type { NormalizedTranslationResponse } from './translation-schema';
 import { normalizeTranslationResponse } from './translation-response-normalizer';
 import { success, failure, type Result } from '../../../../shared/types/Result';
 import {
@@ -6,7 +6,7 @@ import {
   TranslationError,
   type AppError,
 } from '../../../../shared/errors';
-import { MAX_TRANSLATION_BYTES } from '../preview/translation-response-limits';
+import { MAX_TRANSLATION_BYTES } from './translation-response-limits';
 
 const MAX_OBJECT_OPENINGS = 8192;
 
@@ -163,7 +163,7 @@ export function extractJsonObject(text: string): string | null {
 export function parseTranslationResponse(
   text: string,
   includeDescription?: boolean,
-): Result<TranslationResponse, AppError> {
+): Result<NormalizedTranslationResponse, AppError> {
   if (new TextEncoder().encode(text).byteLength > MAX_TRANSLATION_BYTES)
     return failure(TranslationError.responseLimit());
 

@@ -11,8 +11,9 @@ import {
   VALID_PAIRED_TRANSLATION_RESPONSE,
 } from '../../../../../../tests/test-fixtures';
 import { AiSdkGenerationTransport } from './AiSdkGenerationTransport';
-import { createTranslationDataSchema } from '../../output/translation-schema';
-import type { GenerationMode, GenerationRequest } from '../GenerationTransport';
+import { createGenerationResponseSchema } from '../../output/translation-schema';
+import type { GenerationRequest } from '../GenerationTransport';
+import type { GenerationMode } from '../generation-modes';
 
 const model = { provider: 'fixture', modelId: 'vision-model' } as LanguageModel;
 
@@ -22,7 +23,7 @@ function request(mode: GenerationMode): GenerationRequest {
     image: VALID_IMAGE,
     instructions: 'JSON instructions',
     userText: 'Read image',
-    schema: createTranslationDataSchema(),
+    schema: createGenerationResponseSchema(),
     signal: new AbortController().signal,
   };
 }

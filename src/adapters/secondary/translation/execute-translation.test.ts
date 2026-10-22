@@ -1,7 +1,7 @@
 function noop(): void {}
 
 import { z } from 'zod';
-import { createTranslationDataSchema } from './output/translation-schema';
+import { createGenerationResponseSchema } from './output/translation-schema';
 import { describe, expect, spyOn, test } from 'bun:test';
 import { APICallError } from 'ai';
 import { executeTranslation } from './execute-translation';
@@ -13,10 +13,8 @@ import type {
   TranslationProgress,
   TranslationExecutionOptions,
 } from '../../../core/ports/outbound/TranslationExecutionOptions';
-import type {
-  GenerationMode,
-  GenerationResult,
-} from './transports/GenerationTransport';
+import type { GenerationResult } from './transports/GenerationTransport';
+import type { GenerationMode } from './transports/generation-modes';
 import {
   modelScopeKey,
   capabilityDigest,
@@ -101,7 +99,7 @@ async function exclude(
   const identity = await modelScopeKey(context);
 
   const schema = await capabilityDigest(
-    z.toJSONSchema(createTranslationDataSchema(true), {
+    z.toJSONSchema(createGenerationResponseSchema(true), {
       target: 'draft-07',
       io: 'input',
     }),
@@ -138,7 +136,7 @@ describe('Adapter: shared streaming execution', () => {
       const progress: TranslationProgress[] = [];
       const structured = mode.startsWith('structured');
 
-      const validation = createTranslationDataSchema(true).safeParse(
+      const validation = createGenerationResponseSchema(true).safeParse(
         CAPTURED_ROOT_DESCRIPTION_RESPONSE,
       );
 

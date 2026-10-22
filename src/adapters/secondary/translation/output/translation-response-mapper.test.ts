@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  mapResponseToDomain,
-  type TranslationData,
-} from './translation-response-mapper';
+import { mapResponseToDomain } from './translation-response-mapper';
+import type { NormalizedTranslationData } from './translation-schema';
 import { Language } from '../../../../core/domain/translation/Language';
 import { ErrorCode } from '../../../../shared/errors/ErrorCode';
 
@@ -24,7 +22,9 @@ function segment(
   };
 }
 
-function makeData(overrides: Partial<TranslationData> = {}): TranslationData {
+function makeData(
+  overrides: Partial<NormalizedTranslationData> = {},
+): NormalizedTranslationData {
   return {
     originalText: {
       contents: [segment('こんにちは', 'ja-JP', 'Japanese', 0, 'konnichiwa')],

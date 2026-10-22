@@ -1,16 +1,12 @@
 import type { ChatResponseChunk, Puter } from '@heyputer/puter.js';
 import type {
-  GenerationMode,
   GenerationRequest,
   GenerationEvent,
   GenerationResult,
   ITranslationGenerationTransport,
 } from '../../translation/transports/GenerationTransport';
-import { classifyGenerationError } from '../../translation/execution/generation-errors';
-import {
-  isConfigurationModeConflict,
-  isConfigurationRejection,
-} from '../../translation/execution/generation-configuration-error';
+import type { GenerationMode } from '../../translation/transports/generation-modes';
+import { classifyGenerationFailure } from '../../translation/errors/classify-generation-failure';
 import { throwIfAborted } from '../../translation/execution/translation-execution';
 import { withPuterSession } from './PuterSdkSession';
 import { responseText, mapPuterError } from './puter-errors';
@@ -80,12 +76,22 @@ export class PuterGenerationTransport implements ITranslationGenerationTransport
         ].includes(mapped.code)
       )
         throw mapped;
-      if (
-        classifyGenerationError(error, request.mode).unsupported ||
-        isConfigurationRejection(error, configuration.rejectionFields) ||
-        isConfigurationModeConflict(error, configuration.rejectionFields)
-      )
-        throw error;
+
+      const classified = classifyGenerationFailure(error, {
+        mode: request.mode,
+        configuration,
+      });
+
+      switch (classified.kind) {
+        case 'configuration-rejected':
+        case 'configuration-mode-rejected':
+        case 'feature-rejected':
+        case 'mode-rejected':
+          throw error;
+        case 'terminal':
+        case 'transient':
+          break;
+      }
 
       throw mapped;
     }

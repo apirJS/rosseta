@@ -3,7 +3,7 @@ import type {
   TranslationDraftSegment,
 } from '../../../../core/ports/outbound/TranslationExecutionOptions';
 import { TranslationError } from '../../../../shared/errors';
-import { MAX_TRANSLATION_SEGMENTS } from './translation-response-limits';
+import { MAX_TRANSLATION_SEGMENTS } from '../output/translation-response-limits';
 
 export function record(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

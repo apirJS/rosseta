@@ -10,7 +10,7 @@ import type {
   AnyProvider,
   Provider,
 } from '../../../core/domain/credential/Provider';
-import { providerProtocol } from '../translation/compatibility/translation-capability-key';
+import { providerProtocol } from './provider-connection';
 import { FakeTranslationCapabilityStorage } from '../../../../tests/fakes/FakeTranslationCapabilityStorage';
 
 function credential(provider: AnyProvider) {

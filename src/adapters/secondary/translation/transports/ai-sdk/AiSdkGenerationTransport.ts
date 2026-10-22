@@ -7,17 +7,17 @@ import {
 } from 'ai';
 import type {
   GenerationEvent,
-  GenerationMode,
   GenerationRequest,
   GenerationResult,
   ITranslationGenerationTransport,
 } from '../GenerationTransport';
-import { isStreamed, isStructured } from '../../execution/translation-fallback';
+import type { GenerationMode } from '../generation-modes';
+import { isStreamed, isStructured } from '../generation-modes';
 import {
   raceAbort,
   throwIfAborted,
 } from '../../execution/translation-execution';
-import { unwrapGenerationError } from '../../execution/generation-errors';
+import { unwrapGenerationError } from '../../errors/provider-error-details';
 import {
   PROVIDER_DEFAULT_CONFIGURATION,
   type ConfiguredModelFactory,

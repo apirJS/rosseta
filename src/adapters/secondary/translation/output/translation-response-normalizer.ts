@@ -1,18 +1,23 @@
 import { Language } from '../../../../core/domain/translation/Language';
 import { failure, success, type Result } from '../../../../shared/types/Result';
 import { TranslationError, type AppError } from '../../../../shared/errors';
-import { record } from '../preview/translation-draft-mapper';
 import {
   MAX_TRANSLATION_BYTES,
   MAX_TRANSLATION_SEGMENTS,
-} from '../preview/translation-response-limits';
-import type { TranslationData } from './translation-response-mapper';
+} from './translation-response-limits';
 import {
-  pairedTranslationSchema,
-  translationDataLenientSchema,
-  type PairedTranslationResponse,
-  type TranslationResponse,
+  pairedResponseSchema,
+  legacyResponseSchema,
+  type PairedResponse,
+  type NormalizedTranslationResponse,
+  type NormalizedTranslationData,
 } from './translation-schema';
+
+function record(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
 
 function sourceLanguageName(code: string): string {
   const language = Language.fromRaw(code);
@@ -35,8 +40,8 @@ function exceedsResponseLimits(raw: unknown): boolean {
 }
 
 function normalizePairedEnvelope(
-  envelope: PairedTranslationResponse,
-): Result<TranslationResponse, AppError> {
+  envelope: PairedResponse,
+): Result<NormalizedTranslationResponse, AppError> {
   if (!envelope.success && envelope.data !== null)
     return failure(TranslationError.malformedResponse());
 
@@ -109,13 +114,13 @@ function omitDescriptions(raw: unknown): unknown {
 
 function parseResponseEnvelope(
   raw: unknown,
-): Result<TranslationResponse, AppError> {
+): Result<NormalizedTranslationResponse, AppError> {
   const envelope = normalizeDescriptionPlacement(raw);
-  const paired = pairedTranslationSchema.safeParse(envelope);
+  const paired = pairedResponseSchema.safeParse(envelope);
 
   if (paired.success) return normalizePairedEnvelope(paired.data);
 
-  const legacy = translationDataLenientSchema.safeParse(envelope);
+  const legacy = legacyResponseSchema.safeParse(envelope);
 
   if (!legacy.success) return failure(TranslationError.malformedResponse());
 
@@ -126,7 +131,7 @@ function parseResponseEnvelope(
   });
 }
 
-function hasValidSegmentPairs(data: TranslationData): boolean {
+function hasValidSegmentPairs(data: NormalizedTranslationData): boolean {
   const originals = data.originalText.contents;
   const translations = data.translatedText.contents;
 
@@ -157,7 +162,7 @@ function hasValidSegmentPairs(data: TranslationData): boolean {
 export function normalizeTranslationResponse(
   raw: unknown,
   includeDescription?: boolean,
-): Result<TranslationResponse, AppError> {
+): Result<NormalizedTranslationResponse, AppError> {
   try {
     if (exceedsResponseLimits(raw))
       return failure(TranslationError.responseLimit());

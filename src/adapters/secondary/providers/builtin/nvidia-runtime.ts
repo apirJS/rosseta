@@ -5,7 +5,7 @@ import {
   type ProviderRuntime,
 } from '../ProviderRuntime';
 import { createProviderSdkTransport } from '../thinking/create-sdk-transport';
-import { PROVIDER_ENDPOINTS } from '../../translation/compatibility/translation-capability-key';
+import { PROVIDER_ENDPOINTS } from '../provider-connection';
 
 export function createNvidiaRuntime(
   input: ProviderRuntimeInput,

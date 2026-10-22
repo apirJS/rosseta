@@ -21,10 +21,8 @@ import {
   VALID_IMAGE,
   VALID_PAIRED_TRANSLATION_RESPONSE,
 } from '../../../../tests/test-fixtures';
-import {
-  modelScopeKey,
-  providerProtocol,
-} from './compatibility/translation-capability-key';
+import { modelScopeKey } from './compatibility/translation-capability-key';
+import { providerProtocol } from '../providers/provider-connection';
 
 const providers = [
   'google',

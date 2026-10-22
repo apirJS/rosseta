@@ -1,17 +1,13 @@
 import type { ITranslationProgressObserver } from '../../../../core/ports/outbound/ITranslationProgressObserver';
 import type { TranslationDraft } from '../../../../core/ports/outbound/TranslationExecutionOptions';
 import { TranslationError } from '../../../../shared/errors';
-import type {
-  GenerationEvent,
-  GenerationMode,
-} from '../transports/GenerationTransport';
-import {
-  MAX_TRANSLATION_BYTES,
-  parsePartialTranslationJson,
-} from './parse-partial-translation-json';
+import type { GenerationEvent } from '../transports/GenerationTransport';
+import type { GenerationMode } from '../transports/generation-modes';
+import { parsePartialTranslationJson } from './parse-partial-translation-json';
+import { MAX_TRANSLATION_BYTES } from '../output/translation-response-limits';
 import { mapTranslationDraft } from './translation-draft-mapper';
 import type { TranslationExecutionScope } from '../execution/translation-execution';
-import { isStructured } from '../execution/translation-fallback';
+import { isStructured } from '../transports/generation-modes';
 
 const SNAPSHOT_INTERVAL_MS = 75;
 const encoder = new TextEncoder();

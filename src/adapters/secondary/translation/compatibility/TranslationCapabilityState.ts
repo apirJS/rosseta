@@ -7,11 +7,11 @@ import type {
 import {
   GENERATION_MODES,
   type GenerationMode,
-} from '../transports/GenerationTransport';
+} from '../transports/generation-modes';
 import { TranslationCapabilityJournal } from './TranslationCapabilityJournal';
 import type { CapabilityFacts } from './translation-capability-facts';
 import { migrateLegacyCapabilities } from './translation-capability-migration';
-import { isStructured, isStreamed } from '../execution/translation-fallback';
+import { isStructured, isStreamed } from '../transports/generation-modes';
 
 type UnsupportedFeature = 'structured' | 'stream' | 'combination' | 'vision';
 

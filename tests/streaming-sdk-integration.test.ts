@@ -11,8 +11,8 @@ import { z } from 'zod';
 import type { LanguageModelV4StreamPart } from '@ai-sdk/provider';
 import { AiSdkGenerationTransport } from '../src/adapters/secondary/translation/transports/ai-sdk/AiSdkGenerationTransport';
 import { EncodedImage } from '../src/core/domain/image/EncodedImage';
-import { createTranslationDataSchema } from '../src/adapters/secondary/translation/output/translation-schema';
-import { inspectTranslationCompletion } from '../src/adapters/secondary/translation/output/translation-completion';
+import { createGenerationResponseSchema } from '../src/adapters/secondary/translation/output/translation-schema';
+import { inspectGenerationCompletion } from '../src/adapters/secondary/translation/output/inspect-generation-completion';
 import { createTranslationFixture } from './fixtures/translation-provider-server';
 
 import { ApiKey } from '../src/core/domain/credential/ApiKey';
@@ -156,7 +156,7 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
         image: image.data,
         instructions: 'Return JSON',
         userText: 'test',
-        schema: createTranslationDataSchema(),
+        schema: createGenerationResponseSchema(),
         signal: new AbortController().signal,
       },
       async () => {},
@@ -223,7 +223,7 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
           image: image.data,
           instructions: 'Return JSON',
           userText: 'test',
-          schema: createTranslationDataSchema(true),
+          schema: createGenerationResponseSchema(true),
           signal: new AbortController().signal,
         },
         async (event) => {
@@ -238,7 +238,7 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
       expect(generated.finishReason).toBe('stop');
 
       expect(
-        inspectTranslationCompletion(generated, streamedText, true),
+        inspectGenerationCompletion(generated, streamedText, true),
       ).toMatchObject({
         kind: 'accepted',
         response: {
@@ -317,7 +317,7 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
           image: image.data,
           instructions: 'Return JSON',
           userText: 'test',
-          schema: createTranslationDataSchema(),
+          schema: createGenerationResponseSchema(),
           signal: new AbortController().signal,
         },
         async () => {},
@@ -326,7 +326,7 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
       expect(generated.text).toBe(text);
       expect(generated.finishReason).not.toBe('stop');
 
-      expect(inspectTranslationCompletion(generated, text, true).kind).not.toBe(
+      expect(inspectGenerationCompletion(generated, text, true).kind).not.toBe(
         'accepted',
       );
 
@@ -368,7 +368,7 @@ describe('Installed AI SDK streaming integration (no Bun preload)', () => {
               image: image.data,
               instructions: 'Return JSON',
               userText: 'test',
-              schema: createTranslationDataSchema(),
+              schema: createGenerationResponseSchema(),
               signal: new AbortController().signal,
             },
             async () => {},

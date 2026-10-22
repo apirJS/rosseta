@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { readGenerationErrorDetails } from './generation-error-details';
+import { readGenerationErrorDetails } from './provider-error-details';
 
 describe('Adapter: generation error details', () => {
   test('prefers a nested error status over a successful HTTP envelope', () => {

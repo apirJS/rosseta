@@ -4,7 +4,7 @@ import type { TranslationProviderContext } from '../translation/transports/Gener
 
 export type { ProviderRuntime } from '../translation/transports/GenerationTransport';
 
-import { providerProtocol } from '../translation/compatibility/translation-capability-key';
+import { providerProtocol } from './provider-connection';
 
 export interface ProviderRuntimeInput {
   readonly credential: Credential;

@@ -5,7 +5,7 @@ import { Credentials } from '../src/core/domain/credential/Credentials';
 import { UserPreferences } from '../src/core/domain/preferences/UserPreferences';
 import { EncodedImage } from '../src/core/domain/image/EncodedImage';
 import { Language } from '../src/core/domain/translation/Language';
-import type { TranslationSchemaOutput } from '../src/adapters/secondary/translation/output/translation-schema';
+import type { NormalizedTranslationResponse } from '../src/adapters/secondary/translation/output/translation-schema';
 import { seedStore } from './browser-mock';
 import type { Provider } from '../src/core/domain/credential/Provider';
 
@@ -22,7 +22,7 @@ export const VALID_IMAGE = (() => {
 
 export const TARGET_LANGUAGE = Language.create('en-US');
 
-export const VALID_TRANSLATION_RESPONSE: TranslationSchemaOutput = {
+export const VALID_TRANSLATION_RESPONSE: NormalizedTranslationResponse = {
   success: true,
   error: null,
   data: {

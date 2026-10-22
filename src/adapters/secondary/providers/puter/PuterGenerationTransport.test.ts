@@ -2,7 +2,7 @@ import { afterAll, afterEach, describe, expect, spyOn, test } from 'bun:test';
 import puterSdk from '@heyputer/puter.js';
 import type { ChatResponseChunk } from '@heyputer/puter.js';
 import { PuterGenerationTransport } from './PuterGenerationTransport';
-import { createTranslationDataSchema } from '../../translation/output/translation-schema';
+import { createGenerationResponseSchema } from '../../translation/output/translation-schema';
 import { VALID_IMAGE } from '../../../../../tests/test-fixtures';
 import type {
   GenerationEvent,
@@ -16,7 +16,7 @@ function request(mode: 'plain-stream' | 'plain-buffered'): GenerationRequest {
     image: VALID_IMAGE,
     instructions: 'JSON prompt',
     userText: 'Read screenshot',
-    schema: createTranslationDataSchema(),
+    schema: createGenerationResponseSchema(),
     signal: new AbortController().signal,
   };
 }

@@ -2,14 +2,14 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import baseline from './compatibility-identities.fixture.json';
 import { capabilityDigest, modelScopeKey } from './translation-capability-key';
-import { createTranslationDataSchema } from '../output/translation-schema';
+import { createGenerationResponseSchema } from '../output/translation-schema';
 import { thinkingConfigurations } from '../../providers/thinking/thinking-configurations';
 
 describe('Adapter: preserved compatibility identity', () => {
   for (const fixture of baseline.schemaFingerprints) {
     test(`schema fingerprint with description ${fixture.includeDescription}`, async () => {
       const schema = z.toJSONSchema(
-        createTranslationDataSchema(fixture.includeDescription),
+        createGenerationResponseSchema(fixture.includeDescription),
         { target: 'draft-07', io: 'input' },
       );
 

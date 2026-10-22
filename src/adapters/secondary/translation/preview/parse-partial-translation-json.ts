@@ -3,9 +3,7 @@ import { parsePartialJson } from 'ai';
 import { TranslationError } from '../../../../shared/errors';
 import type { TranslationDraft } from '../../../../core/ports/outbound/TranslationExecutionOptions';
 import { mapTranslationDraft, record } from './translation-draft-mapper';
-import { MAX_TRANSLATION_BYTES } from './translation-response-limits';
-
-export { MAX_TRANSLATION_BYTES } from './translation-response-limits';
+import { MAX_TRANSLATION_BYTES } from '../output/translation-response-limits';
 
 const MAX_PREVIEW_CANDIDATES = 32;
 

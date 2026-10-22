@@ -5,7 +5,7 @@ import {
   parseTranslationResponse,
 } from './parse-translation-json';
 import { ErrorCode } from '../../../../shared/errors';
-import { MAX_TRANSLATION_BYTES } from '../preview/translation-response-limits';
+import { MAX_TRANSLATION_BYTES } from './translation-response-limits';
 
 const VALID_PAYLOAD = `{"success":true,"data":{"originalText":{"contents":[{"text":"Where to Find Your Likes","languageBcp47Code":"en-US","language":"English","romanization":null}]},"translatedText":{"contents":[{"text":"Cara Menemukan Suka Anda","languageBcp47Code":"id-ID","language":"Indonesian","romanization":null}]},"description":""}}`;
 

@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { createTranslationDataSchema } from './translation-schema';
+import { createGenerationResponseSchema } from './translation-schema';
 
 export interface PromptParams {
   targetLanguageCode: string;
@@ -8,7 +8,7 @@ export interface PromptParams {
 }
 
 export function buildPlainPrompt(params: PromptParams): string {
-  return `${buildBasePrompt(params)}\nJSON Schema:\n${JSON.stringify(z.toJSONSchema(createTranslationDataSchema(params.includeDescription ?? true), { target: 'draft-07', io: 'input' }))}`;
+  return `${buildBasePrompt(params)}\nJSON Schema:\n${JSON.stringify(z.toJSONSchema(createGenerationResponseSchema(params.includeDescription ?? true), { target: 'draft-07', io: 'input' }))}`;
 }
 
 export function buildBasePrompt({

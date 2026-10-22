@@ -1,9 +1,22 @@
+import { RetryError } from 'ai';
+
 export interface GenerationErrorDetails {
   status: number;
   message: string;
   code: string;
   parameters: string[];
   url?: string;
+}
+
+/** Unwrap bounded SDK retry containers before reading the provider failure. */
+export function unwrapGenerationError(error: unknown): unknown {
+  let current = error;
+
+  for (let depth = 0; depth < 5 && RetryError.isInstance(current); depth++) {
+    current = current.lastError;
+  }
+
+  return current;
 }
 
 const MAX_ERROR_ENVELOPES = 16;

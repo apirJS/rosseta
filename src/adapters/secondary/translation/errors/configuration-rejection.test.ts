@@ -5,10 +5,31 @@ import {
   StreamProviderError,
   UnsupportedFunctionalityError,
 } from 'ai';
-import {
-  isConfigurationModeConflict,
-  isConfigurationRejection,
-} from './generation-configuration-error';
+import { classifyGenerationFailure } from './classify-generation-failure';
+
+function isConfigurationRejection(
+  error: unknown,
+  fields: readonly string[],
+): boolean {
+  return (
+    classifyGenerationFailure(error, {
+      mode: 'structured-stream',
+      configuration: { id: 'fixture', rejectionFields: fields },
+    }).kind === 'configuration-rejected'
+  );
+}
+
+function isConfigurationModeConflict(
+  error: unknown,
+  fields: readonly string[],
+): boolean {
+  return (
+    classifyGenerationFailure(error, {
+      mode: 'structured-stream',
+      configuration: { id: 'fixture', rejectionFields: fields },
+    }).kind === 'configuration-mode-rejected'
+  );
+}
 
 function api(message: string, statusCode = 400, param?: string): APICallError {
   return new APICallError({
@@ -23,6 +44,70 @@ function api(message: string, statusCode = 400, param?: string): APICallError {
 }
 
 describe('Adapter: generation configuration rejection evidence', () => {
+  test.each([
+    ['reasoning_effort none is not supported with json_schema', 'structured'],
+    ['Streaming is not supported when reasoning_effort is none', 'stream'],
+    [
+      'Structured streaming is unsupported with reasoning_effort',
+      'combination',
+    ],
+    ['reasoning_effort cannot be used in streaming', 'combination'],
+  ] as const)(
+    'retains the existing fallback reason for a scoped conflict: %s',
+    (message, reason) => {
+      expect(
+        classifyGenerationFailure(api(message), {
+          mode: 'structured-stream',
+          configuration: {
+            id: 'thinking-off',
+            rejectionFields: ['reasoning_effort'],
+          },
+        }),
+      ).toMatchObject({
+        kind: 'configuration-mode-rejected',
+        configurationId: 'thinking-off',
+        mode: 'structured-stream',
+        reason,
+      });
+    },
+  );
+
+  test('active-control attribution precedes a broader structured-feature interpretation', () => {
+    const error = api(
+      'reasoning_effort is unsupported; response_format is unavailable',
+      400,
+      'reasoning_effort',
+    );
+
+    expect(
+      classifyGenerationFailure(error, {
+        mode: 'structured-stream',
+        configuration: { id: 'off', rejectionFields: ['reasoning_effort'] },
+      }),
+    ).toMatchObject({ kind: 'configuration-rejected', configurationId: 'off' });
+
+    expect(
+      classifyGenerationFailure(error, { mode: 'structured-stream' }),
+    ).toMatchObject({ kind: 'feature-rejected', feature: 'structured' });
+  });
+
+  test('retryable stream evidence stays transient with an active control', () => {
+    const error = new StreamProviderError({
+      statusCode: 400,
+      code: 'invalid_request_error',
+      message: 'reasoning_effort is unsupported',
+      data: { param: 'reasoning_effort' },
+      isRetryable: true,
+    });
+
+    expect(
+      classifyGenerationFailure(error, {
+        mode: 'plain-stream',
+        configuration: { id: 'off', rejectionFields: ['reasoning_effort'] },
+      }),
+    ).toMatchObject({ kind: 'transient' });
+  });
+
   test.each([
     ['Unsupported parameter', 'reasoning_effort'],
     [

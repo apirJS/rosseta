@@ -4,22 +4,22 @@ import {
   type AppError,
 } from '../../../../shared/errors';
 import type { GenerationResult } from '../transports/GenerationTransport';
-import { MAX_TRANSLATION_BYTES } from '../preview/parse-partial-translation-json';
+import { MAX_TRANSLATION_BYTES } from './translation-response-limits';
 import { parseTranslationResponse } from './parse-translation-json';
 import { normalizeTranslationResponse } from './translation-response-normalizer';
-import type { TranslationResponse } from './translation-schema';
+import type { NormalizedTranslationResponse } from './translation-schema';
 
-export type TranslationCompletion =
-  | { kind: 'accepted'; response: TranslationResponse }
-  | { kind: 'incomplete'; text: string; finishReason: string }
+export type CompletionDecision =
+  | { kind: 'accepted'; response: NormalizedTranslationResponse }
+  | { kind: 'repairable'; previousResponse: string }
   | { kind: 'failed'; error: AppError };
 
 /** Final validation is independent of provisional parsing and retry policy. */
-export function inspectTranslationCompletion(
+export function inspectGenerationCompletion(
   generated: GenerationResult,
   streamedText: string,
   includeDescription: boolean,
-): TranslationCompletion {
+): CompletionDecision {
   const raw = generated.text.trim() ? generated.text : streamedText;
   const texts = [...new Set([generated.text, streamedText])];
 
@@ -68,9 +68,8 @@ export function inspectTranslationCompletion(
     return { kind: 'accepted', response: parsed.data };
   }
 
-  return {
-    kind: 'incomplete',
-    text: raw,
-    finishReason: generated.finishReason,
-  };
+  if (generated.finishReason !== 'stop' && generated.finishReason !== 'length')
+    return { kind: 'failed', error: TranslationError.interrupted() };
+
+  return { kind: 'repairable', previousResponse: raw };
 }

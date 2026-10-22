@@ -4,9 +4,14 @@ import {
   StreamProviderError,
   UnsupportedFunctionalityError,
 } from 'ai';
-import { classifyGenerationError } from './generation-errors';
+import { classifyGenerationFailure } from './classify-generation-failure';
+import type { GenerationMode } from '../transports/generation-modes';
 import { ErrorCode, NetworkError } from '../../../../shared/errors';
 import { UNAVAILABLE_RESPONSE_FORMAT_ERROR } from '../../../../../tests/fixtures/captured-provider-errors';
+
+function classify(error: unknown, mode: GenerationMode) {
+  return classifyGenerationFailure(error, { mode });
+}
 
 function api(message: string, statusCode = 400) {
   return new APICallError({
@@ -20,10 +25,10 @@ function api(message: string, statusCode = 400) {
 describe('Adapter: provider failure evidence', () => {
   test('an adapter timeout preserves its error and allows a transport restart', () => {
     const error = NetworkError.timeout();
-    const result = classifyGenerationError(error, 'plain-stream');
+    const result = classify(error, 'plain-stream');
 
     expect(result.error).toBe(error);
-    expect(result.transient).toBe(true);
+    expect(result.kind).toBe('transient');
   });
 
   test('reads SDK functionality metadata even when a custom message omits it', () => {
@@ -32,9 +37,10 @@ describe('Adapter: provider failure evidence', () => {
       message: 'Request rejected',
     });
 
-    expect(
-      classifyGenerationError(error, 'structured-stream').unsupported,
-    ).toBe('structured');
+    expect(classify(error, 'structured-stream')).toMatchObject({
+      kind: 'feature-rejected',
+      feature: 'structured',
+    });
   });
 
   test('recognizes explicit feature rejection in a typed successful-HTTP stream error', () => {
@@ -44,9 +50,10 @@ describe('Adapter: provider failure evidence', () => {
       message: 'response_format is unsupported',
     });
 
-    expect(
-      classifyGenerationError(error, 'structured-stream').unsupported,
-    ).toBe('structured');
+    expect(classify(error, 'structured-stream')).toMatchObject({
+      kind: 'feature-rejected',
+      feature: 'structured',
+    });
   });
 
   test('retryable in-band errors restart without teaching model incompatibility', () => {
@@ -56,25 +63,24 @@ describe('Adapter: provider failure evidence', () => {
       isRetryable: true,
     });
 
-    const result = classifyGenerationError(error, 'structured-stream');
+    const result = classify(error, 'structured-stream');
 
-    expect(result.unsupported).toBeUndefined();
-    expect(result.transient).toBe(true);
+    expect(result.kind).toBe('transient');
   });
 
   test('plain untyped error prose cannot establish no-vision compatibility', () => {
-    const result = classifyGenerationError(
+    const result = classify(
       new Error('This model does not support images'),
       'plain-stream',
     );
 
-    expect(result.unsupported).toBeUndefined();
+    expect(result).toMatchObject({ kind: 'terminal' });
   });
 
   test.each(['permission_denied', 'access_denied', 'authentication_error'])(
     'keeps terminal nested %s codes ahead of feature evidence',
     (code) => {
-      const result = classifyGenerationError(
+      const result = classify(
         {
           status: 400,
           error: { code, message: 'response_format is unsupported' },
@@ -82,13 +88,13 @@ describe('Adapter: provider failure evidence', () => {
         'structured-stream',
       );
 
-      expect(result.unsupported).toBeUndefined();
+      expect(result).toMatchObject({ kind: 'terminal' });
       expect(result.error.isCategory('AUTH')).toBe(true);
     },
   );
 
   test('an invalid_json_schema code cannot teach structured-output incompatibility', () => {
-    const result = classifyGenerationError(
+    const result = classify(
       {
         status: 400,
         error: {
@@ -99,7 +105,7 @@ describe('Adapter: provider failure evidence', () => {
       'structured-stream',
     );
 
-    expect(result.unsupported).toBeUndefined();
+    expect(result).toMatchObject({ kind: 'terminal' });
   });
 
   test.each([
@@ -110,7 +116,7 @@ describe('Adapter: provider failure evidence', () => {
   ])(
     'keeps nested input/access code %s ahead of feature evidence',
     (code, expected) => {
-      const result = classifyGenerationError(
+      const result = classify(
         {
           status: 400,
           error: { code, message: 'response_format is unsupported' },
@@ -118,7 +124,7 @@ describe('Adapter: provider failure evidence', () => {
         'structured-stream',
       );
 
-      expect(result.unsupported).toBeUndefined();
+      expect(result).toMatchObject({ kind: 'terminal' });
       expect(result.error.code).toBe(expected);
     },
   );
@@ -137,26 +143,20 @@ describe('Adapter: provider failure evidence', () => {
   ])(
     'retains terminal normalized code %s ahead of compatibility evidence',
     (code, message, expected) => {
-      const result = classifyGenerationError(
-        { status: 400, code, message },
-        'plain-stream',
-      );
+      const result = classify({ status: 400, code, message }, 'plain-stream');
 
       expect(result.error.code).toBe(expected);
-      expect(result.unsupported).toBeUndefined();
+      expect(result).toMatchObject({ kind: 'terminal' });
     },
   );
 
   test.each([408, 504])(
     'transport HTTP %i timeouts can restart once',
     (status) => {
-      const result = classifyGenerationError(
-        api('Request timed out', status),
-        'plain-stream',
-      );
+      const result = classify(api('Request timed out', status), 'plain-stream');
 
       expect(result.error.code).toBe(ErrorCode.NETWORK_TIMEOUT);
-      expect(result.transient).toBe(true);
+      expect(result.kind).toBe('transient');
     },
   );
 
@@ -165,10 +165,12 @@ describe('Adapter: provider failure evidence', () => {
     'streaming is not supported with response_format',
     'json_schema streaming is not available',
   ])('scopes a combined rejection to the observed mode: %s', (message) => {
-    const failure = classifyGenerationError(api(message), 'structured-stream');
+    const failure = classify(api(message), 'structured-stream');
 
-    expect(failure.unsupported).toBe('combination');
-    expect(failure.general).not.toBe(true);
+    expect(failure).toMatchObject({
+      kind: 'mode-rejected',
+      mode: 'structured-stream',
+    });
   });
 
   test.each([
@@ -176,9 +178,9 @@ describe('Adapter: provider failure evidence', () => {
     'response_format schema is invalid',
     'Required properties missing in JSON schema',
   ])('does not persist application schema bugs: %s', (message) => {
-    expect(
-      classifyGenerationError(api(message), 'structured-stream').unsupported,
-    ).toBeUndefined();
+    expect(classify(api(message), 'structured-stream')).toMatchObject({
+      kind: 'terminal',
+    });
   });
 
   test.each([
@@ -189,28 +191,24 @@ describe('Adapter: provider failure evidence', () => {
   ])(
     'HTTP %i remains terminal even if the text contains unsupported features',
     (status, code) => {
-      const failure = classifyGenerationError(
+      const failure = classify(
         api('Streaming is unsupported', status as number),
         'structured-stream',
       );
 
-      expect(failure.unsupported).toBeUndefined();
+      expect(failure).toMatchObject({ kind: 'terminal' });
       expect(failure.error.code).toBe(code);
     },
   );
 
   test('definitive no-vision is model evidence while invalid image input is terminal', () => {
     expect(
-      classifyGenerationError(
-        api('This model does not support images'),
-        'plain-buffered',
-      ).unsupported,
-    ).toBe('vision');
+      classify(api('This model does not support images'), 'plain-buffered'),
+    ).toMatchObject({ kind: 'feature-rejected', feature: 'vision' });
 
     expect(
-      classifyGenerationError(api('Invalid image payload'), 'plain-stream')
-        .unsupported,
-    ).toBeUndefined();
+      classify(api('Invalid image payload'), 'plain-stream'),
+    ).toMatchObject({ kind: 'terminal' });
   });
 
   test.each([
@@ -235,10 +233,10 @@ describe('Adapter: provider failure evidence', () => {
       ];
 
       for (const error of errors) {
-        const result = classifyGenerationError(error, 'plain-stream');
+        const result = classify(error, 'plain-stream');
 
         expect(result.error.code).toBe(expected);
-        expect(result.unsupported).toBeUndefined();
+        expect(result).toMatchObject({ kind: 'terminal' });
       }
     },
   );
@@ -247,9 +245,10 @@ describe('Adapter: provider failure evidence', () => {
     'This model does not support image input',
     'Image input is unsupported by this text-only model',
   ])('retains genuine model no-vision evidence: %s', (message) => {
-    expect(
-      classifyGenerationError(api(message), 'plain-stream').unsupported,
-    ).toBe('vision');
+    expect(classify(api(message), 'plain-stream')).toMatchObject({
+      kind: 'feature-rejected',
+      feature: 'vision',
+    });
   });
 
   test('duplicated JSON error metadata does not misidentify unsupported schema as an invalid application schema', () => {
@@ -267,9 +266,10 @@ describe('Adapter: provider failure evidence', () => {
       }),
     });
 
-    expect(
-      classifyGenerationError(error, 'structured-stream').unsupported,
-    ).toBe('structured');
+    expect(classify(error, 'structured-stream')).toMatchObject({
+      kind: 'feature-rejected',
+      feature: 'structured',
+    });
   });
 
   test.each([
@@ -283,10 +283,12 @@ describe('Adapter: provider failure evidence', () => {
     'JSON-schema is not supported',
     'response format is unavailable',
   ])('recognizes explicit unavailable-format wording: %s', (message) => {
-    const result = classifyGenerationError(api(message), 'structured-stream');
+    const result = classify(api(message), 'structured-stream');
 
-    expect(result.unsupported).toBe('structured');
-    expect(result.general).toBe(true);
+    expect(result).toMatchObject({
+      kind: 'feature-rejected',
+      feature: 'structured',
+    });
   });
 
   test.each([
@@ -308,9 +310,10 @@ describe('Adapter: provider failure evidence', () => {
   ])(
     'finds captured feature evidence in nested SDK/provider envelopes %#',
     (error) => {
-      expect(
-        classifyGenerationError(error, 'structured-stream').unsupported,
-      ).toBe('structured');
+      expect(classify(error, 'structured-stream')).toMatchObject({
+        kind: 'feature-rejected',
+        feature: 'structured',
+      });
     },
   );
 
@@ -322,11 +325,11 @@ describe('Adapter: provider failure evidence', () => {
     'recognizes structured-feature evidence supplied only by a provider code: %s',
     (code) => {
       expect(
-        classifyGenerationError(
+        classify(
           { statusCode: 400, error: { code, message: 'Request rejected' } },
           'structured-stream',
-        ).unsupported,
-      ).toBe('structured');
+        ),
+      ).toMatchObject({ kind: 'feature-rejected', feature: 'structured' });
     },
   );
 
@@ -377,9 +380,9 @@ describe('Adapter: provider failure evidence', () => {
         responseBody: JSON.stringify({ error: { code, message } }),
       });
 
-      const result = classifyGenerationError(error, 'structured-stream');
+      const result = classify(error, 'structured-stream');
 
-      expect(result.unsupported).toBeUndefined();
+      expect(result).toMatchObject({ kind: 'terminal' });
       expect(result.error.code).toBe(expected);
     },
   );
@@ -394,9 +397,9 @@ describe('Adapter: provider failure evidence', () => {
   ])(
     'does not discover provider modes from an unrelated or invalid request: %s',
     (message) => {
-      expect(
-        classifyGenerationError(api(message), 'structured-stream').unsupported,
-      ).toBeUndefined();
+      expect(classify(api(message), 'structured-stream')).toMatchObject({
+        kind: 'terminal',
+      });
     },
   );
 
@@ -411,15 +414,15 @@ describe('Adapter: provider failure evidence', () => {
   ])(
     'does not share credential access restrictions with other accounts: %s',
     (message) => {
-      const result = classifyGenerationError(api(message), 'structured-stream');
+      const result = classify(api(message), 'structured-stream');
 
-      expect(result.unsupported).toBeUndefined();
+      expect(result).toMatchObject({ kind: 'terminal' });
       expect(result.error.code).toBe(ErrorCode.AUTH_ACCESS_DENIED);
     },
   );
 
   test('does not persist backend downtime as unsupported-format evidence', () => {
-    const result = classifyGenerationError(
+    const result = classify(
       api(
         'response_format is temporarily unavailable; service unavailable',
         503,
@@ -427,8 +430,7 @@ describe('Adapter: provider failure evidence', () => {
       'structured-stream',
     );
 
-    expect(result.unsupported).toBeUndefined();
-    expect(result.transient).toBe(true);
+    expect(result.kind).toBe('transient');
     expect(result.error.code).toBe(ErrorCode.NETWORK_PROVIDER_UNAVAILABLE);
   });
 
@@ -438,10 +440,9 @@ describe('Adapter: provider failure evidence', () => {
   ])(
     'keeps explicit temporary HTTP 400 outages transient without feature learning: %s',
     (message) => {
-      const result = classifyGenerationError(api(message), 'structured-stream');
+      const result = classify(api(message), 'structured-stream');
 
-      expect(result.unsupported).toBeUndefined();
-      expect(result.transient).toBe(true);
+      expect(result.kind).toBe('transient');
       expect(result.error.code).toBe(ErrorCode.NETWORK_PROVIDER_UNAVAILABLE);
     },
   );

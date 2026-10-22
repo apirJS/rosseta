@@ -1,5 +1,5 @@
 import type { generateText, LanguageModel } from 'ai';
-import type { GenerationConfiguration } from '../generation-configurations';
+import type { GenerationConfiguration } from '../GenerationTransport';
 
 export type SdkProviderOptions = NonNullable<
   Parameters<typeof generateText>[0]['providerOptions']

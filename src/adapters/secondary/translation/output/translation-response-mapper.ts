@@ -4,20 +4,10 @@ import { TextSegment } from '../../../../core/domain/translation/TextSegment';
 import { Translation } from '../../../../core/domain/translation/Translation';
 import { success, failure, type Result } from '../../../../shared/types/Result';
 import { TranslationError, type AppError } from '../../../../shared/errors';
-
-interface ResponseSegment {
-  text: string;
-  languageBcp47Code: string;
-  language: string;
-  romanization: string | null;
-  blockIndex: number;
-}
-
-export interface TranslationData {
-  originalText: { contents: ResponseSegment[] };
-  translatedText: { contents: ResponseSegment[] };
-  description?: string | null;
-}
+import type {
+  NormalizedResponseSegment,
+  NormalizedTranslationData,
+} from './translation-schema';
 
 function resolveSourceLanguage(code: string, tag: string): Language {
   let language = Language.fromRaw(code);
@@ -35,8 +25,8 @@ function resolveSourceLanguage(code: string, tag: string): Language {
 }
 
 function mapSegments(
-  items: ResponseSegment[],
-  languageFor: (item: ResponseSegment) => Language,
+  items: NormalizedResponseSegment[],
+  languageFor: (item: NormalizedResponseSegment) => Language,
   tag: string,
 ): Result<TextSegment[], AppError> {
   const segments: TextSegment[] = [];
@@ -62,7 +52,7 @@ function mapSegments(
 }
 
 export function mapResponseToDomain(
-  data: TranslationData,
+  data: NormalizedTranslationData,
   targetLanguage: Language,
   tag: string,
 ): Result<Translation, AppError> {

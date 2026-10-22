@@ -1,6 +1,6 @@
 import type { EncodedImage } from '../../../../core/domain/image/EncodedImage';
 import type { z } from 'zod';
-import type { GenerationConfiguration } from './generation-configurations';
+import type { GenerationMode } from './generation-modes';
 
 export interface ModelScopeInput {
   providerId: string;
@@ -25,18 +25,16 @@ export interface ProviderRuntime {
   readonly context: TranslationProviderContext;
 }
 
-export type GenerationMode =
-  | 'structured-stream'
-  | 'plain-stream'
-  | 'structured-buffered'
-  | 'plain-buffered';
+/** Request controls have opaque identities outside their provider transport. */
+export interface GenerationConfiguration {
+  id: string;
+  rejectionFields: readonly string[];
+}
 
-export const GENERATION_MODES: readonly GenerationMode[] = [
-  'structured-stream',
-  'plain-stream',
-  'structured-buffered',
-  'plain-buffered',
-];
+export type GenerationRoute = Readonly<{
+  mode: GenerationMode;
+  configurationId?: string;
+}>;
 
 export interface GenerationRequest {
   mode: GenerationMode;
@@ -65,6 +63,13 @@ export interface GenerationResult {
   schemaValidated: boolean;
   validationError?: unknown;
 }
+
+/** The completed invocation's provenance survives later selection changes. */
+export type AttemptReceipt = Readonly<{
+  route: GenerationRoute;
+  generated: GenerationResult;
+  streamedText: string;
+}>;
 
 export interface ITranslationGenerationTransport {
   readonly supportedModes?: readonly GenerationMode[];

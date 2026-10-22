@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { FakeTranslationCapabilityStorage } from '../../../../../tests/fakes/FakeTranslationCapabilityStorage';
 import { StorageError } from '../../../../shared/errors';
 import { TranslationCapabilityState } from './TranslationCapabilityState';
-import { GENERATION_MODES } from '../transports/GenerationTransport';
+import { GENERATION_MODES } from '../transports/generation-modes';
 
 describe('Adapter: TranslationCapabilityState', () => {
   afterEach(() => mock.restore());

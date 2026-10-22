@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { ErrorCode } from '../../../../shared/errors';
 import { normalizeTranslationResponse } from './translation-response-normalizer';
-import { MAX_TRANSLATION_BYTES } from '../preview/translation-response-limits';
+import { MAX_TRANSLATION_BYTES } from './translation-response-limits';
 
 function pair(blockIndex = 0) {
   return {

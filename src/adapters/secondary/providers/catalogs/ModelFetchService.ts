@@ -14,7 +14,7 @@ import { isCustomProviderId } from '../../../../core/domain/provider/CustomProvi
 import type { CustomProviderType } from '../../../../core/domain/provider/CustomProviderConfig';
 import { buildCustomProviderURL } from '../requests/custom-provider-request';
 import { withPuterSession } from '../puter/PuterSdkSession';
-import { PROVIDER_ENDPOINTS } from '../../translation/compatibility/translation-capability-key';
+import { PROVIDER_ENDPOINTS } from '../provider-connection';
 
 class HttpError extends Error {
   constructor(

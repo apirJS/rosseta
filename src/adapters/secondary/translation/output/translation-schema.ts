@@ -1,5 +1,25 @@
 import { z } from 'zod';
-import type { TranslationData } from './translation-response-mapper';
+
+/** Canonical completed data shared by receipt validation and domain mapping. */
+export interface NormalizedResponseSegment {
+  text: string;
+  languageBcp47Code: string;
+  language: string;
+  romanization: string | null;
+  blockIndex: number;
+}
+
+export interface NormalizedTranslationData {
+  originalText: { contents: NormalizedResponseSegment[] };
+  translatedText: { contents: NormalizedResponseSegment[] };
+  description?: string | null;
+}
+
+export interface NormalizedTranslationResponse {
+  success: boolean;
+  error: string | null;
+  data: NormalizedTranslationData | null;
+}
 
 const blockIndexSchema = z
   .number()
@@ -36,7 +56,8 @@ const segmentSchema = z
   })
   .strict();
 
-export function createTranslationDataSchema(includeDescription = true) {
+/** Strict outgoing contract, also serialized into plain generation prompts. */
+export function createGenerationResponseSchema(includeDescription = true) {
   const shape = {
     segments: z
       .array(segmentSchema)
@@ -79,7 +100,7 @@ export function createTranslationDataSchema(includeDescription = true) {
 }
 
 // Receipt-only schemas tolerate omitted nullable metadata; requests stay strict.
-export const pairedTranslationSchema = z
+export const pairedResponseSchema = z
   .object({
     success: z.boolean(),
     error: z.string().nullable().optional(),
@@ -97,8 +118,6 @@ export const pairedTranslationSchema = z
   })
   .strict();
 
-export const translationDataSchema = createTranslationDataSchema();
-
 const legacySegment = z
   .object({
     text: z.string(),
@@ -109,7 +128,7 @@ const legacySegment = z
   })
   .strict();
 
-export const translationDataLenientSchema = z
+export const legacyResponseSchema = z
   .object({
     success: z.boolean(),
     error: z.string().nullish(),
@@ -124,15 +143,4 @@ export const translationDataLenientSchema = z
   })
   .strict();
 
-export interface TranslationResponse {
-  success: boolean;
-  error: string | null;
-  data: TranslationData | null;
-}
-
-// Existing completed/domain fixtures deliberately retain the legacy representation.
-export type TranslationSchemaOutput = TranslationResponse;
-export type TranslationSchemaLenientOutput = z.infer<
-  typeof translationDataLenientSchema
->;
-export type PairedTranslationResponse = z.infer<typeof pairedTranslationSchema>;
+export type PairedResponse = z.infer<typeof pairedResponseSchema>;

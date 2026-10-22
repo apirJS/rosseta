@@ -4,8 +4,8 @@ import type {
   GenerationRequest,
   GenerationResult,
   ITranslationGenerationTransport,
-  GenerationMode,
 } from '../../src/adapters/secondary/translation/transports/GenerationTransport';
+import type { GenerationMode } from '../../src/adapters/secondary/translation/transports/generation-modes';
 
 export interface ScriptedGeneration {
   events?: GenerationEvent[];

@@ -15,19 +15,19 @@ import type { TranslationExecutionOptions } from '../../../../core/ports/outboun
 import { ErrorCode, StorageError } from '../../../../shared/errors';
 import { failure } from '../../../../shared/types/Result';
 import { executeTranslation } from '../execute-translation';
-import type { GenerationConfiguration } from '../transports/generation-configurations';
+import type { GenerationConfiguration } from '../transports/GenerationTransport';
 import type {
   GenerationEvent,
-  GenerationMode,
   GenerationRequest,
   GenerationResult,
 } from '../transports/GenerationTransport';
+import type { GenerationMode } from '../transports/generation-modes';
 import {
   capabilityDigest,
   modelScopeKey,
 } from '../compatibility/translation-capability-key';
 import { TranslationCapabilityState } from '../compatibility/TranslationCapabilityState';
-import { createTranslationDataSchema } from '../output/translation-schema';
+import { createGenerationResponseSchema } from '../output/translation-schema';
 
 const OFF = 'thinking.fixture-off.v1';
 const MINIMUM = 'thinking.fixture-minimum.v1';
@@ -173,7 +173,7 @@ async function cacheModeConflict(
   profile: string,
 ) {
   const schemaScope = await capabilityDigest(
-    z.toJSONSchema(createTranslationDataSchema(true), {
+    z.toJSONSchema(createGenerationResponseSchema(true), {
       target: 'draft-07',
       io: 'input',
     }),

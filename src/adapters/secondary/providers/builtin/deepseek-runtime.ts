@@ -5,7 +5,7 @@ import {
   type ProviderRuntime,
 } from '../ProviderRuntime';
 import { createProviderSdkTransport } from '../thinking/create-sdk-transport';
-import type { GenerationMode } from '../../translation/transports/GenerationTransport';
+import type { GenerationMode } from '../../translation/transports/generation-modes';
 
 const DEEPSEEK_MODES: readonly GenerationMode[] = [
   'plain-stream',

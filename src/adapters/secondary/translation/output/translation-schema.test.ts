@@ -2,9 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { buildPlainPrompt } from './prompt-base';
 import {
-  createTranslationDataSchema,
-  translationDataSchema,
-  translationDataLenientSchema,
+  createGenerationResponseSchema,
+  legacyResponseSchema,
 } from './translation-schema';
 import {
   VALID_TRANSLATION_RESPONSE,
@@ -65,7 +64,7 @@ function collectPropertiesMissingFromRequired(
 
 describe('Adapter: translation schema', () => {
   test('wire schema lists every property in required (strict json_schema endpoints)', () => {
-    const jsonSchema = z.toJSONSchema(translationDataSchema);
+    const jsonSchema = z.toJSONSchema(createGenerationResponseSchema());
 
     const required =
       (
@@ -83,7 +82,7 @@ describe('Adapter: translation schema', () => {
   test('every property is required at every nesting level (Groq strict mode)', () => {
     for (const includeDescription of [true, false]) {
       const jsonSchema = z.toJSONSchema(
-        createTranslationDataSchema(includeDescription),
+        createGenerationResponseSchema(includeDescription),
       ) as JsonSchemaNode;
 
       expect(collectPropertiesMissingFromRequired(jsonSchema)).toEqual([]);
@@ -92,7 +91,7 @@ describe('Adapter: translation schema', () => {
 
   test('wire schema includes description when requested', () => {
     const dataSchema = z.toJSONSchema(
-      createTranslationDataSchema(true).shape.data.unwrap(),
+      createGenerationResponseSchema(true).shape.data.unwrap(),
     );
 
     expect(dataSchema.properties).toHaveProperty('description');
@@ -101,7 +100,7 @@ describe('Adapter: translation schema', () => {
 
   test('wire schema omits description entirely when not requested', () => {
     const dataSchema = z.toJSONSchema(
-      createTranslationDataSchema(false).shape.data.unwrap(),
+      createGenerationResponseSchema(false).shape.data.unwrap(),
     );
 
     expect(dataSchema.properties).not.toHaveProperty('description');
@@ -112,7 +111,7 @@ describe('Adapter: translation schema', () => {
     'exports field guidance in the schema and plain prompt with description %s',
     (includeDescription) => {
       const schema = z.toJSONSchema(
-        createTranslationDataSchema(includeDescription),
+        createGenerationResponseSchema(includeDescription),
         { target: 'draft-07', io: 'input' },
       ) as JsonSchemaNode;
 
@@ -155,7 +154,7 @@ describe('Adapter: translation schema', () => {
   );
 
   test('wire schema accepts a fully-formed response', () => {
-    const result = translationDataSchema.safeParse(
+    const result = createGenerationResponseSchema().safeParse(
       VALID_PAIRED_TRANSLATION_RESPONSE,
     );
 
@@ -163,7 +162,7 @@ describe('Adapter: translation schema', () => {
   });
 
   test('wire schema rejects a response that omits the error key', () => {
-    const result = translationDataSchema.safeParse({
+    const result = createGenerationResponseSchema().safeParse({
       success: true,
       data: VALID_TRANSLATION_RESPONSE.data,
     });
@@ -172,7 +171,7 @@ describe('Adapter: translation schema', () => {
   });
 
   test('lenient schema accepts a response that omits the error key', () => {
-    const result = translationDataLenientSchema.safeParse({
+    const result = legacyResponseSchema.safeParse({
       success: true,
       data: VALID_TRANSLATION_RESPONSE.data,
     });
@@ -181,7 +180,7 @@ describe('Adapter: translation schema', () => {
   });
 
   test('lenient schema accepts a failure response that omits the data key', () => {
-    const result = translationDataLenientSchema.safeParse({
+    const result = legacyResponseSchema.safeParse({
       success: false,
       error: 'NO_TEXT_FOUND',
     });
@@ -190,7 +189,7 @@ describe('Adapter: translation schema', () => {
   });
 
   test('schema without description accepts a success response that omits it', () => {
-    const result = createTranslationDataSchema(false).safeParse({
+    const result = createGenerationResponseSchema(false).safeParse({
       success: true,
       error: null,
       data: {
@@ -202,31 +201,25 @@ describe('Adapter: translation schema', () => {
   });
 
   test('wire schema rejects a segment missing blockIndex', () => {
+    const { blockIndex: _blockIndex, ...segment } =
+      VALID_PAIRED_TRANSLATION_RESPONSE.data.segments[0];
+
     const withoutBlockIndex = {
       success: true,
       error: null,
       data: {
-        ...VALID_TRANSLATION_RESPONSE.data,
-        originalText: {
-          contents: [
-            {
-              languageBcp47Code: 'ja-JP',
-              language: 'Japanese',
-              romanization: 'konnichiwa',
-              text: 'こんにちは',
-            },
-          ],
-        },
+        ...VALID_PAIRED_TRANSLATION_RESPONSE.data,
+        segments: [segment],
       },
     };
 
-    expect(translationDataSchema.safeParse(withoutBlockIndex).success).toBe(
-      false,
-    );
+    expect(
+      createGenerationResponseSchema().safeParse(withoutBlockIndex).success,
+    ).toBe(false);
   });
 
   test('lenient schema defaults a missing blockIndex to 0', () => {
-    const parsed = translationDataLenientSchema.safeParse({
+    const parsed = legacyResponseSchema.safeParse({
       success: true,
       data: {
         ...VALID_TRANSLATION_RESPONSE.data,

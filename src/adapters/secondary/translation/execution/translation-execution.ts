@@ -7,7 +7,6 @@ export interface TranslationExecutionScope {
   signal: AbortSignal;
   deadline: number;
   abort(reason: unknown): void;
-  error(): NetworkError | TranslationError;
   dispose(): void;
 }
 
@@ -20,10 +19,7 @@ export function executionScope(
   const deadline =
     options.generationDeadlineAt ?? Date.now() + DEFAULT_GENERATION_TIMEOUT_MS;
 
-  let timedOut = false;
-
   const expire = () => {
-    timedOut = true;
     controller.abort(NetworkError.timeout());
   };
 
@@ -43,10 +39,6 @@ export function executionScope(
     signal: controller.signal,
     deadline,
     abort: (reason) => controller.abort(reason),
-    error: () =>
-      timedOut || Date.now() >= deadline
-        ? NetworkError.timeout()
-        : TranslationError.cancelled(),
     dispose() {
       clearTimeout(timer);
       unsubscribe?.();

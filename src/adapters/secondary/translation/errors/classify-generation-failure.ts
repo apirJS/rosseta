@@ -2,7 +2,6 @@ import {
   APICallError,
   NoObjectGeneratedError,
   NoOutputGeneratedError,
-  RetryError,
   StreamProviderError,
   UnsupportedFunctionalityError,
 } from 'ai';
@@ -13,21 +12,41 @@ import {
   TranslationError,
   ErrorCode,
 } from '../../../../shared/errors';
-import type { GenerationMode } from '../transports/GenerationTransport';
+import type { GenerationConfiguration } from '../transports/GenerationTransport';
+import type { GenerationMode } from '../transports/generation-modes';
 import {
   readGenerationErrorDetails,
+  unwrapGenerationError,
   type GenerationErrorDetails,
-} from './generation-error-details';
+} from './provider-error-details';
+import { matchConfigurationRejection } from './configuration-rejection';
 
-export interface GenerationFailure {
-  error: AppError;
-  unsupported?: 'structured' | 'stream' | 'combination' | 'vision';
-  general?: boolean;
-  transient: boolean;
+export type GenerationFailure =
+  | { kind: 'terminal'; error: AppError }
+  | { kind: 'transient'; error: AppError }
+  | { kind: 'configuration-rejected'; configurationId: string; error: AppError }
+  | {
+      kind: 'configuration-mode-rejected';
+      configurationId: string;
+      mode: GenerationMode;
+      reason: 'structured' | 'stream' | 'combination';
+      error: AppError;
+    }
+  | {
+      kind: 'feature-rejected';
+      feature: 'structured' | 'stream' | 'vision';
+      error: AppError;
+    }
+  | { kind: 'mode-rejected'; mode: GenerationMode; error: AppError };
+
+interface ActiveGenerationRequest {
+  mode: GenerationMode;
+  configuration?: GenerationConfiguration;
 }
 
 interface FailureContext extends GenerationErrorDetails {
   combined: string;
+  sdkUnsupported: boolean;
   allowsCapabilityEvidence: boolean;
   explicitlyUnsupported: boolean;
   namesStructuredFeature: boolean;
@@ -42,20 +61,10 @@ const TRANSIENT_APPLICATION_ERRORS = new Set([
   ErrorCode.NETWORK_INVALID_RESPONSE,
 ]);
 
-export function unwrapGenerationError(error: unknown): unknown {
-  let current = error;
-
-  for (let depth = 0; depth < 5 && RetryError.isInstance(current); depth++) {
-    current = current.lastError;
-  }
-
-  return current;
-}
-
 /** Precedence matters: request/access errors must never become capability facts. */
-export function classifyGenerationError(
+export function classifyGenerationFailure(
   unknownError: unknown,
-  mode: GenerationMode,
+  { mode, configuration }: ActiveGenerationRequest,
 ): GenerationFailure {
   const error = unwrapGenerationError(unknownError);
 
@@ -71,13 +80,81 @@ export function classifyGenerationError(
   }
 
   const context = createFailureContext(error);
+  const requestFailure = classifyRequestFailure(context);
+
+  if (requestFailure) return requestFailure;
+
+  const modelFailure = classifyModelOrCapabilityFailure(error, context, mode);
+
+  if (
+    modelFailure &&
+    (modelFailure.kind === 'terminal' ||
+      modelFailure.kind === 'transient' ||
+      (modelFailure.kind === 'feature-rejected' &&
+        modelFailure.feature === 'vision'))
+  )
+    return modelFailure;
+
+  const classified =
+    modelFailure ??
+    classifyTransportFailure(error, context) ??
+    failure(AppError.fromUnknown(error));
 
   return (
-    classifyRequestFailure(context) ??
-    classifyModelOrCapabilityFailure(error, context, mode) ??
-    classifyTransportFailure(error, context) ??
-    failure(AppError.fromUnknown(error))
+    classifyConfigurationFailure(
+      error,
+      context,
+      mode,
+      configuration,
+      classified,
+    ) ?? classified
   );
+}
+
+function classifyConfigurationFailure(
+  error: unknown,
+  context: FailureContext,
+  mode: GenerationMode,
+  configuration: GenerationConfiguration | undefined,
+  classified: GenerationFailure,
+): GenerationFailure | null {
+  if (
+    !configuration ||
+    !permitsConfigurationEvidence(error, context, context.sdkUnsupported) ||
+    excludesConfigurationEvidence(context)
+  )
+    return null;
+
+  const rejection = matchConfigurationRejection(
+    {
+      text: context.combined.replace(/[_-]+/g, ' '),
+      parameters: context.parameters,
+      sdkUnsupported: context.sdkUnsupported,
+    },
+    configuration.rejectionFields,
+  );
+
+  if (rejection === 'configuration')
+    return {
+      kind: 'configuration-rejected',
+      configurationId: configuration.id,
+      error: classified.error,
+    };
+
+  if (rejection === 'configuration-mode')
+    return {
+      kind: 'configuration-mode-rejected',
+      configurationId: configuration.id,
+      mode,
+      reason:
+        classified.kind === 'feature-rejected' &&
+        (classified.feature === 'structured' || classified.feature === 'stream')
+          ? classified.feature
+          : 'combination',
+      error: classified.error,
+    };
+
+  return null;
 }
 
 function createFailureContext(error: unknown): FailureContext {
@@ -98,6 +175,7 @@ function createFailureContext(error: unknown): FailureContext {
   return {
     ...details,
     combined,
+    sdkUnsupported,
     allowsCapabilityEvidence:
       !(StreamProviderError.isInstance(error) && error.isRetryable) &&
       (status === 0 ||
@@ -242,9 +320,8 @@ function classifyModelOrCapabilityFailure(
   ) {
     return {
       error: TranslationError.modelNoVision(message),
-      unsupported: 'vision',
-      general: true,
-      transient: false,
+      kind: 'feature-rejected',
+      feature: 'vision',
     };
   }
 
@@ -270,14 +347,18 @@ function classifyModelOrCapabilityFailure(
     /stream/i.test(combined) &&
     (context.namesStructuredFeature || /\bstructured\b/i.test(combined))
   ) {
-    return unsupported('combination');
+    return {
+      kind: 'mode-rejected',
+      mode,
+      error: TranslationError.requestRejected(),
+    };
   }
 
   if (context.namesStructuredFeature && mode.startsWith('structured'))
-    return unsupported('structured', true);
+    return rejectFeature('structured');
 
   if (/stream(?:ing)?/i.test(combined) && mode.endsWith('stream'))
-    return unsupported('stream', true);
+    return rejectFeature('stream');
 
   return null;
 }
@@ -357,17 +438,90 @@ function classifyTransportFailure(
 }
 
 function failure(error: AppError, transient = false): GenerationFailure {
-  return { error, transient };
+  return { kind: transient ? 'transient' : 'terminal', error };
 }
 
-function unsupported(
-  kind: NonNullable<GenerationFailure['unsupported']>,
-  general = false,
-): GenerationFailure {
+function rejectFeature(feature: 'structured' | 'stream'): GenerationFailure {
   return {
+    kind: 'feature-rejected',
+    feature,
     error: TranslationError.requestRejected(),
-    unsupported: kind,
-    general,
-    transient: false,
   };
+}
+
+function permitsConfigurationEvidence(
+  error: unknown,
+  details: GenerationErrorDetails,
+  sdkUnsupported: boolean,
+): boolean {
+  if (StreamProviderError.isInstance(error) && error.isRetryable) return false;
+  if ([400, 422, 501].includes(details.status)) return true;
+  if (details.status !== 0 && (details.status < 200 || details.status >= 300))
+    return false;
+  if (sdkUnsupported) return true;
+  if (!hasConfigurationErrorCode(details.code)) return false;
+  if (StreamProviderError.isInstance(error)) return !error.isRetryable;
+
+  return isTypedProviderEnvelope(error);
+}
+
+function isTypedProviderEnvelope(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  if (
+    'type' in error &&
+    (error.type === 'error' || error.type === 'invalid_request_error')
+  )
+    return true;
+
+  return (
+    'success' in error &&
+    error.success === false &&
+    'error' in error &&
+    typeof error.error === 'object' &&
+    error.error !== null
+  );
+}
+
+function hasConfigurationErrorCode(code: string): boolean {
+  return /(?:^|\n)(?:invalid_request(?:_error)?|(?:unsupported|invalid|unrecognized)_(?:parameter|argument|value|feature))(?:\n|$)/i.test(
+    code,
+  );
+}
+
+/** Control evidence excludes unrelated failure prose more strictly than general mapping. */
+function excludesConfigurationEvidence({
+  code,
+  message,
+  invalidApplicationSchema,
+}: FailureContext): boolean {
+  const text = (code + '\n' + message).replace(/[_-]+/g, ' ');
+
+  return (
+    invalidApplicationSchema ||
+    isAccessFailure(text) ||
+    isTemporaryFailure(text)
+  );
+}
+
+function isAccessFailure(text: string): boolean {
+  return (
+    /invalid token|token auth failed|unauthorized|payment required|unknown model|model not found|model not supported/i.test(
+      text,
+    ) ||
+    /permission denied|access denied|forbidden|unauthenticated|email must be confirmed|email confirmation required|authentication (?:failed|error|required)/i.test(
+      text,
+    ) ||
+    /\b(?:account|api[ -]?key|credential|subscription|organization|plan|project|tier)\b|unauthori[sz]ed|authentication failed|\b(?:invalid|incorrect|expired) (?:api[ -]?)?(?:key|token)\b/i.test(
+      text,
+    ) ||
+    /insufficient.{0,20}(?:quota|credit|balance|funds)|(?:quota|credit|balance).{0,30}(?:exceed|exhaust|deplet)|usage limited|usage limit|billing|\brate limit|too many requests\b/i.test(
+      text,
+    )
+  );
+}
+
+function isTemporaryFailure(text: string): boolean {
+  return /\btemporar(?:ily|y)\b|\b(?:service|backend|server) (?:is )?unavailable\b|\btry again\b|network|connection|timeout|timed out/i.test(
+    text,
+  );
 }

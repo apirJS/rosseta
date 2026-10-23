@@ -1,14 +1,13 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "outDir": "./node_modules/.tmp/tsconfig-node",
     "target": "ES2023",
-    "lib": [
-      "ES2023",
-    ],
+    "lib": ["ES2023"],
     "module": "ESNext",
     "skipLibCheck": true,
     "composite": true,
-    "types": ["node"],
+    "types": ["node", "bun"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -27,6 +26,8 @@
     "noUncheckedSideEffectImports": true
   },
   "include": [
-    "vite.config.ts"
+    "vite.config.ts",
+    "tests/vitest.streaming-sdk.config.ts",
+    "scripts/**/*.ts"
   ]
 }

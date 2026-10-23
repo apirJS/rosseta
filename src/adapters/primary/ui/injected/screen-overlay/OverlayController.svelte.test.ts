@@ -90,10 +90,27 @@ describe('UI Controller: OverlayController', () => {
     onReady?: () => void,
   ): { controller: OverlayController; cleanup: () => void } {
     let controller!: OverlayController;
+
     const cleanup = $effect.root(() => {
-      controller = new OverlayController(mockImageBase64, detach, onReady);
+      controller = new OverlayController(
+        mockImageBase64,
+        detach,
+        onReady,
+        async (requestId, imageBase64) => {
+          await sendMessageToRuntime({
+            action: 'TRANSLATE_IMAGE',
+            payload: {
+              requestId,
+              documentSessionId: 'test-session',
+              imageBase64,
+            },
+          });
+        },
+      );
     });
+
     flushSync(); // Trigger any pending effects
+
     return { controller, cleanup };
   }
 
@@ -167,6 +184,7 @@ describe('UI Controller: OverlayController', () => {
 
     beforeEach(() => {
       eventListeners = {};
+
       mockTarget = {
         setPointerCapture: vi.fn(),
         releasePointerCapture: vi.fn(),
@@ -192,6 +210,7 @@ describe('UI Controller: OverlayController', () => {
       expect(controller.isPointerMoving).toBe(true);
       expect(mockTarget.setPointerCapture).toHaveBeenCalledWith(1);
       expect(mockSelectionBoxInstance.mount).toHaveBeenCalled();
+
       expect(mockSelectionBoxInstance.update).toHaveBeenCalledWith({
         left: 100,
         top: 100,
@@ -203,10 +222,12 @@ describe('UI Controller: OverlayController', () => {
         'pointermove',
         expect.any(Function),
       );
+
       expect(mockTarget.addEventListener).toHaveBeenCalledWith(
         'pointerup',
         expect.any(Function),
       );
+
       cleanup();
     });
 
@@ -223,6 +244,7 @@ describe('UI Controller: OverlayController', () => {
 
       // End selection at (150, 150)
       const pointerUpHandler = eventListeners['pointerup'];
+
       expect(pointerUpHandler).toBeDefined();
 
       await pointerUpHandler({
@@ -237,7 +259,11 @@ describe('UI Controller: OverlayController', () => {
 
       expect(sendMessageToRuntime).toHaveBeenCalledWith({
         action: 'TRANSLATE_IMAGE',
-        payload: { imageBase64: 'data:image/jpeg;base64,CROPPED_RESULT' },
+        payload: {
+          imageBase64: 'data:image/jpeg;base64,CROPPED_RESULT',
+          requestId: expect.any(String),
+          documentSessionId: 'test-session',
+        },
       });
 
       expect(detachMock).toHaveBeenCalled();

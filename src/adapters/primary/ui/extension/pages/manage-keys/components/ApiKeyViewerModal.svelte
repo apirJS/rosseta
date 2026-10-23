@@ -3,25 +3,15 @@
 
   interface Props {
     apiKey: string;
+    copied: boolean;
+    oncopy: () => void;
     onclose: () => void;
   }
 
-  const { apiKey, onclose }: Props = $props();
-
-  let copied = $state(false);
-
-  async function copyToClipboard() {
-    await navigator.clipboard.writeText(apiKey);
-    copied = true;
-    setTimeout(() => (copied = false), 1500);
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onclose();
-  }
+  const { apiKey, copied, oncopy, onclose }: Props = $props();
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={(event) => event.key === 'Escape' && onclose()} />
 
 <div class="fixed inset-0 z-50 flex items-center justify-center">
   <button
@@ -56,7 +46,7 @@
         type="button"
         class="p-2 text-muted hover:text-foreground transition-colors cursor-pointer rounded-lg border border-border hover:border-primary/40 shrink-0"
         aria-label="Copy API key"
-        onclick={copyToClipboard}
+        onclick={oncopy}
       >
         {#if copied}
           <Icon name="check" class="w-4 h-4 text-primary" />

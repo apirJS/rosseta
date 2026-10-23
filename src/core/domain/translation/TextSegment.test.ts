@@ -11,7 +11,9 @@ describe('Domain: TextSegment', () => {
   describe('create — valid', () => {
     test('creates segment with text and language', () => {
       const result = TextSegment.create('こんにちは', japanese);
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.text).toBe('こんにちは');
         expect(result.data.language.code).toBe('ja-JP');
@@ -21,7 +23,9 @@ describe('Domain: TextSegment', () => {
 
     test('creates segment with romanization', () => {
       const result = TextSegment.create('こんにちは', japanese, 'konnichiwa');
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.romanization).toBe('konnichiwa');
       }
@@ -29,7 +33,9 @@ describe('Domain: TextSegment', () => {
 
     test('trims text and romanization', () => {
       const result = TextSegment.create('  Hello  ', english, '  hello  ');
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.text).toBe('Hello');
         expect(result.data.romanization).toBe('hello');
@@ -38,7 +44,9 @@ describe('Domain: TextSegment', () => {
 
     test('null romanization is preserved as null', () => {
       const result = TextSegment.create('Hello', english, null);
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.romanization).toBeNull();
       }
@@ -46,7 +54,9 @@ describe('Domain: TextSegment', () => {
 
     test('empty romanization string becomes null', () => {
       const result = TextSegment.create('Hello', english, '');
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.romanization).toBeNull();
       }
@@ -54,7 +64,9 @@ describe('Domain: TextSegment', () => {
 
     test('defaults blockIndex to 0 when omitted', () => {
       const result = TextSegment.create('Hello', english);
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.blockIndex).toBe(0);
       }
@@ -62,7 +74,9 @@ describe('Domain: TextSegment', () => {
 
     test('preserves an explicit blockIndex', () => {
       const result = TextSegment.create('Hello', english, null, 3);
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.blockIndex).toBe(3);
       }
@@ -71,6 +85,7 @@ describe('Domain: TextSegment', () => {
     test('normalizes an invalid blockIndex to 0', () => {
       const negative = TextSegment.create('Hello', english, null, -2);
       const fractional = TextSegment.create('Hello', english, null, 1.5);
+
       expect(negative.success && negative.data.blockIndex).toBe(0);
       expect(fractional.success && fractional.data.blockIndex).toBe(0);
     });
@@ -80,7 +95,9 @@ describe('Domain: TextSegment', () => {
   describe('create — invalid', () => {
     test('rejects empty text', () => {
       const result = TextSegment.create('', japanese);
+
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBeInstanceOf(DomainError);
         expect(result.error.message).toContain('empty');
@@ -89,6 +106,7 @@ describe('Domain: TextSegment', () => {
 
     test('rejects whitespace-only text', () => {
       const result = TextSegment.create('   ', japanese);
+
       expect(result.success).toBe(false);
     });
   });

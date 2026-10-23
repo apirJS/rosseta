@@ -10,8 +10,10 @@ function makeSegment(
 ): TextSegment {
   const lang = Language.create(langCode);
   const result = TextSegment.create(text, lang, romanization);
+
   if (!result.success)
     throw new Error('Test helper: failed to create TextSegment');
+
   return result.data;
 }
 
@@ -110,7 +112,9 @@ describe('Domain: Translation', () => {
         'A',
         now,
       );
+
       const b = Translation.create('t-1', [], [], 'B', new Date());
+
       expect(a.equals(b)).toBe(true);
     });
 
@@ -122,6 +126,7 @@ describe('Domain: Translation', () => {
         'A',
         now,
       );
+
       const b = Translation.create(
         't-2',
         originalSegments,
@@ -129,6 +134,7 @@ describe('Domain: Translation', () => {
         'A',
         now,
       );
+
       expect(a.equals(b)).toBe(false);
     });
   });

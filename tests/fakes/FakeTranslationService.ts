@@ -4,9 +4,15 @@ import type { Language } from '../../src/core/domain/translation/Language';
 import { Translation } from '../../src/core/domain/translation/Translation';
 import { success, failure, type Result } from '../../src/shared/types/Result';
 import type { AppError } from '../../src/shared/errors';
+import type { TranslationExecutionOptions } from '../../src/core/ports/outbound/TranslationExecutionOptions';
 import { v4 as uuidv4 } from 'uuid';
 
 export class FakeTranslationService implements ITranslationService {
+  readonly calls: {
+    image: EncodedImage;
+    targetLanguage: Language;
+    options?: TranslationExecutionOptions;
+  }[] = [];
   private injectedError: AppError | null = null;
   private translationValue: Translation | null = null;
 
@@ -21,12 +27,17 @@ export class FakeTranslationService implements ITranslationService {
   }
 
   async translateImage(
-    _image: EncodedImage,
-    _targetLanguage: Language,
+    image: EncodedImage,
+    targetLanguage: Language,
+    options?: TranslationExecutionOptions,
   ): Promise<Result<Translation, AppError>> {
+    this.calls.push({ image, targetLanguage, options });
+
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
 

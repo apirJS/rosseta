@@ -28,6 +28,7 @@ export class Credential extends Entity<string> {
     if (!id || id.trim().length === 0) {
       return failure(new DomainError('Credential ID cannot be empty'));
     }
+
     return success(new Credential(id, apiKey, provider));
   }
 
@@ -37,7 +38,9 @@ export class Credential extends Entity<string> {
     }
 
     const apiKeyResult = ApiKey.fromRaw(props.apiKey, props.provider);
+
     if (!apiKeyResult.success) return failure(apiKeyResult.error);
+
     return this.create(props.id, apiKeyResult.data, props.provider);
   }
 

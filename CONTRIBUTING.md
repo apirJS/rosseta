@@ -1,465 +1,266 @@
-# Contributing to Rosseta
+# Contributing to and maintaining Rosseta
 
-Thank you for your interest in contributing! This document provides everything you need to get started, from setting up your environment to submitting your first pull request.
+Rosseta is a Chrome and Firefox extension built with Manifest V3, TypeScript, Bun, Svelte 5 and Tailwind CSS. It uses ports and adapters: core code defines what the app needs, and adapters connect it to browsers, storage and AI providers. This guide explains setup, where code belongs, how to make common changes and how to check them. [FLOW.md](FLOW.md) walks through translation and testing with excerpts from the source code.
 
----
+- [Setup](#setup)
+- [Architecture](#architecture)
+- [Where to change the code](#find-the-owner)
+- [Follow a translation from start to finish](#read-a-normal-translation)
+- [Key terms and where data is kept](#terms-and-state)
+- [Coding rules](#coding-conventions)
+- [Tests and checks](#tests-and-verification)
+- [Adding a provider](#adding-a-provider)
+- [Common changes](#common-changes)
+- [Rules to keep when making changes](#contracts-to-preserve)
+- [Pull requests and releases](#pull-requests-and-releases)
+- [Updating the guides](#documentation-responsibilities)
 
-## Table of Contents
+## Setup
 
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Architecture Overview](#architecture-overview)
-- [Project Structure](#project-structure)
-- [Development Workflow](#development-workflow)
-- [Pull Request Checks](#pull-request-checks)
-- [Coding Standards](#coding-standards)
-- [Testing](#testing)
-- [Commit Guidelines](#commit-guidelines)
-- [Pull Request Process](#pull-request-process)
-- [Adding a New AI Provider](#adding-a-new-ai-provider)
-
----
-
-## Prerequisites
-
-| Tool                 | Version | Purpose                               |
-| -------------------- | ------- | ------------------------------------- |
-| **Bun**              | ≥ 1.0   | Runtime, package manager, test runner |
-| **Node.js**          | ≥ 18    | Required by some Vite tooling         |
-| **Chrome / Firefox** | Latest  | Extension testing                     |
-
-## Getting Started
+Use Bun 1.4.2, or the version set in CI. Releases use Node 22.
 
 ```bash
-# 1. Fork & clone
-git clone https://github.com/<your-fork>/rosseta.git
-cd rosseta
-
-# 2. Install dependencies
 bun install
-
-# 3. Start dev build (Chrome)
-bun run build:dev:chrome
-
-# 4. Load the extension
-#    Chrome  → chrome://extensions → "Load unpacked" → select dist/chrome
-#    Firefox → about:debugging → "Load Temporary Add-on" → select dist/firefox/manifest.json
+bun run dev:chrome
+# Or:
+bun run dev:firefox
 ```
 
-## Architecture Overview
+Load `dist/chrome` as an unpacked extension in Chrome. In Firefox, load `dist/firefox/manifest.json` through `about:debugging`. The popup updates through hot module replacement (HMR); background and content scripts rebuild separately. Keep the popup HTML's script URL starting from the extension root.
 
-This project follows **Domain-Driven Design (DDD)** with a **Hexagonal (Ports & Adapters)** architecture. All dependencies point inward — adapters depend on the core, never the other way around.
+| Command                                          | Purpose                                                   |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| `bun run dev:chrome` / `dev:firefox`             | Development server for the selected browser               |
+| `bun run build:dev:chrome` / `build:dev:firefox` | Watch development builds                                  |
+| `bun run build:prod`                             | Production Chrome and Firefox builds                      |
+| `bun run format`                                 | Format maintained source, configuration and documentation |
+| `bun run format:check`                           | Check formatting without changing files                   |
+| `bun run lint`                                   | Oxlint with warnings treated as failures                  |
+| `bun run check`                                  | Svelte and TypeScript checks                              |
+| `bun run test`                                   | Run logic, Svelte UI and tests using the installed SDK    |
 
-```
-┌────────────────────────────────────────────────────────┐
-│                      Adapters                          │
-│  ┌──────────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │   Primary     │  │ Secondary│  │   Primary (UI)   │  │
-│  │  background   │  │  @ai-sdk │  │  Svelte 5 + TW4  │  │
-│  │  content      │  │  clients │  │  extension popup │  │
-│  │              │  │  storage  │  │  injected overlay│  │
-│  │              │  │  fetching │  │                  │  │
-│  └──────┬───────┘  └────┬─────┘  └────────┬─────────┘  │
-│         │               │                 │             │
-│ ────────┼───────────────┼─────────────────┼──────────── │
-│         ▼               ▼                 ▼             │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │                    Core                          │    │
-│  │  ┌────────────┐ ┌────────────┐ ┌─────────────┐  │    │
-│  │  │   Domain    │ │Application │ │    Ports     │  │    │
-│  │  │ (entities,  │ │(use cases) │ │ (inbound /   │  │    │
-│  │  │  value objs)│ │            │ │  outbound)   │  │    │
-│  │  └────────────┘ └────────────┘ └─────────────┘  │    │
-│  └─────────────────────────────────────────────────┘    │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │                   Shared                         │    │
-│  │  errors · types · DI container · messaging       │    │
-│  └─────────────────────────────────────────────────┘    │
-└────────────────────────────────────────────────────────┘
-```
+## Architecture
 
-**Key principles:**
+Adapters depend on core, rather than the other way around. Core contains the app's rules, actions and interfaces, plus shared types and errors. It does not depend on a UI framework. Keep browser APIs and provider SDK code in adapters. Composition creates the implementations and passes each feature a small object containing the dependencies it needs.
 
-- **Domain layer** — Pure value objects and entities with no framework dependencies
-- **Ports** — Interfaces that define boundaries (`ITranslationStorage`, `ICredentialStorage`, etc.)
-- **Adapters** — Concrete implementations of ports (browser storage, API clients, UI components)
-- **Use cases** — Application logic orchestrating domain objects through ports
+Group related features within the existing layers. A new folder does not need its own domain object, interface or service. Each application action should complete one user task. Parsing, retrying and rendering are steps that support those tasks; they do not each need a use case. Keep the ports and adapters structure without adding containers for entire layers or a general retry framework.
 
-## Project Structure
-
-```
-src/
-├── core/                          # Framework-free business logic
-│   ├── domain/
-│   │   ├── credential/            # ApiKey, Credential, Credentials, Provider, KeySelectionMode
-│   │   ├── image/                 # EncodedImage
-│   │   ├── preferences/           # UserPreferences, AiModel, Theme
-│   │   ├── provider/              # ProviderRegistry, CustomProviderConfig
-│   │   └── translation/           # Translation, Language, TextSegment
-│   ├── application/               # Use cases (one class per action)
-│   │   ├── auth/                  # Add/Remove API keys, active key, key-selection mode
-│   │   ├── command/               # Keyboard shortcut lookup
-│   │   ├── models/                # Fetch/Load/Add/Remove/Clear models
-│   │   ├── preferences/           # Get/Update user preferences
-│   │   ├── provider/              # Custom provider config CRUD
-│   │   └── translation/           # Translate, Save, Get, Delete, ClearAll
-│   └── ports/
-│       ├── inbound/               # Use case interfaces (driven side)
-│       └── outbound/              # Storage & service interfaces (driving side)
-│
-├── adapters/
-│   ├── primary/                   # Entry points (driving adapters)
-│   │   ├── background/            # Service worker handlers (translation, model fetch)
-│   │   ├── content/               # Content script (overlay, toast, modal)
-│   │   └── ui/
-│   │       ├── extension/         # Popup UI (pages, components)
-│   │       ├── injected/          # In-page overlay, toast, translation modal
-│   │       └── shared/            # Hooks, context, constants, components
-│   └── secondary/                 # Infrastructure (driven adapters)
-│       ├── google/ groq/ xai/     # @ai-sdk/* translation adapters (thin)
-│       ├── openai/ anthropic/ ... # one directory per provider
-│       ├── huggingface/ opencode/ # incl. Hugging Face + OpenCode
-│       ├── puter/                 # Puter SDK translation adapter
-│       ├── openai-compatible/     # custom OpenAI-compatible providers
-│       ├── anthropic-compatible/  # custom Anthropic-compatible providers
-│       ├── model-fetchers/        # ModelFetchService (provider /models APIs)
-│       ├── shared/                # executeTranslation, prompt, schema,
-│       │                          # parse-translation-json, response mapper
-│       └── storage/               # Browser storage adapters (Zod-validated)
-│
-├── shared/                        # Cross-cutting concerns
-│   ├── di/                        # Dependency injection container
-│   ├── errors/                    # AppError hierarchy (typed error codes)
-│   ├── messaging/                 # Runtime message helpers
-│   └── types/                     # Result<T, E>, shared type utilities
-│
-└── tests/
-    └── fakes/                     # In-memory test doubles (one per outbound port)
+```text
+src/core/
+  domain/                Immutable values, entities and pure selection rules
+  application/
+    translation/         Resolve configuration; validate and translate input
+    history/             Save, query and delete final results
+    providers/           Custom configuration and model catalog actions
+    credentials/         API keys and key selection
+    preferences/ settings/ shortcuts/
+  ports/                 Inbound actions; outbound persistence/services
+src/adapters/primary/
+  background/            Browser jobs, capture, handlers and messaging
+  content/               Content sessions, capture, Shadow DOM and messaging
+  ui/                    Svelte components, controllers, contexts and popup lifetime
+src/adapters/secondary/
+  translation/           Shared generation engine, output, previews, compatibility
+    execution/           Explicit generation/repair, route selection and budget
+    errors/              Provider failure interpretation and trusted details
+    transports/ai-sdk/   Installed AI SDK integration and its option types
+  providers/             Explicit factories, native controls, requests, catalogs, Puter
+  storage/               Browser storage grouped by capability
+src/composition/         Background/popup roots and storage constructors
+src/shared/              Result, errors, wire contracts and pure serialization
 ```
 
-## Development Workflow
+- **Composition:** [background.ts](src/composition/background.ts) and [popup.ts](src/composition/popup.ts) are the places where dependencies are put together. [storage.ts](src/composition/storage.ts) creates storage implementations. The popup does not create provider or network clients. Feature code must not import these composition entry points.
+- **Translation:** core validates input and calls `ITranslationService` once. Primary adapters manage translation jobs in the browser; saving history is a separate action. All providers use one generation engine. Provider factories supply the transport and compatibility context, so the engine does not need to discover providers itself.
+- **Generation:** the [module guide](src/adapters/secondary/translation/README.md) explains the steps: generate a response, inspect it, run one repair stage if needed, then accept the final result. Initial generation and repair share the fallback runner, request selection, attempt limits and deadline. Repair is an internal step, not a public action or provider interface.
+- **Errors:** the [provider failure classifier](src/adapters/secondary/translation/errors/classify-generation-failure.ts) is the only place that decides what a provider failure means. The runner acts on that decision, and compatibility code records what the failure proves about feature support. Errors from building requests, delivering progress locally, storage, checking final output or converting it to a domain result do not go through this classifier. If the operation was stopped, the outer error handler keeps its original error. It also keeps existing `AppError` instances and uses `AppError.fromUnknown` for other unexpected local exceptions. Local failures never change recorded provider support.
+- **Models:** keep fixed [provider definitions](src/core/domain/provider/provider-definitions.ts), saved model lists and the popup's reactive copies separate. [model-selection.ts](src/core/domain/preferences/model-selection.ts) chooses the model without reading or writing storage. There is no shared, changeable global model list.
 
-### Available Scripts
+Create provider SDK clients in the background. Popup and content code must not import that construction code, and background code must not import UI components or styles. When changing imports or how dependencies are created, check the affected entry points.
 
-| Command                     | Description                                     |
-| --------------------------- | ----------------------------------------------- |
-| `bun run dev:chrome`        | Vite dev server (true HMR for the popup)        |
-| `bun run dev:firefox`       | Vite dev server for Firefox (no popup HMR)      |
-| `bun run build:dev:chrome`  | Development build with watch mode (Chrome)      |
-| `bun run build:dev:firefox` | Development build with watch mode (Firefox)     |
-| `bun run build:prod`        | Production build for both browsers              |
-| `bun run lint`              | Lint TypeScript, JavaScript, and Svelte files with Oxlint |
-| `bun run test:logic`        | Domain, application, background, content, adapter tests |
-| `bun run test:ui`           | Svelte component + `*.svelte.ts` controller tests (Vitest + jsdom) |
-| `bun run test`              | Run all tests                                   |
-| `bun run check`             | Type-check Svelte files and Node config         |
+<a id="find-the-owner"></a>
 
-> [!IMPORTANT]
-> Tests run on two runners, split by **path**, not by config. A file in the wrong
-> place silently never runs:
->
-> - `bun run test:logic` (bun) covers `src/shared`, `src/core`,
->   `src/adapters/primary/{background,content}`, `src/adapters/secondary`.
-> - `bun run test:ui` (vitest) covers `src/adapters/primary/ui` only — that is
->   where the Svelte compiler is needed for `$state`/`$derived` in `*.svelte.ts`.
->
-> Import from `bun:test` in the first scope and from `vitest` in the second.
+### Where to change the code
 
-### Recommended Dev Loop
+| Change                                       | Start with                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Background construction and startup          | [background composition](src/composition/background.ts) and [service worker](src/adapters/primary/background/service-worker.ts)                                                                                                                                                                                     |
+| Popup construction                           | [popup composition](src/composition/popup.ts) and [popup entry](src/adapters/primary/ui/extension/main.ts)                                                                                                                                                                                                          |
+| Start, progress and end of a translation     | [TranslationJobCoordinator](src/adapters/primary/background/translation/TranslationJobCoordinator.ts)                                                                                                                                                                                                               |
+| Choosing the key, model and preferences      | [ResolveTranslationConfigurationUseCase](src/core/application/translation/ResolveTranslationConfigurationUseCase.ts)                                                                                                                                                                                                |
+| Steps in translation                         | [execute-translation](src/adapters/secondary/translation/execute-translation.ts), [repair operation](src/adapters/secondary/translation/execution/repair-translation-response.ts) and [module guide](src/adapters/secondary/translation/README.md)                                                                  |
+| Fallback choices and attempt limits          | [shared runner](src/adapters/secondary/translation/execution/generate-with-fallback.ts), [selection](src/adapters/secondary/translation/execution/generation-selection.ts) and [budget](src/adapters/secondary/translation/execution/generation-budget.ts)                                                          |
+| Deciding what a provider error means         | [single classifier](src/adapters/secondary/translation/errors/classify-generation-failure.ts), the helper that reads trusted error details, and the helper that matches rejected settings                                                                                                                           |
+| Creating provider clients                    | [create-provider-runtime](src/adapters/secondary/providers/create-provider-runtime.ts)                                                                                                                                                                                                                              |
+| Partial output                               | [TranslationAttemptPreview](src/adapters/secondary/translation/preview/TranslationAttemptPreview.ts)                                                                                                                                                                                                                |
+| Checking and saving provider feature support | [TranslationCapabilityState](src/adapters/secondary/translation/compatibility/TranslationCapabilityState.ts), [Journal](src/adapters/secondary/translation/compatibility/TranslationCapabilityJournal.ts), and [browser store](src/adapters/secondary/storage/compatibility/BrowserTranslationCapabilityStorage.ts) |
+| Completed results                            | [history actions](src/core/application/history) and [history storage](src/adapters/secondary/storage/history)                                                                                                                                                                                                       |
+| Showing and closing the page's result modal  | [content translation module](src/adapters/primary/content/translation) and [modal controller](src/adapters/primary/ui/injected/translation-result-modal/TranslationModalController.svelte.ts)                                                                                                                       |
+
+<a id="read-a-normal-translation"></a>
+
+### Follow a translation from start to finish
+
+1. The background message handler passes the request and the verified sender's details to `TranslationJobCoordinator`.
+2. Configuration resolution chooses the credential, such as an API key, once and returns a snapshot: a copy of the settings for this translation. Composition creates the provider runtime and a translation use case that works with any provider.
+3. `TranslateImageUseCase` validates the input. `TranslationServiceAdapter` then calls the shared generation engine.
+4. The engine sets up cancellation and the deadline, shared attempt limits, and the model's recorded feature support. It generates a response, checks it, and may run one repair stage. Initial generation and repair use the same fallback runner. When the result passes all checks, the engine records which settings actually succeeded and converts the final data to the app's translation type.
+5. The coordinator makes the final decision to save the result, writes history, and sends completion. The content session accepts progress messages in order for the document that started the request. Its modal controller updates the display.
+
+For fallback and repair, start with the [translation module guide](src/adapters/secondary/translation/README.md). The runner calls the provider; selection chooses request settings; the budget tracks the remaining attempts; output code decides whether a result can be accepted; repair manages the one repair step. The classifier decides what provider failures mean. Local failures in progress delivery, storage or result conversion bypass it. Background and content translation modules handle browser messages, recovery after interrupted delivery, and when jobs start and end.
+
+```mermaid
+flowchart LR
+  subgraph Popup
+    P[Settings and Translate button]
+  end
+  subgraph Background
+    C[Capture] --> J[Translation job]
+    J --> A[Application actions]
+    A --> G[Generation and provider transport]
+    J --> H[Final history save]
+  end
+  subgraph Content
+    O[Selection overlay] --> S[Translation session and modal]
+  end
+  P -->|runtime message| C
+  C -->|tab message| O
+  O -->|request and document identity| J
+  J -->|ordered progress and completion| S
+```
+
+The popup, background worker and content script each have their own memory and can start or stop independently. They communicate through messages. Importing the same source file does not make them share an object at runtime.
+
+<a id="terms-and-state"></a>
+
+### Key terms and where data is kept
+
+- A **translation** is the final result the app has accepted. A **draft** is preview data converted to a common shape; it can still change or fail validation.
+- A **schema** describes the expected JSON shape. A **mode** combines whether a request uses structured output or plain JSON and whether the response is streamed or buffered until complete.
+- A **provider factory** is a function that sets up a provider client. It supplies a **transport**, which sends a request and reads the response, and a **context**, which holds information about the provider and model.
+- A **configuration** is one declared set of provider request controls. Its ID identifies that set; callers do not need to interpret the ID.
+- **Compatibility** means the feature support recorded for a provider and model. A **compatibility fact** says that support is unknown, supported or unsupported for a particular model, schema or settings combination.
+- A **namespace** groups a provider's compatibility records so they can be reset together. A compatibility **generation** is a reset version that prevents observations made before a reset from being saved afterward.
+- A **job** is the work started by a verified document. An **attempt** is one call to generate a response within that job. An **attempt receipt** records the response and the request settings actually used.
+- A **retry** makes another call after a temporary failure. A **fallback** changes settings after the provider rejects a feature or a combination of settings. A **repair** asks for corrected output after a completed response fails the final checks. There is only one repair stage, but it can use fallback or the remaining retry; it does not get new attempts or extra time.
+
+| State                                | Where it lives and when it is kept or cleared                                                                                                                                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Credentials, active key and rotation | Credential and key-selection stores choose one credential for each translation.                                                                                                                                                     |
+| Provider details and model lists     | Built-in definitions stay fixed; `IModelStorage` saves fetched model lists. Popup hooks keep their own copies.                                                                                                                      |
+| Model refresh and provider removal   | The [provider mutation lock](src/adapters/secondary/storage/providers/BrowserProviderMutationLock.ts) prevents refresh writes and staged removal from changing the same provider at once. Network requests happen outside the lock. |
+| Saved model and language choices     | The preferences store saves them. Application actions use the shared selection rule to choose valid settings.                                                                                                                       |
+| Recorded feature support             | State interprets observations, Journal combines them and retries failed writes, and browser storage saves them. A reset version rejects writes from before the reset.                                                               |
+| Remaining generation attempts        | One `GenerationBudget` covers initial generation and repair. Changing the phase or configuration does not reset it.                                                                                                                 |
+| Request settings already tried       | One `GenerationSelection` tracks configurations across phases. It starts fresh mode history for each new phase or configuration.                                                                                                    |
+| Running and finished jobs            | The background request registry keeps jobs in memory and keeps a limited number of finished-job summaries. Jobs are not saved across worker restarts.                                                                               |
+| Preview text and timers              | One `TranslationAttemptPreview` manages them and cleans them up before the next attempt.                                                                                                                                            |
+| Progress delivery and ordering       | The background progress publisher and content session each handle their side of message delivery, revisions and sequence numbers.                                                                                                   |
+| What the modal displays              | The modal controller updates the view, allows copying only final results, and controls how long copy feedback appears.                                                                                                              |
+| Popup reads and listeners            | Popup startup loads settings and registers listeners. Cleanup removes them when the popup unmounts; guards prevent unfinished reads from publishing results afterward.                                                              |
+| Pending key deletions                | The Manage Keys controller manages the Undo timer and saves deletions one at a time. Final cleanup continues when the page closes.                                                                                                  |
+| Saved history                        | The history store saves only validated final results. It uses a Web Lock across browser contexts when available, or a queue within each JavaScript environment otherwise.                                                           |
+
+<a id="coding-conventions"></a>
+
+## Coding rules
+
+Run `bun run format` before submitting. Prettier formats source files, Svelte scripts, templates, styles and documentation with single quotes and LF line endings. `.prettierignore` skips generated output and local files. Code examples in Markdown keep their formatting.
+
+- **Types and errors:** use strict TypeScript, `unknown` instead of `any`, and `import type`. Return `Result<T, AppError>` for expected application and storage failures. At adapter boundaries, convert unknown exceptions using the existing error subclasses.
+- **Scope:** give each class one purpose. Extract a helper when it has a clear rule, transformation or resource to manage. Share repeated code, but avoid frameworks for hypothetical needs and classes that only forward calls. One use-case file handles one public action. Internal retry, parsing, transport and rendering steps are not separate actions.
+- **Interfaces and tests:** prefix port interfaces with `I`. Prefer tests that check the interface's promised behavior using in-memory implementations from `tests/fakes`.
+- **UI:** use Svelte 5 runes, a `Props` interface and tested controllers for behavior. Smart pages connect typed context and browser dependencies. Display components receive props and callbacks. Simple handling of DOM events stays in components. Store the popup's copies of state in `ui/extension/state` and reusable controls in `ui/shared/components`. See [UI owners](src/adapters/primary/ui/).
+- **Styling:** use Tailwind's named theme tokens (`bg-background`, `text-foreground`, `border-border`), check both themes, and add UI to web pages through the Shadow DOM host.
+- **Resources:** keep one implementation responsible for each queue, journal, lease or other managed resource. A lease gives temporary access to a shared resource. Remove temporary compatibility wrappers once all callers use the new code.
+
+<a id="tests-and-verification"></a>
+
+## Tests and checks
+
+Keep tests beside the code they test, except for tests using the installed SDK. Test runners find files by path, so moving a test to the wrong folder can stop it from running.
+
+| Runner                       | Files it tests                                                                         | Test import |
+| ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
+| `bun run test:logic`         | `src/core`, `src/shared`, `src/composition`, background/content and secondary adapters | `bun:test`  |
+| `bun run test:ui`            | `src/adapters/primary/ui`, including `.svelte.ts` controllers                          | `vitest`    |
+| `bun run test:streaming-sdk` | `tests/*-sdk-integration.test.ts`                                                      | `vitest`    |
+
+Bun's preload replaces browser APIs, Svelte and SDK calls with test versions. UI Vitest compiles components and `.svelte.ts` controllers; run tests that use Svelte runes there, rather than in Bun. Installed-SDK tests use the actual SDK with a separate Node configuration and no Bun preload. Tests with a mocked SDK do not prove how the real SDK behaves.
+
+Bun logic tests use explicit paths starting with `./`, and UI Vitest has an explicit list of source paths to include. Keep these restrictions: substring filters can also match archived source folders. After moving tests, check the file names in the runner's output, not just the number of passing cases.
+
+Installed-SDK tests also check rejected promises under browser-like conditions. The SDK handles telemetry differently in Node, which can hide failures caused by how long promises remain pending in an extension. The transport explicitly disables telemetry because the app does not use it.
 
 ```bash
-# Terminal 1: Watch build
-bun run build:dev:chrome
-
-# Terminal 2: Run logic tests on change
-bun run test:logic
-
-# Before committing
-bun run check && bun run test
+bun test src/core/application/history/ClearAllTranslationsUseCase.test.ts
+bunx vitest run src/adapters/primary/ui/extension/pages/manage-keys/ManageKeysController.test.ts
+bun run test:streaming-sdk
 ```
 
-## Pull Request Checks
+Test behavior that callers can observe, including errors, cancellation and work that finishes after it is no longer needed. Use fixed provider request, stream and error examples so tests are repeatable; do not call paid or live APIs. When moving files, update runner paths, mock paths, imports and configurations together. Then check the runner's output to confirm that it found the tests.
 
-`.github/workflows/pr-checks.yml` runs for opened, updated, reopened, and
-ready-for-review pull requests. It runs four checks for each approved PR:
-
-- `lint` — Oxlint diagnostics with warnings treated as failures
-- `test` — the full logic and UI test suite
-- `typecheck` — Svelte and TypeScript checks
-- `build` — production Chrome and Firefox builds
-
-The `Verify & Test` job aggregates those jobs into the status required by the
-`main` branch ruleset. It fails if any individual check fails or is skipped.
-
-GitHub's outside-collaborator approval policy holds workflow runs from other
-authors before a runner checks out or executes their code. Once a maintainer
-approves the run, the same checks proceed normally. `.github/CODEOWNERS`
-requires review from `@apirJS` for every file.
-
-## Coding Standards
-
-### TypeScript
-
-- **Strict mode** — No `any` types. Use `unknown` when the type is genuinely unknown.
-- **Imports** — Use `import type` for type-only imports to enable proper tree-shaking.
-- **Value objects** — Domain types are immutable. Use `create()` / `fromRaw()` factory methods, never raw constructors for validation.
-- **Result type** — Never throw exceptions for expected failures. Return `Result<T, AppError>` from use cases and storage adapters.
-
-```typescript
-// ✅ Good — Result-based error handling
-async execute(): Promise<Result<void, AppError>> {
-  return this.storage.clear();
-}
-
-// ❌ Bad — throwing for expected failures
-async execute(): Promise<void> {
-  throw new Error('Storage failed');
-}
-```
-
-### Svelte
-
-- **Svelte 5 runes** — Use `$state`, `$derived`, `$effect`, and `$props` exclusively. No legacy `$:` reactive statements.
-- **Component naming** — PascalCase filenames matching the component name (`ModelSelector.svelte`).
-- **Props interface** — Define a `Props` interface in every component for type safety.
-- **Context** — Use typed Svelte context (`setContext` / `getContext`) for dependency injection, never global stores.
-
-### Styling
-
-- **Tailwind CSS v4** — Use utility classes in templates. Avoid inline styles.
-- **Design tokens** — Use semantic color names (`bg-background`, `text-foreground`, `border-border`) for theme compatibility.
-- **Dark mode** — Supported via class-based toggling. Always verify both themes.
-
-### File Organization
-
-- **One use case per file** — Each use case gets its own file and test file.
-- **Port interfaces** — Prefixed with `I` (e.g., `ITranslationStorage`).
-- **Fakes over mocks** — Use in-memory fakes from `tests/fakes/` for testing. Use mocks only for verifying interaction patterns.
-
-## Testing
-
-### Test Structure
-
-Tests live alongside their source files with the `.test.ts` suffix:
-
-```
-ClearAllTranslationsUseCase.ts
-ClearAllTranslationsUseCase.test.ts
-```
-
-### Naming Convention
-
-```typescript
-describe('Application: ClearAllTranslationsUseCase', () => {
-  test('clears all translations from storage', async () => { ... });
-  test('succeeds when storage is already empty', async () => { ... });
-  test('fails when storage.clear() fails', async () => { ... });
-});
-```
-
-Use descriptive prefixes to indicate the layer:
-
-- `Domain:` for value objects and entities
-- `Application:` for use cases
-- `Adapter:` for storage, API, and UI adapters
-- `Service:` for application services
-- `UI Controller:` for `*Controller.svelte.ts` factories (vitest scope)
-
-### Running Tests
+Before accepting a change that combines work across modules, run:
 
 ```bash
-# All tests
+bun run format:check
+bun run lint
+bun run check
 bun run test
-
-# Logic tests only (fast, no DOM)
-bun run test:logic
-
-# UI component tests only
-bun run test:ui
-
-# Single file
-bun test src/core/application/translation/ClearAllTranslationsUseCase.test.ts
+bun run build:prod
+git diff --check
 ```
 
-### Writing Tests
+Pull request checks run `lint`, `test`, `typecheck` and `build`. The required **Verify & Test** check combines their results and fails if any required check fails or is skipped. Contributors outside the project may still need workflow approval, and CODEOWNERS review requirements still apply.
 
-1. **Use fakes** — Prefer `FakeTranslationStorage`, `FakeCredentialStorage`, etc. over ad-hoc mocks.
-2. **Test the contract** — Focus on inputs and outputs, not internal implementation.
-3. **Cover the error path** — Every use case test should include a failure scenario.
-4. **No network calls** — All external dependencies must be faked or mocked.
+## Adding a provider
 
-## Commit Guidelines
+Providers must accept images. Structured output and streaming are optional: the shared engine records whether the model supports them and uses a fallback when needed. Keep provider-specific fields out of core translation types, UI interfaces and browser message formats.
 
-Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+1. **Provider identity:** update [Provider.ts](src/core/domain/credential/Provider.ts) and the fixed [provider-definitions.ts](src/core/domain/provider/provider-definitions.ts). Default model IDs are suggestions, not a current list of available models. Assign API keys to providers explicitly; never guess the provider from a key's prefix.
+2. **Provider runtime:** add a [builtin factory](src/adapters/secondary/providers/builtin) with one clear purpose, following [groq-runtime.ts](src/adapters/secondary/providers/builtin/groq-runtime.ts). Take the key and model as explicit inputs and return `{ transport, context }`. Use `createProviderContext` so provider identity is built consistently. See [custom factories](src/adapters/secondary/providers/custom) for other API formats.
+3. **Construction:** add a case to [create-provider-runtime.ts](src/adapters/secondary/providers/create-provider-runtime.ts), keeping every provider covered. Reuse `TranslationServiceAdapter`. Do not add a provider-specific `ITranslationService` wrapper or copy the generation logic.
+4. **Connection and model list:** set the default endpoint and API format in [provider-connection.ts](src/adapters/secondary/providers/provider-connection.ts). Keep the existing hashing rules and identities in [translation-capability-key.ts](src/adapters/secondary/translation/compatibility/translation-capability-key.ts). Add model fetching in [ModelFetchService.ts](src/adapters/secondary/providers/catalogs/ModelFetchService.ts), reusing helpers for the same API format where useful. Preserve headers, query parameters and error conversion. Let users enter model IDs manually when the provider has no model-list API.
+5. **Thinking controls:** declare the provider's documented settings for disabling or minimizing thinking in [providers/thinking](src/adapters/secondary/providers/thinking). Pass them through the factory's `createProviderSdkTransport`. Keep the provider's defaults for unknown models or endpoints. If the installed SDK leaves out a verified field, use a model factory tied to that configuration and [configured-generation-fetch.ts](src/adapters/secondary/providers/requests/configured-generation-fetch.ts). Preserve cancellation, images, custom headers and query parameters. Link official sources beside the declarations and request examples. Use [installed-SDK fixtures](tests/thinking-sdk-integration.test.ts) to check the actual request fields.
+6. **Display:** update badge colors and setup URLs in [providers.ts](src/adapters/primary/ui/shared/constants/providers.ts). Add provider-specific instructions only when its setup differs.
+7. **Checks:** extend [runtime tests](src/adapters/secondary/providers/create-provider-runtime.test.ts), model-list tests and request and control examples. Use the installed SDK to check request formatting and streaming. Run lint, type checks, tests and both browser builds. Keep shared fallback behavior and the existing core and UI interfaces.
 
-```
-<type>(<scope>): <description>
+A client that does not use AI SDK implements [ITranslationGenerationTransport](src/adapters/secondary/translation/transports/GenerationTransport.ts). That adapter converts its SDK's events, errors and completed responses into the shared format. [PuterGenerationTransport.ts](src/adapters/secondary/providers/puter/PuterGenerationTransport.ts) gives translation and model-list calls temporary, exclusive access to one shared authentication client. Calls run one at a time. Cancelling a translation cannot stop a request already submitted to Puter, and the SDK may make its own HTTP retries.
 
-[optional body]
-```
+DeepSeek uses its own SDK and declares which plain-JSON modes its installed transport allows. NVIDIA uses an OpenAI-compatible client. These transport declarations describe SDK limits for the current request; they do not mean a model permanently lacks a feature.
 
-### Types
+## Common changes
 
-| Type       | When to use                                 |
-| ---------- | ------------------------------------------- |
-| `feat`     | New feature or capability                   |
-| `fix`      | Bug fix                                     |
-| `refactor` | Code change that is neither fix nor feature |
-| `test`     | Adding or updating tests                    |
-| `docs`     | Documentation only changes                  |
-| `chore`    | Build, CI, tooling, dependencies            |
-| `style`    | Formatting, whitespace (no logic change)    |
+- **Add a provider:** Follow [the provider checklist](#adding-a-provider): identity, fixed provider details, runtime factory, API format, endpoint, model list, thinking controls and display details. Extend the construction, request and model-list tests. Keep the existing core interfaces and browser message formats.
+- **Change the prompt or response schema:** Start in [output](src/adapters/secondary/translation/output). Update the prompt, schema and final validation together. Check required keys when descriptions are off, and how output becomes preview data. Run parser, normalizer, schema and installed-SDK tests. Changes to output meaning or prompt and schema hashes are behavior changes; make them deliberately.
+- **Debug a provider HTTP 400:** Save the response with secrets removed, the mode and configuration actually used, and the declared control. Start with [classify-generation-failure](src/adapters/secondary/translation/errors/classify-generation-failure.ts). Its [detail reader](src/adapters/secondary/translation/errors/provider-error-details.ts) reads trusted error fields, and its [configuration matcher](src/adapters/secondary/translation/errors/configuration-rejection.ts) identifies rejected settings. Add the exact response as a test example. Check that fallback happens and that later requests skip the rejected option using saved compatibility. HTTP 400 alone does not prove a feature is unsupported.
+- **Change model selection:** Start with [the selection rule](src/core/domain/preferences/model-selection.ts), then configuration resolution, [catalog refresh](src/core/application/providers/RefreshProviderModelsUseCase.ts) and the popup display. Test saved and default choices, removed models and empty lists. Keep storage and error handling in the actions responsible for them.
+- **Change the modal:** Edit [modal components and controller](src/adapters/primary/ui/injected/translation-result-modal), run their Vitest tests and check both themes. Keep row conversion and clipboard access in their helpers. Preserve bodies that show only the error on failure, registration of each local view, and copying of final results only.
+- **Change history or retention:** Start with [retention](src/core/domain/translation/translation-history-retention.ts), [history actions](src/core/application/history) and the [browser history store](src/adapters/secondary/storage/history). Test dates at the expiry boundary, removal of old entries, backup replacement and simultaneous writes. Keep the shared lock and queue.
+- **Change saved storage:** Start with the relevant outbound port, which defines the storage interface, and the [storage module](src/adapters/secondary/storage) for that feature. Then check encoding, decoding, validation of stored values, and settings backup tests. Preserve existing keys and formats or write an explicit migration. Run the focused tests for compatibility identities, reset markers and history locking.
+- **Change API key deletion:** Start with [ManageKeysController](src/adapters/primary/ui/extension/pages/manage-keys/ManageKeysController.svelte.ts). Test consecutive deletions, Undo for only the latest deletion, delayed saves, failures, duplicate events and page cleanup. Keep saves ordered, and keep model cleanup when the last key is removed.
 
-### Examples
+<a id="contracts-to-preserve"></a>
 
-```
-feat(auth): add logout confirmation modal with history clear
-fix(overlay): prevent blink on mount when dark theme active
-refactor(provider): centralize model config in ProviderRegistry
-test(translation): add ClearAllTranslationsUseCase tests
-```
+## Rules to keep when making changes
 
-## Pull Request Process
+- **Service:** `ITranslationService` returns `Promise<Result<Translation, AppError>>`. Optional execution settings carry cancellation, a fixed end time and a progress callback that works with any provider. Providers that return a complete response at once may send no previews.
+- **Attempt limits and repair:** allow at most **six** generation calls within one **60-second** generation deadline. Initial generation, fallback after rejected controls or modes, restart and repair all share those limits and the same runner. Preparation and saving the result have separate coordinator time limits. Stop when a valid result is accepted. Allow one restart with a buffered response, including during repair. Never repair a repair response again. Prefer a buffered repair mode known to work. If attempts run out, keep the actual error. Record final compatibility using the successful attempt receipt, which identifies the settings actually used. Six calls do not probe every possible combination and do not limit the SDK's own HTTP retries.
+- **When compatibility expires:** save both supported and unsupported results for a fixed **7-day** period. Check expiry when a translation needs the records, and start a fresh period if they have expired. Normal success does not extend the period. Model-list refresh resets the provider's compatibility records after saving the list. A failure before that save leaves compatibility unchanged. If the list is saved but the reset fails, report a partial failure.
+- **What proves incompatibility:** mark a control or feature unsupported only when the provider explicitly rejects it. Authentication, quota, invalid input, network errors, temporary failures and malformed JSON do not prove lack of support. If a thinking control conflicts with a generation mode, record only that combination as unsupported; do not disable either feature everywhere. Skip configurations with no eligible modes without marking their controls unsupported. Keep general model support separate from support for a particular schema or configuration. Preserve reset versions that reject old observations, and preserve recovery after failed writes.
+- **Output:** pair each source segment with its translation in order. When descriptions are disabled, remove them even if the provider sends one. Before asking for repair, try to recover a complete, valid response object from the generated text. Do not accept a nested success object when the containing response is conflicting or incomplete. A missing finish reason does not count as successful completion. Treat partial JSON as a preview and keep strict validation for the final result. Only accepted final results can be saved to history or copied.
+- **Messages:** verify the sender and initiating document. Preserve request IDs, revisions, message sequence and acknowledgement order, cancellation, and recovery of completed or failed jobs. When adding an action, update the schema union, return map and receiving router together.
+- **Stored changes:** remove history more than **90 days** after its creation on startup, access, changes and backup replacement. Use a Web Lock to order browser writes, with the queue as a fallback. Remove all data belonging to a custom provider before deleting its configuration. Manage Keys must save earlier deletions in order; Undo applies to the latest pending key only.
+- **Stable formats:** a structural refactor must not silently change stored keys, encoding and decoding, compatibility identities, browser message data, prompt and schema behavior, or backup formats. Leave saved compatibility results out of backups; they are runtime support records, not user settings.
 
-1. **Branch** — Create a feature branch from `main`:
+## Pull requests and releases
 
-   ```bash
-   git checkout -b feat/my-feature
-   ```
+Use Conventional Commits, for example `fix(keys): serialize consecutive deletions` or `refactor(translation): group generation ownership`. Explain the problem, the behavior after the change, what changed and how you checked it. Include screenshots for UI changes.
 
-2. **Implement** — Make your changes following the coding standards above.
+Target `main`, address review comments and keep unrelated changes separate. Semantic release sets versions for `main` and `beta`, updates the manifest, and builds and packages both browsers. Do not edit package or manifest versions by hand.
 
-3. **Verify** — Ensure everything passes before pushing:
+<a id="documentation-responsibilities"></a>
 
-   ```bash
-   bun run check    # Type checking
-   bun run test     # All tests
-   ```
+## Updating the guides
 
-4. **Submit** — Open a PR against `main` with:
-   - A clear title following commit guidelines
-   - A description of **what** changed and **why**
-   - Screenshots for any UI changes
-
-5. **Review** — Address review feedback promptly. Keep commits clean.
-
-## Adding a New AI Provider
-
-One of the most common contributions is adding support for a new AI provider. The checklist below covers **every file** that needs changes — follow it in order.
-
-> [!IMPORTANT]
-> New providers **must** support **multilingual image understanding** (vision) —
-> Rosseta sends screenshots of selected regions for translation.
->
-> Structured outputs (`json_schema` / response schema) are strongly preferred but
-> **not required**: `executeTranslation()` detects a model that rejects the
-> `json_schema` response format, caches it in `structuredOutputExemptModels`
-> (keyed `provider:modelId`), and falls back to prompt-only JSON mode with a
-> manual parse + repair retry on every later call.
-
-### Domain layer
-
-#### 1. Add to the `Provider` type
-
-**File:** `src/core/domain/credential/Provider.ts`
-
-- Add your provider ID to the `Provider` union type
-- Add it to the `PROVIDERS` array
-
-```typescript
-export type Provider = 'google' | 'groq' | 'xai' | /* ... */ | 'your-provider';
-export const PROVIDERS: Provider[] = ['google', 'groq', 'xai', /* ... */, 'your-provider'];
-```
-
-> [!NOTE]
-> API keys are **not validated** and providers are picked explicitly in the UI — do not add key-format detection rules.
-
-#### 2. Register the provider in `ProviderRegistry`
-
-**File:** `src/core/domain/provider/ProviderRegistry.ts` — append a new `ProviderRegistry.register()` call at the bottom. Model lists start empty; they are populated at runtime from the provider API (or manual user input).
-
-```typescript
-ProviderRegistry.register({
-  id: 'your-provider',
-  name: 'Your Provider',
-  defaultModelId: 'your-default-model',
-  models: [],
-});
-```
-
-### Adapter layer
-
-#### 3. Create the translation adapter
-
-Create `src/adapters/secondary/<provider>/YourProviderTranslationAdapter.ts`. For providers supported by the Vercel AI SDK, the adapter creates the `@ai-sdk/*` client, resolves the model id for **its own** provider, and delegates to the shared `executeTranslation()`. Copy an existing adapter such as [GroqTranslationAdapter.ts](src/adapters/secondary/groq/GroqTranslationAdapter.ts) and swap the client:
-
-```typescript
-import { createYourProvider } from '@ai-sdk/your-provider';
-
-export class YourProviderTranslationAdapter implements ITranslationService {
-  constructor(
-    private readonly credential: Credential,
-    private readonly userPreferences: UserPreferences,
-    private readonly structuredOutputExemptions: IStructuredOutputExemptionStorage,
-  ) {}
-
-  public async translateImage(
-    image: EncodedImage,
-    targetLanguage: Language,
-  ): Promise<Result<Translation, AppError>> {
-    const client = createYourProvider({ apiKey: this.credential.apiKey.value });
-    const model = client(
-      this.userPreferences.getModelIdFor(this.credential.provider),
-    );
-    return executeTranslation(
-      model,
-      image,
-      targetLanguage,
-      'YOUR_PROVIDER', // uppercase log tag
-      this.userPreferences.includeDescription,
-      this.structuredOutputExemptions,
-    );
-  }
-}
-```
-
-The prompt, response schema, parse/repair fallback, and domain mapping live in `src/adapters/secondary/shared/` — do not duplicate them per provider.
-
-Providers that need a separate SDK may implement `ITranslationService` directly. Keep the same domain boundary and reuse the shared prompt, JSON parser, and response mapper. [PuterTranslationAdapter.ts](src/adapters/secondary/puter/PuterTranslationAdapter.ts) is the reference: it uses `@heyputer/puter.js`, sends the full response schema through `buildPlainPrompt()`, parses the returned JSON manually, and maps SDK errors to the existing `AppError` types. It authenticates with a user-created token from [Puter account settings](https://puter.com/#account); do not use `puter.auth.signIn()` from the extension popup because Puter does not accept extension URLs as sign-in origins.
-
-#### 4. Wire into the adapter factory
-
-**File:** `src/adapters/secondary/TranslationAdapterFactory.ts` — add a `case` for your provider in the switch statement (the `default` branch is an exhaustive `never` check, so TypeScript will remind you).
-
-#### 5. Add model fetching
-
-**File:** `src/adapters/secondary/model-fetchers/ModelFetchService.ts` — add your provider to the `MODEL_FETCHERS` record. If the provider exposes an OpenAI-compatible `/v1/models` endpoint, reuse `fetchOpenAICompatibleModels`. A provider-specific SDK can use its own model-list method. If it has no list endpoint, omit it — users add models manually.
-
-Check the SDK's failure behavior before mapping errors. Puter's `ai.listModels()` returns an empty list when its endpoint or driver fails, so its fetcher first calls `auth.getUser()` to validate the token and surface an actionable authentication error.
-
-### UI layer
-
-#### 6. Add UI metadata
-
-**File:** `src/adapters/primary/ui/shared/constants/providers.ts` — add a `PROVIDER_BADGE_COLORS` entry and the API key URL to `API_KEY_URLS`. If credential setup needs provider-specific guidance, add a short note to the Manage Keys page; PuterJS links users to its account page because its credential is an auth token.
-
-The Manage Keys page reads the provider list straight from `PROVIDERS`, so no separate provider-list wiring is needed.
-
-### Tests & fixtures
-
-#### 7. Update tests
-
-**File:** `src/adapters/secondary/TranslationAdapterFactory.test.ts` — add your provider class to the `expectedAdapters` map (the test loops over it and asserts the factory returns the right class for each provider).
-
-**File:** `src/adapters/secondary/model-fetchers/ModelFetchService.test.ts` — cover your fetcher, including error status mapping.
-
-**File:** `tests/test-fixtures.ts` — add a credential factory only if the e2e tests need one.
-
----
-
-## Questions?
-
-If something is unclear or you'd like to discuss a larger change before starting, open an issue and we'll figure it out together.
-
-Happy contributing!
+Update this guide when code responsibilities, the suggested reading order, contributor commands or provider setup change. Update [FLOW.md](FLOW.md) for the detailed translation and testing walkthrough, and [CLAUDE.md](CLAUDE.md) for coding-agent instructions. Keep architecture decisions brief and link to the code responsible rather than copying its implementation. Refactor plans and check results describe past work; use the current guides and code to find responsibilities and commands.

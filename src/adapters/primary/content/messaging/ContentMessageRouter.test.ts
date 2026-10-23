@@ -11,28 +11,10 @@ const mockTranslationModalHandle = mock();
 const mockToastShow = mock();
 const mockToastDismiss = mock();
 
-mock.module('../handlers/OverlayHandler', () => ({
-  OverlayHandler: class {
-    handle = mockOverlayHandle;
-  },
-}));
-
-mock.module('../handlers/TranslationModalHandler', () => ({
-  TranslationModalHandler: class {
-    handle = mockTranslationModalHandle;
-  },
-}));
-
-mock.module('../handlers/ToastHandler', () => ({
-  ToastHandler: class {
-    show = mockToastShow;
-    dismiss = mockToastDismiss;
-  },
-}));
-
 // ── Provide window.matchMedia for ThemeManager ───────────────────────
 globalThis.window =
   globalThis.window || ({} as unknown as typeof globalThis.window);
+
 (globalThis.window as unknown as Record<string, unknown>).matchMedia = ((
   query: string,
 ) => ({
@@ -51,8 +33,6 @@ globalThis.window =
 import { ContentMessageRouter } from './ContentMessageRouter';
 import { ThemeManager } from '../hosts/ThemeManager';
 
-// ── Tests ────────────────────────────────────────────────────────────
-
 const runtimeOnMessage = browser.runtime as unknown as {
   onMessage: { addListener: ReturnType<typeof mock> };
 };
@@ -68,7 +48,25 @@ describe('Adapter: ContentMessageRouter', () => {
     mockToastDismiss.mockClear();
 
     const themeManager = new ThemeManager();
-    const router = new ContentMessageRouter(themeManager);
+
+    const router = new ContentMessageRouter(themeManager, {
+      translation: {
+        handle: mockTranslationModalHandle,
+        register: mock((requestId) => ({
+          requestId,
+          documentSessionId: 'session',
+        })),
+        runtimeSettled: mock(),
+        runtimeFailed: mock(),
+        dispose: mock(),
+        resetDocument: mock(),
+        checkDeadlines: mock(),
+        receive: mock(),
+      },
+      toast: { show: mockToastShow, dismiss: mockToastDismiss },
+      createOverlay: () => ({ handle: mockOverlayHandle }),
+    });
+
     router.register();
 
     callback = runtimeOnMessage.onMessage.addListener.mock
@@ -136,9 +134,10 @@ describe('Adapter: ContentMessageRouter', () => {
     expect(mockToastDismiss).toHaveBeenCalledWith('toast-123');
   });
 
-  test('PING → returns { type: "PONG" }', async () => {
+  test('PING → returns { action: "PONG" }', async () => {
     const result = await callback({ action: 'PING' });
-    expect(result).toEqual({ type: 'PONG' });
+
+    expect(result).toEqual({ action: 'PONG' });
   });
 
   test('invalid message (schema fail) → no handler called', async () => {

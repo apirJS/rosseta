@@ -1,8 +1,6 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
-import {
-  TranslationModalController,
-  type SegmentPayload,
-} from './TranslationModalController.svelte';
+import { TranslationModalController } from './TranslationModalController.svelte';
+import type { SegmentPayload } from './translation-modal-segments';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -13,6 +11,7 @@ function makeSegments(
     text: string;
     romanization?: string | null;
     blockIndex?: number;
+    index?: number;
   }[],
 ): SegmentPayload[] {
   return items.map((i) => ({
@@ -20,6 +19,7 @@ function makeSegments(
     text: i.text,
     romanization: i.romanization ?? null,
     blockIndex: i.blockIndex ?? 0,
+    index: i.index,
   }));
 }
 
@@ -65,16 +65,44 @@ describe('UI Controller: TranslationModalController', () => {
   test('initial position is (0, 0)', () => {
     const ctrl = createController();
 
-    expect(ctrl.posX).toBe(0);
-    expect(ctrl.posY).toBe(0);
+    expect(ctrl.drag.x).toBe(0);
+    expect(ctrl.drag.y).toBe(0);
   });
 
   test('initial copy states are all idle', () => {
     const ctrl = createController();
 
-    expect(ctrl.originalCopy).toBe('idle');
-    expect(ctrl.translatedCopy).toBe('idle');
-    expect(ctrl.descriptionCopy).toBe('idle');
+    expect(ctrl.clipboard.states.original).toBe('idle');
+    expect(ctrl.clipboard.states.translated).toBe('idle');
+    expect(ctrl.clipboard.states.description).toBe('idle');
+  });
+
+  test('completed status hides after one second and a new attempt makes status visible again', () => {
+    const ctrl = createController();
+
+    expect(ctrl.headerStatus).toBe('Complete');
+    vi.advanceTimersByTime(1_000);
+    expect(ctrl.headerStatus).toBe('');
+    ctrl.started({ code: 'en-US', name: 'English' });
+    expect(ctrl.headerStatus).toBe('Translating...');
+    vi.advanceTimersByTime(1_000);
+    expect(ctrl.headerStatus).toBe('Translating...');
+    ctrl.dispose();
+  });
+
+  test('a failure keeps its title in the body instead of the header status', () => {
+    const ctrl = createController();
+
+    ctrl.failed({
+      code: 'TRANSLATION_NO_TEXT_FOUND',
+      title: 'No Text Found',
+      userMessage: 'No readable text was found.',
+    });
+
+    expect(ctrl.headerStatus).toBe('');
+    expect(ctrl.status).toBe('No Text Found');
+    expect(ctrl.failureDescription).toBe('No readable text was found.');
+    ctrl.dispose();
   });
 
   // ── Derived text ───────────────────────────────────────────
@@ -135,10 +163,7 @@ describe('UI Controller: TranslationModalController', () => {
     });
 
     expect(ctrl.originalBlocks).toHaveLength(2);
-    expect(ctrl.originalBlocks[0].map((s) => s.text)).toEqual([
-      'OK',
-      'ボタン',
-    ]);
+    expect(ctrl.originalBlocks[0].map((s) => s.text)).toEqual(['OK', 'ボタン']);
     expect(ctrl.originalBlocks[0].map((s) => s.index)).toEqual([0, 1]);
     expect(ctrl.originalBlocks[1].map((s) => s.text)).toEqual(['3.50']);
     expect(ctrl.originalBlocks[1][0].index).toBe(2);
@@ -244,6 +269,65 @@ describe('UI Controller: TranslationModalController', () => {
     expect(ctrl.isMultiLang).toBe(true);
   });
 
+  test('hover uses the paired source index for the label and resets to Mixed on leave', () => {
+    const original = makeSegments([
+      { code: 'ja-JP', name: 'Japanese', text: 'Japanese source', index: 10 },
+      { code: 'ko-KR', name: 'Korean', text: 'Korean source', index: 20 },
+    ]);
+
+    const ctrl = createController({
+      original,
+      translated: makeSegments([
+        {
+          code: 'en-US',
+          name: 'English',
+          text: 'First translation',
+          index: 10,
+        },
+        {
+          code: 'en-US',
+          name: 'English',
+          text: 'Second translation',
+          index: 20,
+        },
+      ]),
+    });
+
+    expect(ctrl.displayedLangLabel).toBe('Mixed');
+    ctrl.hoverSegment(10);
+    expect(ctrl.displayedLangLabel).toBe('Japanese (ja-JP)');
+    expect(ctrl.highlightedSegmentIndex).toBe(10);
+    ctrl.hoverSegment(20);
+    expect(ctrl.displayedLangLabel).toBe('Korean (ko-KR)');
+    expect(ctrl.targetLanguageLabel).toBe('English (en-US)');
+    ctrl.hoverSegment(99);
+    expect(ctrl.displayedLangLabel).toBe('Mixed');
+    ctrl.hoverSegment(null);
+    expect(ctrl.displayedLangLabel).toBe('Mixed');
+    expect(ctrl.highlightedSegmentIndex).toBeNull();
+    ctrl.dispose();
+  });
+
+  test.each(['number', 'symbol', 'unknown'])(
+    'hovering a %s segment keeps the Mixed source label',
+    (code) => {
+      const ctrl = createController({
+        original: makeSegments([
+          { code: 'ja-JP', name: 'Japanese', text: 'Japanese source' },
+          { code: 'ko-KR', name: 'Korean', text: 'Korean source' },
+          { code, name: code, text: '42' },
+        ]),
+      });
+
+      ctrl.hoverSegment(0);
+      expect(ctrl.displayedLangLabel).toBe('Japanese (ja-JP)');
+      ctrl.hoverSegment(2);
+      expect(ctrl.displayedLangLabel).toBe('Mixed');
+      expect(ctrl.highlightedSegmentIndex).toBe(2);
+      ctrl.dispose();
+    },
+  );
+
   test('isMultiLang is false with one real language + non-lang codes', () => {
     const ctrl = createController({
       original: makeSegments([
@@ -278,44 +362,146 @@ describe('UI Controller: TranslationModalController', () => {
 
   test('copyOriginal sets originalCopy to "copied", resets after 2s', async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
+
     Object.assign(navigator, {
       clipboard: { writeText: writeTextMock },
     });
 
     const ctrl = createController();
 
-    await ctrl.copyOriginal();
-    expect(ctrl.originalCopy).toBe('copied');
+    await ctrl.copy('original');
+    expect(ctrl.clipboard.states.original).toBe('copied');
     expect(writeTextMock).toHaveBeenCalledWith('こんにちは');
 
     vi.advanceTimersByTime(2000);
-    expect(ctrl.originalCopy).toBe('idle');
+    expect(ctrl.clipboard.states.original).toBe('idle');
   });
 
   test('copyTranslated sets translatedCopy to "copied"', async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
+
     Object.assign(navigator, {
       clipboard: { writeText: writeTextMock },
     });
 
     const ctrl = createController();
 
-    await ctrl.copyTranslated();
-    expect(ctrl.translatedCopy).toBe('copied');
+    await ctrl.copy('translated');
+    expect(ctrl.clipboard.states.translated).toBe('copied');
     expect(writeTextMock).toHaveBeenCalledWith('Hello');
   });
 
-  test('copyDescription sets descriptionCopy to "copied"', async () => {
+  test('copyDescription preserves Markdown and sets copy feedback', async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
+
     Object.assign(navigator, {
       clipboard: { writeText: writeTextMock },
     });
 
-    const ctrl = createController({ description: 'Test desc' });
+    const description = '**Context**\n\n- A useful detail';
+    const ctrl = createController({ description });
 
-    await ctrl.copyDescription();
-    expect(ctrl.descriptionCopy).toBe('copied');
-    expect(writeTextMock).toHaveBeenCalledWith('Test desc');
+    await ctrl.copy('description');
+    expect(ctrl.clipboard.states.description).toBe('copied');
+    expect(writeTextMock).toHaveBeenCalledWith(description);
+  });
+
+  test('clipboard fallback copies the final text and removes its temporary textarea', async () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi
+          .fn()
+          .mockRejectedValue(new Error('Clipboard unavailable')),
+      },
+    });
+
+    const execCommand = vi.fn().mockReturnValue(true);
+
+    Object.assign(document, { execCommand });
+
+    const ctrl = createController();
+
+    await ctrl.copy('translated');
+
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    expect(ctrl.clipboard.states.translated).toBe('copied');
+    expect(document.querySelector('textarea')).toBeNull();
+    ctrl.dispose();
+  });
+
+  test('failed clipboard fallback removes its textarea and leaves feedback idle', async () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi
+          .fn()
+          .mockRejectedValue(new Error('Clipboard unavailable')),
+      },
+    });
+
+    Object.assign(document, {
+      execCommand: vi.fn(() => {
+        throw new Error('Copy denied');
+      }),
+    });
+
+    const ctrl = createController();
+
+    await ctrl.copy('translated');
+
+    expect(ctrl.clipboard.states.translated).toBe('idle');
+    expect(document.querySelector('textarea')).toBeNull();
+    ctrl.dispose();
+  });
+
+  test('a clipboard operation settling after disposal cannot start feedback', async () => {
+    let resolveCopy: (() => void) | undefined;
+
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn(
+          () =>
+            new Promise<void>((resolve) => {
+              resolveCopy = resolve;
+            }),
+        ),
+      },
+    });
+
+    const ctrl = createController();
+    const copying = ctrl.copy('translated');
+
+    ctrl.dispose();
+    resolveCopy?.();
+    await copying;
+
+    expect(ctrl.clipboard.states.translated).toBe('idle');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test('disposing during a drag stops further position updates', () => {
+    const ctrl = createController();
+
+    ctrl.drag.start({
+      button: 0,
+      clientX: 10,
+      clientY: 20,
+    } as PointerEvent);
+
+    window.dispatchEvent(
+      new MouseEvent('pointermove', { clientX: 35, clientY: 47 }),
+    );
+
+    expect(ctrl.drag.x).toBe(25);
+    expect(ctrl.drag.y).toBe(27);
+
+    ctrl.dispose();
+
+    window.dispatchEvent(
+      new MouseEvent('pointermove', { clientX: 70, clientY: 80 }),
+    );
+
+    expect(ctrl.drag.x).toBe(25);
+    expect(ctrl.drag.y).toBe(27);
   });
 
   // ── Close ──────────────────────────────────────────────────
@@ -343,5 +529,206 @@ describe('UI Controller: TranslationModalController', () => {
     expect(ctrl.langColorMap.get('ja-JP')).toBe(0);
     expect(ctrl.langColorMap.get('en-US')).toBe(1);
     expect(ctrl.langColorMap.size).toBe(2); // no duplicate
+  });
+
+  test('live rows stay paired and preserve indexes while metadata arrives', () => {
+    const ctrl = new TranslationModalController({
+      original: [],
+      translated: [],
+      description: '',
+      live: true,
+      detachModal: vi.fn(),
+    });
+
+    ctrl.started({ code: 'en-US', name: 'English' });
+    ctrl.reset();
+
+    ctrl.snapshot({
+      segments: [
+        {
+          index: 0,
+          blockIndex: null,
+          originalText: 'first',
+          translatedText: '',
+          sourceLanguageCode: null,
+          romanization: null,
+        },
+        {
+          index: 1,
+          blockIndex: null,
+          originalText: '',
+          translatedText: 'second',
+          sourceLanguageCode: '__proto__',
+          romanization: null,
+        },
+      ],
+      description: null,
+    });
+
+    expect(ctrl.original.map((row) => row.index)).toEqual([0, 1]);
+    expect(ctrl.translated.map((row) => row.index)).toEqual([0, 1]);
+    expect(ctrl.original[1].text).toBe('');
+    expect(ctrl.original[1].language).toEqual({ code: 'unknown', name: '' });
+
+    const originalKey = ctrl.original[1].rowKey;
+
+    ctrl.hoverSegment(1);
+
+    ctrl.snapshot({
+      segments: [
+        {
+          index: 0,
+          blockIndex: 0,
+          originalText: 'first',
+          translatedText: 'First',
+          sourceLanguageCode: 'ja-JP',
+          romanization: null,
+        },
+        {
+          index: 1,
+          blockIndex: 0,
+          originalText: 'second',
+          translatedText: 'Second',
+          sourceLanguageCode: 'ko-KR',
+          romanization: null,
+        },
+      ],
+      description: null,
+    });
+
+    expect(ctrl.original[1].rowKey).toBe(originalKey);
+    expect(ctrl.originalBlocks).toHaveLength(2);
+    expect(ctrl.displayedLangLabel).toBe('Korean (ko-KR)');
+    expect(ctrl.highlightedSegmentIndex).toBe(1);
+    ctrl.reset();
+    expect(ctrl.highlightedSegmentIndex).toBeNull();
+    expect(ctrl.original).toEqual([]);
+    ctrl.dispose();
+  });
+
+  test.each([
+    'TRANSLATION_NO_TEXT_FOUND',
+    'TRANSLATION_CONTENT_BLOCKED',
+    'TRANSLATION_AI_REJECTED',
+  ])(
+    'clears provisional content for %s and keeps Copy unavailable',
+    async (code) => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      const ctrl = new TranslationModalController({
+        original: [],
+        translated: [],
+        description: '',
+        live: true,
+        detachModal: vi.fn(),
+      });
+
+      ctrl.started({ code: 'en-US', name: 'English' });
+      ctrl.reset();
+
+      ctrl.snapshot({
+        segments: [
+          {
+            index: 0,
+            blockIndex: null,
+            originalText: 'preview',
+            translatedText: 'partial',
+            sourceLanguageCode: null,
+            romanization: null,
+          },
+        ],
+        description: 'Draft',
+      });
+
+      await ctrl.copy('original');
+      ctrl.committing();
+      await ctrl.copy('translated');
+
+      ctrl.failed({
+        code,
+        title: 'Cannot translate',
+        userMessage: 'Try another area.',
+      });
+
+      await ctrl.copy('description');
+      expect(ctrl.original).toEqual([]);
+      expect(ctrl.translated).toEqual([]);
+      expect(ctrl.description).toBe('');
+      expect(ctrl.canCopy).toBe(false);
+      expect(writeText).not.toHaveBeenCalled();
+      ctrl.dispose();
+    },
+  );
+
+  test('a connection failure preserves the safe preview and never enables Copy', () => {
+    const ctrl = new TranslationModalController({
+      original: [],
+      translated: [],
+      description: '',
+      live: true,
+      detachModal: vi.fn(),
+    });
+
+    ctrl.started({ code: 'en-US', name: 'English' });
+    ctrl.reset();
+
+    ctrl.snapshot({
+      segments: [
+        {
+          index: 0,
+          blockIndex: null,
+          originalText: 'source',
+          translatedText: 'partial',
+          sourceLanguageCode: null,
+          romanization: null,
+        },
+      ],
+      description: null,
+    });
+
+    ctrl.failed({
+      code: 'NETWORK_CONNECTION_FAILED',
+      title: 'Disconnected',
+      userMessage: 'Try again.',
+    });
+
+    expect(ctrl.translated[0].text).toBe('partial');
+    expect(ctrl.canCopy).toBe(false);
+    expect(ctrl.isBusy).toBe(false);
+    ctrl.dispose();
+  });
+
+  test('disposed controllers ignore queued lifecycle updates and close only once', () => {
+    const detach = vi.fn();
+    const retry = vi.fn();
+
+    const ctrl = new TranslationModalController({
+      original: [],
+      translated: [],
+      description: '',
+      live: true,
+      detachModal: detach,
+      onretry: retry,
+    });
+
+    ctrl.close();
+    ctrl.started({ code: 'en-US', name: 'English' });
+    ctrl.reset();
+    ctrl.committing();
+    ctrl.cancelled();
+
+    ctrl.failed({
+      code: 'NETWORK_TIMEOUT',
+      title: 'Timeout',
+      userMessage: 'Try again.',
+    });
+
+    ctrl.retry();
+    ctrl.close();
+    expect(ctrl.phase).toBe('preparing');
+    expect(detach).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
   });
 });

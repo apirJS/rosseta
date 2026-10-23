@@ -7,6 +7,7 @@ import { StorageError, ErrorCode } from '../../../shared/errors';
 function createUseCase() {
   const storage = new FakeUserPreferencesStorage();
   const useCase = new GetPreferencesUseCase(storage);
+
   return { storage, useCase };
 }
 
@@ -17,6 +18,7 @@ describe('Application: GetPreferencesUseCase', () => {
     const result = await useCase.execute();
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data).toBeNull();
     }
@@ -25,11 +27,13 @@ describe('Application: GetPreferencesUseCase', () => {
   test('returns stored preferences', async () => {
     const { storage, useCase } = createUseCase();
     const prefs = UserPreferences.createDefault('prefs-1');
+
     storage.seed(prefs);
 
     const result = await useCase.execute();
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data).not.toBeNull();
       expect(result.data!.id).toBe('prefs-1');
@@ -39,11 +43,13 @@ describe('Application: GetPreferencesUseCase', () => {
 
   test('fails when storage.get() fails', async () => {
     const { storage, useCase } = createUseCase();
+
     storage.failNextCallWith(StorageError.readFailed('preferences'));
 
     const result = await useCase.execute();
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBeInstanceOf(StorageError);
       expect(result.error.code).toBe(ErrorCode.STORAGE_READ_FAILED);

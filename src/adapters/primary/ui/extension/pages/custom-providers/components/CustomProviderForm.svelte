@@ -29,7 +29,10 @@
     'px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-sm placeholder:text-muted focus:outline-none focus:border-primary';
 </script>
 
-<div class="flex-1 flex flex-col gap-3 overflow-y-auto">
+<fieldset
+  disabled={isSaving}
+  class="flex-1 flex flex-col gap-3 overflow-y-auto min-w-0"
+>
   <p class="text-xs text-muted">
     Configure an OpenAI-compatible or Anthropic-compatible endpoint. API keys
     are managed under Manage API Keys.
@@ -71,10 +74,9 @@
     </span>
     <textarea
       class="{inputClass} resize-none font-mono"
-      placeholder='&#123;"HTTP-Referer": "https://rosseta.app"&#125;'
+      placeholder={'{"HTTP-Referer": "https://rosseta.app"}'}
       rows="2"
-      bind:value={headers}
-    ></textarea>
+      bind:value={headers}></textarea>
   </label>
 
   <label class="flex flex-col gap-1">
@@ -83,10 +85,9 @@
     </span>
     <textarea
       class="{inputClass} resize-none font-mono"
-      placeholder='&#123;"api-version": "2024-02-01"&#125;'
+      placeholder={'{"api-version": "2024-02-01"}'}
       rows="2"
-      bind:value={queryParams}
-    ></textarea>
+      bind:value={queryParams}></textarea>
     {#if type === 'anthropic'}
       <span class="text-[10px] text-muted">
         Anthropic requests use <code>/messages</code>; model discovery uses
@@ -120,4 +121,4 @@
       {isSaving ? 'Saving…' : 'Save Provider'}
     </button>
   </div>
-</div>
+</fieldset>

@@ -21,6 +21,7 @@ describe('Domain: CustomProviderConfig', () => {
     const result = CustomProviderConfig.create(baseProps());
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data.id).toBe('custom-test-1');
       expect(result.data.name).toBe('My Provider');
@@ -45,6 +46,7 @@ describe('Domain: CustomProviderConfig', () => {
     );
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data.name).toBe('Padded');
       expect(result.data.baseURL).toBe('https://api.example.com');
@@ -79,6 +81,7 @@ describe('Domain: CustomProviderConfig', () => {
     );
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.data.headers).toBeUndefined();
       expect(result.data.queryParams).toBeUndefined();
@@ -90,8 +93,10 @@ describe('Domain: CustomProviderConfig', () => {
     const result = CustomProviderConfig.create(baseProps({ headers }));
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const props = result.data.toProps();
+
       expect(props.headers).toEqual(headers);
       expect(props.headers).not.toBe(headers);
     }

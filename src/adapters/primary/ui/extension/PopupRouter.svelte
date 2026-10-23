@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createHomeController } from './pages/home/HomeController.svelte';
+  import { createPopupNavigationController } from './PopupNavigationController.svelte';
   import HomePage from './pages/home/HomePage.svelte';
   import ManageKeysPage from './pages/manage-keys/ManageKeysPage.svelte';
   import ManageModelsPage from './pages/manage-models/ManageModelsPage.svelte';
@@ -7,7 +7,7 @@
   import HistoryPage from './pages/history/HistoryPage.svelte';
   import SettingsPage from './pages/settings/SettingsPage.svelte';
 
-  const controller = createHomeController();
+  const controller = createPopupNavigationController();
 
   const currentView = $derived(controller.state.currentView);
 </script>
@@ -20,20 +20,20 @@
   {#key currentView}
     {#if currentView === 'manage-api-keys'}
       <ManageKeysPage
-        onback={controller.showMain}
+        onback={controller.showHome}
         initialProvider={controller.state.selectedProvider}
       />
     {:else if currentView === 'manage-models'}
       <ManageModelsPage
-        onback={controller.showMain}
+        onback={controller.showHome}
         initialProvider={controller.state.selectedProvider}
       />
     {:else if currentView === 'custom-providers'}
-      <CustomProvidersPage onback={controller.showMain} />
+      <CustomProvidersPage onback={controller.showHome} />
     {:else if currentView === 'history'}
-      <HistoryPage onback={controller.showMain} />
+      <HistoryPage onback={controller.showHome} />
     {:else if currentView === 'settings'}
-      <SettingsPage onback={controller.showMain} />
+      <SettingsPage onback={controller.showHome} />
     {:else}
       <HomePage navigation={controller} />
     {/if}

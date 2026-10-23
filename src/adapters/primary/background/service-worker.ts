@@ -1,12 +1,11 @@
-import { container } from './di-container';
-import { MessageRouter } from './MessageRouter';
+import { createBackgroundRuntime } from '../../../composition/background';
 import { CommandListener } from './CommandListener';
-import { OverlayService } from './services/OverlayService';
+import { pruneExpiredTranslationHistory } from './history/prune-expired-translation-history';
 
-const overlayService = new OverlayService(container);
+const runtime = createBackgroundRuntime();
 
-const messageRouter = new MessageRouter(container, overlayService);
-messageRouter.register();
+runtime.messageRouter.register();
 
-const commandListener = new CommandListener(overlayService);
-commandListener.register();
+new CommandListener(runtime.overlayService).register();
+
+void pruneExpiredTranslationHistory(runtime.getAllTranslations);

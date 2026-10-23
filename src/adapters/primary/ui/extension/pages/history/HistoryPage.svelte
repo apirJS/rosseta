@@ -1,11 +1,17 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     EmptyState,
     Icon,
     PageShell,
     UndoBar,
   } from '../../../shared/components';
-  import { getPreferencesStateContext } from '../../../shared/context';
+  import {
+    getPreferencesStateContext,
+    getTranslationContext,
+  } from '../../context';
+  import { sendMessageToRuntime } from '../../../../../../shared/messaging';
+  import { serializeForModal } from '../../../../../../shared/types/TranslationModalPayload';
   import { createHistoryController } from './HistoryController.svelte';
   import HistoryItem from './components/HistoryItem.svelte';
   import HistorySearchBar from './components/HistorySearchBar.svelte';
@@ -16,11 +22,24 @@
 
   const { onback }: Props = $props();
 
-  const controller = createHistoryController();
+  const translations = getTranslationContext();
+
+  const controller = createHistoryController({
+    load: () => translations.getAllTranslations.execute(),
+    remove: (id) => translations.deleteTranslation.execute(id),
+    open: async (translation) => {
+      await sendMessageToRuntime({
+        action: 'MOUNT_HISTORY_MODAL',
+        payload: serializeForModal(translation),
+      });
+    },
+  });
+
   const preferences = getPreferencesStateContext();
 
-  $effect(() => {
-    controller.load();
+  onMount(() => {
+    void controller.load();
+
     return () => controller.destroy();
   });
 </script>
@@ -39,37 +58,38 @@
   />
 
   <div class="flex-1 overflow-y-auto flex flex-col gap-1.5 min-h-0 -mx-1 px-1">
+    {#if controller.state.error}
+      <p class="text-center text-sm text-red-400 py-4" role="alert">
+        {controller.state.error}
+      </p>
+    {/if}
     {#if controller.state.loading}
       <div class="flex items-center justify-center py-8 text-muted">
         <Icon name="spinner" class="w-5 h-5" />
       </div>
-    {:else if controller.state.error}
-      <p class="text-center text-sm text-red-400 py-4">
-        {controller.state.error}
-      </p>
-    {:else if controller.filtered.length === 0}
-      <EmptyState
-        message={controller.state.searchQuery
-          ? 'No results found'
-          : 'No history yet'}
-      />
+    {:else if controller.items.length === 0}
+      {#if !controller.state.error}
+        <EmptyState
+          message={controller.state.searchQuery
+            ? 'No results found'
+            : 'No history yet'}
+        />
+      {/if}
     {:else}
-      {#each controller.filtered as translation (translation.id)}
+      {#each controller.items as item (item.id)}
         <HistoryItem
-          {translation}
-          onopen={() => controller.openItem(translation)}
-          ondelete={() => controller.deleteItem(translation.id)}
+          previewText={item.previewText}
+          formattedDate={item.formattedDate}
+          onopen={() => controller.openItem(item.id)}
+          ondelete={() => controller.deleteItem(item.id)}
         />
       {/each}
     {/if}
   </div>
 
   {#snippet footer()}
-    {#if controller.state.pendingDelete}
-      <UndoBar
-        message="Translation deleted"
-        onundo={controller.undoDelete}
-      />
+    {#if controller.state.pendingDeleteId}
+      <UndoBar message="Translation deleted" onundo={controller.undoDelete} />
     {/if}
   {/snippet}
 </PageShell>

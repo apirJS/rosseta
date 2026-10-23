@@ -8,6 +8,8 @@ export type Provider =
   | 'anthropic'
   | 'mistral'
   | 'deepinfra'
+  | 'deepseek'
+  | 'nvidia'
   | 'zai'
   | 'openrouter'
   | 'opencode'
@@ -22,6 +24,8 @@ export const PROVIDERS: Provider[] = [
   'anthropic',
   'mistral',
   'deepinfra',
+  'deepseek',
+  'nvidia',
   'zai',
   'openrouter',
   'opencode',

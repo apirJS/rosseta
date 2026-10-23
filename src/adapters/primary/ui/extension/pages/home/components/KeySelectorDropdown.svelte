@@ -36,7 +36,9 @@
         type="button"
         aria-pressed={isActive}
         class="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left
-               {isActive ? 'text-foreground' : 'text-muted hover:text-foreground'}
+               {isActive
+          ? 'text-foreground'
+          : 'text-muted hover:text-foreground'}
                hover:bg-surface cursor-pointer"
         onclick={() => onSelectAutoBalance(provider)}
       >

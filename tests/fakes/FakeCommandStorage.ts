@@ -21,9 +21,12 @@ export class FakeCommandStorage implements ICommandStorage {
   ): Promise<Result<string | null, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     return success(this.shortcutValues.get(commandName) ?? null);
   }
 }

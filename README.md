@@ -2,7 +2,7 @@
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/flbdkalgeiekpnchpakdpaabcehpnlln?style=flat&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/rosseta/flbdkalgeiekpnchpakdpaabcehpnlln) [![Firefox Add-ons](https://img.shields.io/amo/v/rosseta?style=flat&logo=firefox&logoColor=white&label=Firefox%20Add-ons)](https://addons.mozilla.org/en-US/firefox/addon/rosseta/)
 
-A browser extension that translates text from any region of a webpage. Draw a selection box over the text, images, or UI elements on screen. The extension captures that region as a screenshot, sends it to a vision LLM for OCR, and renders the translated text in an overlay on the page.
+A browser extension that translates text from any region of a webpage. Draw a selection box over the text, images, or UI elements on screen. The extension captures that region as a screenshot, sends it to a vision LLM for translation, and renders the translated text in an overlay on the page.
 
 Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone). Successor of [select-and-translate](https://github.com/apirJS/select-and-translate), rebuilt from scratch.
 
@@ -10,16 +10,18 @@ Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone). Su
 
 ## Demo
 
-![Rosseta demo banner 1](demo/chrome_banner_big_1.png)
+![Rosseta translation demo](demo/translation-demo.gif)
 
-![Rosseta demo banner 4](demo/chrome_banner_big_5.png)
+<details>
+<summary>Screenshots</summary>
+
+![Rosseta demo banner 1](demo/translation-demo.png)
 
 ![Rosseta demo banner 2](demo/chrome_banner_big_2.png)
 
-![Rosseta demo banner 4](demo/chrome_banner_big_4.png)
+![Rosseta demo banner 3](demo/chrome_banner_big_4.png)
 
-![Rosseta demo banner 3](demo/chrome_banner_big_3.png)
----
+</details>
 
 ## Features
 
@@ -39,17 +41,17 @@ Each translation result can include a brief contextual summary describing what w
 
 The OCR output is segmented by visually distinct blocks, not merged into a single blob. Each heading, label, timestamp, button, and caption is its own segment with its own language tag and translation. Mixed-language text within a single block is split by language.
 
-### 12 built-in AI providers
+### 14 built-in AI providers
 
-Rosseta supports the following providers out of the box: Google, Groq, xAI, OpenAI, Anthropic, Mistral, DeepInfra, Z.ai, OpenRouter, OpenCode, Hugging Face, and PuterJS.
+Rosseta supports the following providers out of the box: Google, Groq, xAI, OpenAI, Anthropic, Mistral, DeepInfra, DeepSeek, NVIDIA, Z.ai, OpenRouter, OpenCode, Hugging Face, and PuterJS.
 
 Model lists are fetched directly from the provider's API at runtime. You can also add models manually.
-
-To use PuterJS, create an auth token in [Puter account settings](https://puter.com/#account), then add it from **Manage API Keys** with PuterJS selected. Puter's popup sign-in flow does not support browser-extension URLs, so Rosseta uses the token as the provider credential.
 
 ### Custom provider endpoints
 
 Point Rosseta at any OpenAI-compatible or Anthropic-compatible API by selecting the protocol and providing a base URL, optional custom headers, and optional query parameters. These values are validated when saved and used for both translation and model discovery. Useful for self-hosted models, corporate proxies, or providers not yet built in.
+
+Deleting a custom provider also removes its API keys, models, saved model selection, and key-rotation state. If that provider was selected, the translation provider selector returns to DeepSeek.
 
 ### Multiple API keys per provider
 
@@ -57,11 +59,15 @@ You can store multiple API keys for each provider. The extension supports round-
 
 ### Translation history
 
-Every translation is automatically saved locally. History is searchable and can be cleared individually or all at once.
+Every completed, validated translation is automatically saved locally. Partial and failed previews are not saved. History is searchable and can be cleared individually or all at once. If saving fails, the completed result remains available in the modal with a notice.
+
+History older than **90 days** is automatically removed when the extension starts and whenever history is read or changed. Restoring a backup also applies this retention limit.
 
 ### Settings backup
 
 Export your complete setup to a JSON file and restore it later from the Settings page. Backups include provider credentials (including API keys and Puter tokens), custom providers, model lists and selections, language and theme preferences, key rotation settings, and translation history.
+
+Learned model compatibility is operational state local to the current browser profile and is excluded from backups. Another browser or a fresh installation starts with unknown capabilities.
 
 ### Keyboard shortcut
 
@@ -83,9 +89,7 @@ Runs on both Chrome and Firefox as a Manifest V3 extension.
 ## Tips for free users
 
 - Explore [awesome-free-llm-apis](https://github.com/mnfst/awesome-free-llm-apis) for providers offering free API access or trial quotas. Limits and availability can change, so check each provider's current terms before adding a key.
-- Use **PuterJS** to access its supported models with a Puter account token. Create a token in [Puter account settings](https://puter.com/#account), add it under **Manage API Keys**, then fetch and select a model under **Manage Models**.
 - Choose a model that supports **image or vision input**. Rosseta sends a screenshot of the selected region, so text-only models cannot perform the translation.
-- If a provider's model list is incomplete, add a compatible vision model manually from **Manage Models**.
 
 ---
 
@@ -99,13 +103,14 @@ Built with Svelte 5 (runes), TypeScript (strict, no `any`), Tailwind CSS v4, and
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, architecture details, coding standards, and the pull request process.
 
+Start with the [ownership map and reading path](CONTRIBUTING.md#find-the-owner), [UI source](src/adapters/primary/ui/) for pages/controllers/components, and [FLOW.md](FLOW.md) for the full translation walkthrough. Use lint, type checks, the three test environments and production builds for both browsers to verify changes.
+
 ---
 
 ## Roadmap
 
 - [x] Release to Chrome Web Store and Firefox Add-ons
 - [ ] More AI providers
-
 
 ---
 

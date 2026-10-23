@@ -7,6 +7,7 @@ export class BrowserError extends AppError {
       ...options,
       code: options.code ?? ErrorCode.BROWSER_COMMUNICATION_FAILED,
     });
+
     this.name = 'BrowserError';
   }
   static noActiveTab(context?: Record<string, unknown>): BrowserError {

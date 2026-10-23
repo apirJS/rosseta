@@ -1,10 +1,111 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "import"],
+  "jsPlugins": [
+    { "name": "stylistic", "specifier": "@stylistic/eslint-plugin" }
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
     "perf": "warn"
+  },
+  "rules": {
+    "stylistic/padding-line-between-statements": [
+      "warn",
+
+      // 1. Directives & Imports: Always isolate at the top of the file/script block
+      { "blankLine": "always", "prev": "directive", "next": "*" },
+      { "blankLine": "any", "prev": "directive", "next": "directive" },
+      { "blankLine": "always", "prev": ["import", "cjs-import"], "next": "*" },
+      {
+        "blankLine": "any",
+        "prev": ["import", "cjs-import"],
+        "next": ["import", "cjs-import"]
+      },
+
+      // 2. Variable Declarations: Separate from code, but allow grouping single-line declarations (e.g., Svelte $state / $derived)
+      { "blankLine": "always", "prev": ["const", "let", "var"], "next": "*" },
+      { "blankLine": "always", "prev": "*", "next": ["const", "let", "var"] },
+      {
+        "blankLine": "any",
+        "prev": ["singleline-const", "singleline-let", "singleline-var"],
+        "next": ["singleline-const", "singleline-let", "singleline-var"]
+      },
+
+      // 3. Multiline Statements & Blocks: Always give breathing room (covers Svelte $effect, multiline $derived, loops, ifs, functions)
+      {
+        "blankLine": "always",
+        "prev": "*",
+        "next": [
+          "block-like",
+          "multiline-block-like",
+          "multiline-expression",
+          "multiline-const",
+          "multiline-let",
+          "multiline-var"
+        ]
+      },
+      {
+        "blankLine": "always",
+        "prev": [
+          "block-like",
+          "multiline-block-like",
+          "multiline-expression",
+          "multiline-const",
+          "multiline-let",
+          "multiline-var"
+        ],
+        "next": "*"
+      },
+
+      // 4. TypeScript Declarations: Isolate interfaces, enums, and types, but allow grouping consecutive single-line type/export statements
+      {
+        "blankLine": "always",
+        "prev": "*",
+        "next": ["interface", "type", "enum"]
+      },
+      {
+        "blankLine": "always",
+        "prev": ["interface", "type", "enum"],
+        "next": "*"
+      },
+      { "blankLine": "any", "prev": "type", "next": "type" },
+
+      // 5. Exports: Isolate exports, but allow consecutive barrel exports or exported constants/types
+      { "blankLine": "always", "prev": "*", "next": ["export", "cjs-export"] },
+      { "blankLine": "always", "prev": ["export", "cjs-export"], "next": "*" },
+      {
+        "blankLine": "any",
+        "prev": ["export", "cjs-export"],
+        "next": ["export", "cjs-export"]
+      },
+
+      // 6. Control Flow Jumps: Visually separate exit statements at the end of blocks
+      {
+        "blankLine": "always",
+        "prev": "*",
+        "next": ["return", "throw", "break", "continue"]
+      },
+
+      // 7. Switch Cases: Add breathing room between cases, without breaking fallthrough cases
+      { "blankLine": "always", "prev": ["case", "default"], "next": "*" },
+      {
+        "blankLine": "any",
+        "prev": ["case", "default"],
+        "next": ["case", "default"]
+      },
+
+      // 8. TypeScript Function Overloads: Must sit at the bottom to override "block-like"
+      {
+        "blankLine": "any",
+        "prev": "function-overload",
+        "next": ["function", "function-overload"]
+      }
+    ],
+    "stylistic/no-multiple-empty-lines": [
+      "warn",
+      { "max": 1, "maxBOF": 0, "maxEOF": 0 }
+    ]
   },
   "env": {
     "browser": true,
@@ -32,14 +133,7 @@
     },
     {
       "files": ["src/adapters/primary/ui/**/*.test.ts"],
-      "plugins": [
-        "eslint",
-        "typescript",
-        "unicorn",
-        "oxc",
-        "import",
-        "vitest"
-      ],
+      "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "vitest"],
       "env": {
         "vitest": true
       }

@@ -7,6 +7,7 @@ export class StorageError extends AppError {
       ...options,
       code: options.code ?? ErrorCode.STORAGE_READ_FAILED,
     });
+
     this.name = 'StorageError';
   }
 

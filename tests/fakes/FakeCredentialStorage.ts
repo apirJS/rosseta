@@ -23,7 +23,9 @@ export class FakeCredentialStorage implements ICredentialStorage {
   async get(): Promise<Result<Credentials | null, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
 
@@ -33,7 +35,9 @@ export class FakeCredentialStorage implements ICredentialStorage {
   async save(credentials: Credentials): Promise<Result<void, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
 

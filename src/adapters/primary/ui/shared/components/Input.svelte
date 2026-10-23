@@ -27,6 +27,7 @@
 
   function handleInput(e: Event) {
     const target = e.target as HTMLInputElement;
+
     oninput?.(target.value);
   }
 

@@ -40,9 +40,12 @@ export class FakeUserPreferencesStorage implements IUserPreferencesStorage {
   async get(): Promise<Result<UserPreferences | null, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     return success(this.storageValue);
   }
 
@@ -51,13 +54,17 @@ export class FakeUserPreferencesStorage implements IUserPreferencesStorage {
   ): Promise<Result<void, AppError>> {
     if (this.setErrorValue) {
       const error = this.setErrorValue;
+
       this.setErrorValue = null;
+
       return failure(error);
     }
 
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
 
@@ -66,7 +73,9 @@ export class FakeUserPreferencesStorage implements IUserPreferencesStorage {
     const base: UserPreferencesProps =
       this.storageValue?.toProps() ??
       UserPreferences.createDefault(uuidv4()).toProps();
+
     const merged = { ...base, ...preferences };
+
     const result = UserPreferences.fromRaw({
       id: merged.id,
       theme: merged.theme,
@@ -74,19 +83,25 @@ export class FakeUserPreferencesStorage implements IUserPreferencesStorage {
       selectedModels: merged.selectedModels,
       includeDescription: merged.includeDescription,
     });
+
     if (result.success) {
       this.storageValue = result.data;
     }
+
     return success(undefined);
   }
 
   async clear(): Promise<Result<void, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     this.storageValue = null;
+
     return success(undefined);
   }
 }

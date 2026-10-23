@@ -3,7 +3,7 @@ import type { AnyProvider } from '../../../../../../core/domain/credential/Provi
 import type { Result } from '../../../../../../shared/types/Result';
 import type { AppError } from '../../../../../../shared/errors';
 import { ERROR_TITLES } from '../../../../../../shared/errors';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 class ManageModelsState {
   selectedProvider = $state<string>('google');
@@ -22,9 +22,7 @@ export interface ManageModelsDeps {
     modelId: string,
   ) => Promise<Result<StoredModel[], AppError>>;
   clearModels: (provider: string) => Promise<Result<void, AppError>>;
-  fetchModels: (
-    provider: string,
-  ) => Promise<Result<StoredModel[], AppError>>;
+  fetchModels: (provider: string) => Promise<Result<StoredModel[], AppError>>;
   hasApiKeyFor: (provider: string) => boolean;
   selectedModelFor: (provider: string) => string | undefined;
   selectModel: (provider: string, modelId: string) => void;
@@ -36,16 +34,20 @@ export function createManageModelsController(
   initialProvider: AnyProvider = 'google',
 ) {
   const state = new ManageModelsState();
+
   state.selectedProvider = initialProvider;
 
   const models = $derived(deps.modelsFor(state.selectedProvider));
+
   const selectedModelId = $derived(
     deps.selectedModelFor(state.selectedProvider),
   );
 
   const filteredModels = $derived.by(() => {
     const query = state.modelInput.trim().toLowerCase();
+
     if (!query) return models;
+
     return models.filter(
       (m) =>
         m.id.toLowerCase().includes(query) ||
@@ -55,6 +57,7 @@ export function createManageModelsController(
 
   const canAddModel = $derived.by(() => {
     const id = state.modelInput.trim();
+
     return id !== '' && !models.some((m) => m.id === id);
   });
 
@@ -65,11 +68,15 @@ export function createManageModelsController(
 
   async function addModel() {
     const id = state.modelInput.trim();
+    const provider = state.selectedProvider;
+
     if (!id || !canAddModel) return;
 
-    const result = await deps.addModel(state.selectedProvider, id);
+    const result = await deps.addModel(provider, id);
+
     if (result.success) {
-      state.modelInput = '';
+      if (state.selectedProvider === provider && state.modelInput.trim() === id)
+        state.modelInput = '';
     } else {
       deps.toast.show({
         type: 'error',
@@ -81,6 +88,7 @@ export function createManageModelsController(
 
   async function removeModel(modelId: string) {
     const result = await deps.removeModel(state.selectedProvider, modelId);
+
     if (!result.success) {
       deps.toast.show({
         type: 'error',
@@ -91,18 +99,36 @@ export function createManageModelsController(
   }
 
   async function fetchModels() {
+    if (state.isFetching) return;
+
     if (!deps.hasApiKeyFor(state.selectedProvider)) {
       deps.toast.show({
         type: 'info',
         message: 'No API key for this provider',
         description: 'Add a key under Manage API Keys first.',
       });
+
       return;
     }
 
     state.isFetching = true;
-    const result = await deps.fetchModels(state.selectedProvider);
-    state.isFetching = false;
+
+    let result: Result<StoredModel[], AppError>;
+
+    try {
+      result = await deps.fetchModels(state.selectedProvider);
+    } catch {
+      deps.toast.show({
+        type: 'error',
+        message: 'Could not fetch models',
+        description:
+          'The extension connection was interrupted. Try fetching models again.',
+      });
+
+      return;
+    } finally {
+      state.isFetching = false;
+    }
 
     if (result.success) {
       deps.toast.show({
@@ -120,6 +146,7 @@ export function createManageModelsController(
 
   async function resetModels() {
     const result = await deps.clearModels(state.selectedProvider);
+
     if (!result.success) {
       deps.toast.show({
         type: 'error',

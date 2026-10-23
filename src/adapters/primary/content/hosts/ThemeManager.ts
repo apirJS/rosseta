@@ -3,7 +3,8 @@ export class ThemeManager {
   private readonly hosts: HTMLElement[] = [];
 
   constructor() {
-    this.currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+    this.currentTheme = window.matchMedia('(prefers-color-scheme: dark)')
+      .matches
       ? 'dark'
       : 'light';
   }
@@ -19,11 +20,13 @@ export class ThemeManager {
 
   unregisterHost(host: HTMLElement): void {
     const idx = this.hosts.indexOf(host);
+
     if (idx !== -1) this.hosts.splice(idx, 1);
   }
 
   setTheme(theme: 'dark' | 'light'): void {
     this.currentTheme = theme;
+
     for (const host of this.hosts) {
       this.applyThemeToHost(host, theme);
     }

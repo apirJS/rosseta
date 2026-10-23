@@ -1,57 +1,32 @@
 <script lang="ts">
-  import type { Translation } from '../../../../../../../core/domain/translation/Translation';
   import Icon from '../../../../shared/components/Icon.svelte';
 
   interface Props {
-    translation: Translation;
+    previewText: string;
+    formattedDate: string;
     onopen: () => void;
     ondelete: () => void;
   }
 
-  function pad(value: number): string {
-    return String(value).padStart(2, '0');
-  }
-
-  const { translation, onopen, ondelete }: Props = $props();
-
-  const previewText = $derived(
-    translation.original.map((s) => s.text).join(' '),
-  );
-
-  const formattedDate = $derived.by(() => {
-    const d = translation.createdAt;
-    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  });
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onopen();
-    }
-  }
+  const { previewText, formattedDate, onopen, ondelete }: Props = $props();
 </script>
 
 <div
-  role="button"
-  tabindex="0"
-  class="flex items-center w-full text-left gap-2 px-3 py-2.5 rounded-lg bg-surface border border-border hover:border-primary/40 transition-colors cursor-pointer group"
-  onclick={onopen}
-  onkeydown={handleKeydown}
+  class="flex items-center w-full gap-2 pr-3 rounded-lg bg-surface border border-border hover:border-primary/40 transition-colors group"
 >
-  <span class="flex-1 text-sm text-foreground truncate">
-    {previewText}
-  </span>
-  <span class="text-xs text-muted whitespace-nowrap">
-    {formattedDate}
-  </span>
+  <button
+    type="button"
+    class="flex flex-1 min-w-0 items-center text-left gap-2 pl-3 py-2.5 cursor-pointer"
+    onclick={onopen}
+  >
+    <span class="flex-1 text-sm text-foreground truncate">{previewText}</span>
+    <span class="text-xs text-muted whitespace-nowrap">{formattedDate}</span>
+  </button>
   <button
     type="button"
     aria-label="Delete translation"
-    class="opacity-0 group-hover:opacity-100 transition-opacity text-muted hover:text-red-400 cursor-pointer shrink-0"
-    onclick={(e: MouseEvent) => {
-      e.stopPropagation();
-      ondelete();
-    }}
+    class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity text-muted hover:text-red-400 cursor-pointer shrink-0"
+    onclick={ondelete}
   >
     <Icon name="trash" class="w-4 h-4" />
   </button>

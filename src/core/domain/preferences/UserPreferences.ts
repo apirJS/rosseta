@@ -3,7 +3,8 @@ import { DomainError } from '../shared/DomainError';
 import { failure, success, type Result } from '../../../shared/types/Result';
 import { Theme, type ThemeValue } from './Theme';
 import { Language, type LanguageCode } from '../translation/Language';
-import { ProviderRegistry } from '../provider/ProviderRegistry';
+import { getProviderDefaultModelId } from '../provider/provider-definitions';
+import { resolveModelId } from './model-selection';
 
 export interface UserPreferencesProps {
   id: string;
@@ -46,7 +47,9 @@ export class UserPreferences extends AggregateRoot<string> {
   }
 
   public getModelIdFor(provider: string): string {
-    return this.selectedModelsValue[provider] ?? ProviderRegistry.getDefaultModelId(provider);
+    return (
+      this.selectedModelsValue[provider] ?? getProviderDefaultModelId(provider)
+    );
   }
 
   public hasSelectedModel(provider: string): boolean {
@@ -64,15 +67,11 @@ export class UserPreferences extends AggregateRoot<string> {
     provider: string,
     availableModels: ReadonlyArray<{ id: string }>,
   ): string {
-    const saved = this.selectedModelsValue[provider];
-    if (saved && availableModels.some((m) => m.id === saved)) return saved;
-
-    const defaultId = ProviderRegistry.getDefaultModelId(provider);
-    if (defaultId && availableModels.some((m) => m.id === defaultId)) {
-      return defaultId;
-    }
-
-    return availableModels[0]?.id ?? saved ?? defaultId;
+    return resolveModelId({
+      savedModelId: this.selectedModelsValue[provider],
+      defaultModelId: getProviderDefaultModelId(provider),
+      availableModels,
+    });
   }
 
   public toProps(): UserPreferencesProps {
@@ -99,9 +98,11 @@ export class UserPreferences extends AggregateRoot<string> {
     }
 
     const themeResult = Theme.fromRaw(props.theme ?? 'system');
+
     if (!themeResult.success) return failure(themeResult.error);
 
     const languageResult = Language.fromRaw(props.targetLanguage ?? 'en-US');
+
     if (!languageResult.success) return failure(languageResult.error);
 
     const selectedModels = sanitizeSelectedModels(props.selectedModels);
@@ -153,10 +154,7 @@ export class UserPreferences extends AggregateRoot<string> {
     );
   }
 
-  public withSelectedModel(
-    provider: string,
-    modelId: string,
-  ): UserPreferences {
+  public withSelectedModel(provider: string, modelId: string): UserPreferences {
     return new UserPreferences(
       this.id,
       this.themeValue,
@@ -194,6 +192,7 @@ function sanitizeSelectedModels(
   raw: Record<string, unknown> | undefined,
 ): Record<string, string> {
   const sanitized: Record<string, string> = {};
+
   if (!raw || typeof raw !== 'object') return sanitized;
 
   for (const [provider, modelId] of Object.entries(raw)) {
@@ -201,5 +200,6 @@ function sanitizeSelectedModels(
       sanitized[provider] = modelId.trim();
     }
   }
+
   return sanitized;
 }

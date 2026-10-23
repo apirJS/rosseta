@@ -26,12 +26,15 @@ export class KeySelectionMode extends ValueObject {
 
   public get autoBalanceProvider(): AnyProvider | null {
     if (!this.isAutoBalance) return null;
+
     return this.modeValue.slice(AUTO_BALANCE_PREFIX.length) as AnyProvider;
   }
 
   public get label(): string {
     if (this.isManual) return 'Manual';
+
     const provider = this.autoBalanceProvider;
+
     return `Auto balance (round robin) ${provider?.toUpperCase() ?? ''}`;
   }
 
@@ -52,6 +55,7 @@ export class KeySelectionMode extends ValueObject {
 
     if (raw.startsWith(AUTO_BALANCE_PREFIX)) {
       const provider = raw.slice(AUTO_BALANCE_PREFIX.length);
+
       if (isAnyProvider(provider)) {
         return success(
           new KeySelectionMode(`${AUTO_BALANCE_PREFIX}${provider}`),

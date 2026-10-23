@@ -83,9 +83,9 @@
 
 .modal-container {
   position: relative;
-  width: 520px;
-  min-width: 320px;
-  min-height: 280px;
+  width: var(--modal-preferred-width, 520px);
+  min-width: min(320px, 90vw);
+  min-height: min(240px, 85vh);
   max-width: 90vw;
   max-height: 85vh;
   background: var(--modal-bg);
@@ -99,6 +99,29 @@
   cursor: default;
   resize: both;
   outline: none;
+}
+
+.modal-container-compact {
+  /* Native resizing writes inline dimensions; terminal errors must shrink too. */
+  width: 380px !important;
+  height: auto !important;
+  min-width: 0;
+  min-height: 0;
+  resize: none;
+}
+
+.modal-container-compact .modal-body {
+  flex: 0 1 auto;
+  gap: 12px;
+}
+
+.modal-container-compact .translation-error,
+.modal-container-compact .translation-retry {
+  margin: 0;
+}
+
+.modal-container-compact .translation-retry {
+  align-self: flex-start;
 }
 
 .modal-footer-drag {
@@ -120,7 +143,8 @@
 .modal-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--modal-border);
   cursor: grab;
@@ -133,6 +157,8 @@
 }
 
 .modal-header-title {
+  flex-shrink: 0;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--modal-fg);
@@ -146,6 +172,8 @@
   justify-content: center;
   width: 28px;
   height: 28px;
+  flex-shrink: 0;
+  margin-left: auto;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -170,17 +198,70 @@
   min-height: 0;
 }
 
-.modal-body::-webkit-scrollbar {
+.modal-body::-webkit-scrollbar,
+.translation-text-sections::-webkit-scrollbar {
   width: 6px;
 }
 
-.modal-body::-webkit-scrollbar-thumb {
+.modal-body::-webkit-scrollbar-thumb,
+.translation-text-sections::-webkit-scrollbar-thumb {
   background: var(--modal-scrollbar-thumb);
   border-radius: 3px;
 }
 
-.modal-body::-webkit-scrollbar-track {
+.modal-body::-webkit-scrollbar-track,
+.translation-text-sections::-webkit-scrollbar-track {
   background: var(--modal-scrollbar-track);
+}
+
+.translation-sections {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  gap: 8px;
+}
+
+.translation-text-sections {
+  display: contents;
+  gap: 8px;
+}
+
+.modal-container-columns .translation-sections {
+  display: grid;
+  grid-template-columns: repeat(var(--translation-columns), minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.modal-container-columns .section {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 0 auto !important;
+  /* Keep previous manual section sizes for when the layout returns to a stack. */
+  height: auto !important;
+}
+
+.modal-container-description-side .translation-text-sections {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.modal-container-columns .text-box,
+.modal-container-columns .description-box {
+  min-height: 0;
+  height: auto !important;
+  flex: 1 !important;
+  border-radius: 8px;
+}
+
+.modal-container-columns .resize-handle {
+  display: none;
 }
 
 .section {
@@ -196,6 +277,7 @@
   align-items: center;
   gap: 4px;
   user-select: none;
+  flex-shrink: 0;
 }
 
 .section-label {
@@ -241,6 +323,7 @@
   color: var(--modal-fg);
   line-height: 1.5;
   display: block;
+  overflow-wrap: anywhere;
 }
 
 .text-block {
@@ -322,9 +405,112 @@
 }
 
 .description-text {
+  min-width: 0;
   font-size: 13px;
   color: var(--modal-muted);
   line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.description-text > * + * {
+  margin-top: 8px;
+}
+
+.description-text :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--modal-fg);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.description-text :is(h1, h2) {
+  font-size: 15px;
+}
+
+.description-text :is(strong, th) {
+  color: var(--modal-fg);
+  font-weight: 600;
+}
+
+.description-text ul,
+.description-text ol {
+  padding-left: 20px;
+}
+
+.description-text ul {
+  list-style: disc;
+}
+
+.description-text ol {
+  list-style: decimal;
+}
+
+.description-text li + li,
+.description-text li > :is(p, ul, ol) + * {
+  margin-top: 4px;
+}
+
+.description-text blockquote {
+  padding-left: 10px;
+  border-left: 2px solid var(--modal-border);
+}
+
+.description-text a {
+  color: var(--modal-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.description-text a:focus-visible {
+  outline: 2px solid var(--modal-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.description-text code {
+  color: var(--modal-fg);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.92em;
+}
+
+.description-text :not(pre) > code {
+  padding: 1px 4px;
+  border: 1px solid var(--modal-border);
+  border-radius: 4px;
+  background: var(--modal-bg);
+}
+
+.description-text pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 10px;
+  border: 1px solid var(--modal-border);
+  border-radius: 6px;
+  background: var(--modal-bg);
+}
+
+.description-text pre code {
+  font-size: 12px;
+}
+
+.description-text table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.description-text th,
+.description-text td {
+  padding: 6px 8px;
+  border: 1px solid var(--modal-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.description-text hr {
+  border: 0;
+  border-top: 1px solid var(--modal-border);
 }
 
 .resize-handle {
@@ -419,4 +605,68 @@
 
 .copy-feedback {
   color: #81c784;
+}
+.translation-status {
+  display: inline-flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  color: var(--modal-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.translation-status-dots {
+  display: inline-block;
+  width: 3ch;
+  font-family: monospace;
+}
+
+.translation-status-dots > span {
+  display: block;
+  width: 1ch;
+  overflow: hidden;
+  animation: translation-progress-dots 1.2s steps(3, jump-none) infinite;
+}
+
+@keyframes translation-progress-dots {
+  from {
+    width: 1ch;
+  }
+  to {
+    width: 3ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .translation-status-dots > span {
+    animation: none;
+    width: 3ch;
+  }
+}
+
+.translation-error-title {
+  color: var(--modal-fg);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.translation-error {
+  color: var(--modal-fg);
+  font-size: 13px;
+  margin: 4px 0 10px;
+}
+
+.translation-pending {
+  color: var(--modal-muted);
+}
+
+.translation-retry {
+  color: var(--modal-fg);
+  background: var(--modal-surface);
+  border: 1px solid var(--modal-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
 }

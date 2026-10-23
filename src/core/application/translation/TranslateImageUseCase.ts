@@ -16,6 +16,7 @@ export class TranslateImageUseCase implements ITranslateImageUseCase {
     command: TranslateImageCommand,
   ): Promise<Result<Translation, AppError>> {
     const targetLangResult = Language.fromRaw(command.targetLanguageCode);
+
     if (!targetLangResult.success) {
       return failure(
         TranslationError.unsupportedLanguage(command.targetLanguageCode),
@@ -23,6 +24,7 @@ export class TranslateImageUseCase implements ITranslateImageUseCase {
     }
 
     const imageResult = EncodedImage.create(command.imageBase64);
+
     if (!imageResult.success) {
       return failure(TranslationError.invalidImage());
     }
@@ -30,7 +32,11 @@ export class TranslateImageUseCase implements ITranslateImageUseCase {
     return await this.translationService.translateImage(
       imageResult.data,
       targetLangResult.data,
-      command.cancellationToken,
+      {
+        cancellationToken: command.cancellationToken,
+        generationDeadlineAt: command.generationDeadlineAt,
+        progress: command.progress,
+      },
     );
   }
 }

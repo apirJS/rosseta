@@ -1,4 +1,3 @@
-import { sendMessageToRuntime } from '../../../../../shared/messaging';
 import { SelectionBox } from './SelectionBox';
 
 export class OverlayController {
@@ -19,7 +18,11 @@ export class OverlayController {
   constructor(
     private viewportImg: string,
     private detachOverlay: () => void,
-    private onReady?: () => void,
+    private onReady: (() => void) | undefined,
+    private readonly startTranslation: (
+      requestId: string,
+      imageBase64: string,
+    ) => Promise<void>,
   ) {
     $effect(() => {
       let active = true;
@@ -48,6 +51,7 @@ export class OverlayController {
 
   private async decodeImage(src: string): Promise<void> {
     const img = new Image();
+
     img.src = src;
     await img.decode();
   }
@@ -55,6 +59,7 @@ export class OverlayController {
   private async loadBlob(base64: string) {
     const res = await fetch(base64);
     const blob = await res.blob();
+
     return URL.createObjectURL(blob);
   }
 
@@ -74,6 +79,7 @@ export class OverlayController {
 
     const mountTarget = this.overlayContainer ?? document.body;
     const selectionBox = new SelectionBox(mountTarget);
+
     const { width: winWidth, height: winHeight } =
       selectionBox.getViewportDimensions();
 
@@ -86,6 +92,7 @@ export class OverlayController {
       width: 0,
       height: 0,
     });
+
     selectionBox.mount();
 
     let rafId: number | null = null;
@@ -130,6 +137,7 @@ export class OverlayController {
       const top = Math.min(finalY, initialY);
 
       const MIN_CROP_DIMENSION = 10;
+
       if (width >= MIN_CROP_DIMENSION && height >= MIN_CROP_DIMENSION) {
         await this.handleSelectionComplete(left, top, width, height);
       }
@@ -145,25 +153,30 @@ export class OverlayController {
     width: number,
     height: number,
   ): Promise<void> {
+    let cropped: string;
+
     try {
-      const cropped = await this.cropImage(
+      cropped = await this.cropImage(
         this.viewportImg,
         left,
         top,
         width,
         height,
       );
-
-      this.detachOverlay();
-
-      await sendMessageToRuntime({
-        action: 'TRANSLATE_IMAGE',
-        payload: {
-          imageBase64: cropped,
-        },
-      });
     } catch (error) {
       console.error('Failed to crop image:', error);
+
+      return;
+    }
+
+    this.detachOverlay();
+
+    const requestId = crypto.randomUUID();
+
+    try {
+      await this.startTranslation(requestId, cropped);
+    } catch (error) {
+      console.error('Failed to start translation:', error);
     }
   }
 
@@ -176,11 +189,14 @@ export class OverlayController {
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image();
+
       img.addEventListener('load', () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
+
         if (!ctx) {
           reject(new Error('Failed to get canvas context'));
+
           return;
         }
 
@@ -207,6 +223,7 @@ export class OverlayController {
 
         resolve(canvas.toDataURL('image/jpeg', 0.8));
       });
+
       img.addEventListener('error', (event) => reject(event));
       img.src = sourceUrl;
     });

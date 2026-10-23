@@ -1,0 +1,17 @@
+# Prettier also respects .gitignore.
+node_modules/
+dist/
+dist-ssr/
+coverage/
+logs/
+temp/
+https/
+
+# Generated dependency and TypeScript output.
+bun.lock
+*.tsbuildinfo
+vite.config.d.ts
+
+# Local environment files.
+.env
+.env.*

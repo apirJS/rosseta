@@ -9,7 +9,7 @@ import {
 } from '../../../../../../core/domain/provider/CustomProviderConfig';
 import { success, failure } from '../../../../../../shared/types/Result';
 import { StorageError } from '../../../../../../shared/errors';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 function makeConfig(
   overrides: Partial<CustomProviderConfigProps> = {},
@@ -17,22 +17,27 @@ function makeConfig(
   const result = CustomProviderConfig.create({
     id: overrides.id ?? 'custom-test-1',
     name: overrides.name ?? 'OpenRouter',
+    type: overrides.type,
     baseURL: overrides.baseURL ?? 'https://openrouter.ai/api/v1',
     headers: overrides.headers,
     queryParams: overrides.queryParams,
   });
+
   if (!result.success) throw new Error('bad config');
+
   return result.data;
 }
 
 function createToastFake() {
   const show = vi.fn();
+
   const toast = {
     show,
     dismiss: vi.fn(),
     update: vi.fn(),
     toasts: [],
   } as unknown as PopupToastController;
+
   return { toast, show };
 }
 
@@ -42,10 +47,13 @@ function createDeps(overrides: Partial<CustomProvidersDeps> = {}) {
 
   const deps: CustomProvidersDeps = {
     providers: () => providers,
-    save: vi.fn().mockImplementation(async (props) =>
-      success(makeConfig({ ...props, id: props.id || 'custom-saved' })),
-    ),
+    save: vi
+      .fn()
+      .mockImplementation(async (props) =>
+        success(makeConfig({ ...props, id: props.id || 'custom-saved' })),
+      ),
     remove: vi.fn().mockResolvedValue(success(undefined)),
+    refresh: vi.fn().mockResolvedValue(undefined),
     toast,
     ...overrides,
   };
@@ -79,9 +87,23 @@ describe('UI Controller: CustomProvidersController', () => {
     expect(controller.state.baseURL).toBe('');
   });
 
+  test('owns the title for list, create and edit views', () => {
+    const { deps } = createDeps();
+    const controller = createCustomProvidersController(deps);
+
+    expect(controller.title).toBe('Custom Providers');
+    controller.showCreate();
+    expect(controller.title).toBe('New Provider');
+    controller.showEdit(makeConfig());
+    expect(controller.title).toBe('Edit Provider');
+    controller.showList();
+    expect(controller.title).toBe('Custom Providers');
+  });
+
   test('showEdit populates the form from the provider', () => {
     const { deps } = createDeps();
     const controller = createCustomProvidersController(deps);
+
     const provider = makeConfig({
       headers: { 'X-Test': 'value' },
     });
@@ -111,12 +133,14 @@ describe('UI Controller: CustomProvidersController', () => {
         baseURL: 'https://api.example.com/v1',
       }),
     );
+
     expect(controller.state.view).toBe('list');
   });
 
   test('save keeps the editing id when updating', async () => {
     const { deps } = createDeps();
     const controller = createCustomProvidersController(deps);
+
     controller.showEdit(makeConfig());
 
     controller.state.name = 'Renamed';
@@ -156,12 +180,94 @@ describe('UI Controller: CustomProvidersController', () => {
     expect(controller.state.error).toContain('Query params');
   });
 
-  test('save shows an error toast and stays on the form on failure', async () => {
-    const { deps, show } = createDeps({
-      save: vi.fn().mockResolvedValue(
-        failure(StorageError.writeFailed('customProviders')),
+  test.each(['[]', 'null', 'true', '{"X-Test": 42}'])(
+    'rejects invalid header records: %s',
+    async (headers) => {
+      const { deps } = createDeps();
+      const controller = createCustomProvidersController(deps);
+
+      controller.showCreate();
+      controller.state.headers = headers;
+      await controller.save();
+
+      expect(deps.save).not.toHaveBeenCalled();
+
+      expect(controller.state.error).toBe(
+        'Headers must be a JSON object of strings.',
+      );
+    },
+  );
+
+  test('preserves Anthropic form configuration when saving an edit', async () => {
+    const { deps } = createDeps();
+    const controller = createCustomProvidersController(deps);
+
+    controller.showEdit(
+      makeConfig({
+        type: 'anthropic',
+        queryParams: { 'api-version': '2024-02-01' },
+      }),
+    );
+
+    await controller.save();
+
+    expect(deps.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'anthropic',
+        queryParams: { 'api-version': '2024-02-01' },
+      }),
+    );
+  });
+
+  test('keeps one save in flight and prevents changing its form view', async () => {
+    let finishSave!: (
+      result: Awaited<ReturnType<CustomProvidersDeps['save']>>,
+    ) => void;
+
+    const { deps } = createDeps({
+      save: vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishSave = resolve;
+          }),
       ),
     });
+
+    const controller = createCustomProvidersController(deps);
+
+    controller.showCreate();
+    controller.state.name = 'New endpoint';
+    controller.state.baseURL = 'https://api.example.com/v1';
+
+    const firstSave = controller.save();
+
+    await controller.save();
+    controller.showList();
+    controller.showEdit(makeConfig());
+
+    expect(deps.save).toHaveBeenCalledOnce();
+    expect(controller.state.isSaving).toBe(true);
+    expect(controller.title).toBe('New Provider');
+
+    finishSave(
+      success(makeConfig({ id: 'custom-created', name: 'New endpoint' })),
+    );
+
+    await firstSave;
+
+    expect(controller.state.isSaving).toBe(false);
+    expect(controller.title).toBe('Custom Providers');
+  });
+
+  test('save shows an error toast and stays on the form on failure', async () => {
+    const { deps, show } = createDeps({
+      save: vi
+        .fn()
+        .mockResolvedValue(
+          failure(StorageError.writeFailed('customProviders')),
+        ),
+    });
+
     const controller = createCustomProvidersController(deps);
 
     controller.showCreate();
@@ -176,6 +282,7 @@ describe('UI Controller: CustomProvidersController', () => {
         description: 'Could not save data.',
       }),
     );
+
     expect(controller.state.view).toBe('form');
   });
 
@@ -186,6 +293,8 @@ describe('UI Controller: CustomProvidersController', () => {
     await controller.remove('custom-test-1');
 
     expect(deps.remove).toHaveBeenCalledWith('custom-test-1');
+    expect(deps.refresh).toHaveBeenCalledOnce();
+
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'success', message: 'Provider removed' }),
     );
@@ -194,10 +303,35 @@ describe('UI Controller: CustomProvidersController', () => {
   test('remove returns to the list when removing the edited provider', async () => {
     const { deps } = createDeps();
     const controller = createCustomProvidersController(deps);
+
     controller.showEdit(makeConfig());
 
     await controller.remove('custom-test-1');
 
     expect(controller.state.view).toBe('list');
+  });
+
+  test('refreshes potentially changed snapshots without reporting success when provider removal fails', async () => {
+    const { deps, show } = createDeps({
+      remove: vi
+        .fn()
+        .mockResolvedValue(
+          failure(StorageError.writeFailed('customProviders')),
+        ),
+    });
+
+    const controller = createCustomProvidersController(deps);
+
+    await controller.remove('custom-test-1');
+
+    expect(deps.refresh).toHaveBeenCalledOnce();
+
+    expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error' }),
+    );
+
+    expect(show).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success' }),
+    );
   });
 });

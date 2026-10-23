@@ -13,7 +13,7 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV === 'development',
     rollupOptions: {
       output: {
-        manualChunks: undefined
+        manualChunks: undefined,
       },
       onwarn(warning, warn) {
         // @tailwindcss/vite transforms CSS without emitting sourcemaps (dev-only notice)
@@ -24,6 +24,7 @@ export default defineConfig({
         // `typeof module` / `typeof exports` checks keep those branches
         // inactive in the browser bundle.
         const warningId = warning.id?.replaceAll('\\', '/');
+
         if (
           warning.code === 'COMMONJS_VARIABLE_IN_ESM' &&
           warningId?.includes('/node_modules/@heyputer/puter.js/')
@@ -52,5 +53,6 @@ export default defineConfig({
   ],
   test: {
     environment: 'jsdom',
+    include: ['src/adapters/primary/ui/**/*.test.ts'],
   },
 });

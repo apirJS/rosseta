@@ -7,6 +7,7 @@ import { describe, expect, test, beforeEach } from 'bun:test';
 
 function createMinimalElement(): HTMLElement {
   const classes = new Set<string>();
+
   return {
     classList: {
       add(name: string) {
@@ -25,6 +26,7 @@ function createMinimalElement(): HTMLElement {
 describe('ThemeManager', () => {
   beforeEach(() => {
     globalThis.window = globalThis.window || ({} as typeof globalThis.window);
+
     (globalThis.window as unknown as Record<string, unknown>).matchMedia = ((
       query: string,
     ) => ({
@@ -42,6 +44,7 @@ describe('ThemeManager', () => {
   test('constructor detects light mode from matchMedia', async () => {
     const { ThemeManager } = await import('./ThemeManager');
     const tm = new ThemeManager();
+
     expect(tm.current).toBe('light');
   });
 
@@ -61,6 +64,7 @@ describe('ThemeManager', () => {
 
     const { ThemeManager } = await import('./ThemeManager');
     const tm = new ThemeManager();
+
     expect(tm.current).toBe('dark');
   });
 

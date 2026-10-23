@@ -6,11 +6,14 @@ let store: Record<string, unknown> = {};
 const storageMock = {
   get: mock(async (keys: string | string[] | null) => {
     if (keys === null) return { ...store };
+
     const keyList = Array.isArray(keys) ? keys : [keys];
     const result: Record<string, unknown> = {};
+
     for (const k of keyList) {
       if (k in store) result[k] = store[k];
     }
+
     return result;
   }),
   set: mock(async (items: Record<string, unknown>) => {
@@ -18,6 +21,7 @@ const storageMock = {
   }),
   remove: mock(async (keys: string | string[]) => {
     const keyList = Array.isArray(keys) ? keys : [keys];
+
     for (const k of keyList) delete store[k];
   }),
   clear: mock(async () => {
@@ -64,9 +68,11 @@ mock.module(
   '../src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css?inline',
   () => ({ default: '' }),
 );
+
 mock.module('../src/adapters/primary/ui/styles/app.css?inline', () => ({
   default: '',
 }));
+
 mock.module(
   '../src/adapters/primary/ui/injected/toast/toast.css?inline',
   () => ({ default: '' }),
@@ -83,10 +89,73 @@ export const generateTextMock = mock(
   },
 );
 
+function defaultStreamText(options: unknown) {
+  const generated = Promise.resolve(generateTextMock(options)).then(
+    (value) =>
+      value as {
+        output?: unknown;
+        text?: string;
+        finishReason?: string;
+      },
+  );
+
+  const text = generated.then(
+    (value) => value.text ?? JSON.stringify(value.output ?? ''),
+  );
+
+  const output = generated.then((value) => value.output);
+
+  // The SDK exposes eagerly observable promises; consumers attach their own handling.
+  void output.catch(() => {});
+  void text.catch(() => {});
+
+  return {
+    text,
+    output,
+    finishReason: generated.then(
+      (value) => value.finishReason ?? 'stop',
+      () => 'error',
+    ),
+    stream: (async function* () {
+      try {
+        const value = await text;
+
+        yield { type: 'text-delta', id: 'text-1', text: value };
+        yield { type: 'finish', finishReason: 'stop' };
+      } catch (error) {
+        const callback = (
+          options as { onError?: (event: { error: unknown }) => void }
+        ).onError;
+
+        callback?.({ error });
+        yield { type: 'error', error };
+      }
+    })(),
+    partialOutputStream: (async function* () {
+      try {
+        const value = await output;
+
+        if (value !== undefined) yield value;
+      } catch {
+        /* error branch carries the original cause */
+      }
+    })(),
+  };
+}
+
+export const streamTextMock = mock(defaultStreamText);
+
+export function resetStreamTextMock() {
+  streamTextMock.mockReset();
+  streamTextMock.mockImplementation(defaultStreamText);
+}
+
 mock.module('ai', () => ({
   ...realAi,
   generateText: (...args: unknown[]) =>
     (generateTextMock as unknown as (...a: unknown[]) => unknown)(...args),
+  streamText: (...args: unknown[]) =>
+    (streamTextMock as unknown as (...a: unknown[]) => unknown)(...args),
 }));
 
 export function seedStore(data: Record<string, unknown>) {
@@ -108,4 +177,5 @@ export function resetBrowserMock() {
   browserMock.commands.onCommand.addListener.mockClear();
   browserMock.scripting.executeScript.mockClear();
   generateTextMock.mockClear();
+  streamTextMock.mockClear();
 }

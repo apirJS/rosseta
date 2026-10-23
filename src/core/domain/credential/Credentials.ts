@@ -28,13 +28,16 @@ export class Credentials extends AggregateRoot<string> {
     }
 
     const items: Credential[] = [];
+
     for (const itemProps of props.items) {
       const result = Credential.fromProps(itemProps);
+
       if (!result.success) return failure(result.error);
       items.push(result.data);
     }
 
     const activeId = props.activeCredentialId;
+
     if (activeId && !items.some((c) => c.id === activeId)) {
       return failure(
         new DomainError('Active credential ID not found in items'),
@@ -58,13 +61,18 @@ export class Credentials extends AggregateRoot<string> {
 
   getActive(): Credential | null {
     if (!this.activeCredentialIdValue) return null;
-    return this.credentialItems.find((c) => c.id === this.activeCredentialIdValue) ?? null;
+
+    return (
+      this.credentialItems.find((c) => c.id === this.activeCredentialIdValue) ??
+      null
+    );
   }
 
   add(credential: Credential): Credentials {
     const filtered = this.credentialItems.filter((c) => c.id !== credential.id);
     const newItems = [...filtered, credential];
     const activeId = credential.id;
+
     return new Credentials(this.id, newItems, activeId);
   }
 
@@ -81,10 +89,14 @@ export class Credentials extends AggregateRoot<string> {
 
   setActive(credentialId: string): Result<Credentials, DomainError> {
     const exists = this.credentialItems.some((c) => c.id === credentialId);
+
     if (!exists) {
       return failure(new DomainError('Credential not found'));
     }
-    return success(new Credentials(this.id, [...this.credentialItems], credentialId));
+
+    return success(
+      new Credentials(this.id, [...this.credentialItems], credentialId),
+    );
   }
 
   getByProvider(provider: string): Credential[] {
@@ -96,12 +108,14 @@ export class Credentials extends AggregateRoot<string> {
     lastUsedId: string | null,
   ): Credential | null {
     const providerKeys = this.getByProvider(provider);
+
     if (providerKeys.length === 0) return null;
 
     if (!lastUsedId) return providerKeys[0];
 
     const lastIndex = providerKeys.findIndex((c) => c.id === lastUsedId);
     const nextIndex = lastIndex < 0 ? 0 : (lastIndex + 1) % providerKeys.length;
+
     return providerKeys[nextIndex];
   }
 

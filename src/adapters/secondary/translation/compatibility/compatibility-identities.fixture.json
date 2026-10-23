@@ -1,0 +1,163 @@
+{
+  "schemaFingerprints": [
+    {
+      "includeDescription": false,
+      "digest": "067a392be790b96f682a13eaf2504f7040471a7504c9c71391eef67cc95ca3cf"
+    },
+    {
+      "includeDescription": true,
+      "digest": "4d0b99aad7b14dc8182964a463e9ce7e4d6fe7cd1baf05ea2179da7bc79d692f"
+    }
+  ],
+  "identities": [
+    {
+      "context": {
+        "providerId": "google",
+        "modelId": "gemini-2.5-flash",
+        "protocol": "google"
+      },
+      "digest": "b60717acb1b8e37d8a2f62fbb35446f9f13354a22abb8373951de68e5018aa95"
+    },
+    {
+      "context": {
+        "providerId": "openai",
+        "modelId": "gpt-5",
+        "protocol": "openai-responses"
+      },
+      "digest": "d02313d8604361395820368af39353868407f8db954176ce5b2908a03d092d10"
+    },
+    {
+      "context": {
+        "providerId": "deepseek",
+        "modelId": "deepseek-flash",
+        "protocol": "openai-compatible"
+      },
+      "digest": "b0fb10d9a0f42c54e8c6f70d426bc1c3c61e761e17d71484e9d8ffa9cf50ba7d"
+    },
+    {
+      "context": {
+        "providerId": "nvidia",
+        "modelId": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "protocol": "openai-compatible"
+      },
+      "digest": "d33c6217f31a098e24663b94d44828f9f874f52c81b68c6ce0bcda793462c98e"
+    },
+    {
+      "context": {
+        "providerId": "puter",
+        "modelId": "fixture-native",
+        "protocol": "puter-native"
+      },
+      "digest": "a4b6bbf250bdb77afdbc9ceb2302d6a53065eec09dc6b654c5e0bd72c651cd22"
+    },
+    {
+      "context": {
+        "providerId": "custom-rewrite-fixture",
+        "modelId": "fixture-vision",
+        "protocol": "openai-compatible",
+        "customConfig": {
+          "id": "custom-rewrite-fixture",
+          "type": "openai-compatible",
+          "baseURL": "https://example.invalid/v1/",
+          "headers": {
+            "X-Routing": "fixture"
+          },
+          "queryParams": {
+            "version": "fixture-v1"
+          }
+        }
+      },
+      "digest": "fd9193abf7e85c478185287f402bb3a7da5893945b236091264c36adced07833"
+    },
+    {
+      "context": {
+        "providerId": "custom-rewrite-fixture",
+        "modelId": "fixture-vision",
+        "protocol": "anthropic",
+        "customConfig": {
+          "id": "custom-rewrite-fixture",
+          "type": "anthropic",
+          "baseURL": "https://example.invalid/v1/#ignored",
+          "headers": {
+            "X-Routing": "fixture"
+          },
+          "queryParams": {
+            "version": "fixture-v1"
+          }
+        }
+      },
+      "digest": "7ba8ac3d21e3ec8294aae0de6c176d01d8410024dbed4e16f4b977f170d12196"
+    }
+  ],
+  "configurations": [
+    {
+      "context": {
+        "provider": "google",
+        "modelId": "gemini-2.5-flash"
+      },
+      "ids": ["thinking.google.budget-0.v1", "thinking.provider-default.v1"]
+    },
+    {
+      "context": {
+        "provider": "openai",
+        "modelId": "gpt-5"
+      },
+      "ids": [
+        "thinking.openai.effort-minimal.v1",
+        "thinking.provider-default.v1"
+      ]
+    },
+    {
+      "context": {
+        "provider": "anthropic",
+        "modelId": "claude-sonnet-4-5"
+      },
+      "ids": ["thinking.anthropic.disabled.v1", "thinking.provider-default.v1"]
+    },
+    {
+      "context": {
+        "provider": "deepseek",
+        "modelId": "deepseek-flash"
+      },
+      "ids": [
+        "thinking.deepseek.disabled.v1",
+        "thinking.deepseek.enabled-low.v1",
+        "thinking.provider-default.v1"
+      ]
+    },
+    {
+      "context": {
+        "provider": "nvidia",
+        "modelId": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "baseURL": "https://integrate.api.nvidia.com/v1",
+        "providerName": "NVIDIA"
+      },
+      "ids": [
+        "thinking.NVIDIA.{\"chat_template_kwargs\":{\"enable_thinking\":false}}.v1",
+        "thinking.NVIDIA.{\"reasoningEffort\":\"low\"}.v1",
+        "thinking.provider-default.v1"
+      ]
+    },
+    {
+      "context": {
+        "provider": "puter",
+        "modelId": "openai/gpt-5"
+      },
+      "ids": ["thinking.puter.minimal.v1", "thinking.provider-default.v1"]
+    },
+    {
+      "context": {
+        "provider": "custom-rewrite-fixture",
+        "modelId": "deepseek-flash",
+        "baseURL": "https://api.deepseek.com",
+        "providerName": "Fixture",
+        "protocol": "openai-compatible"
+      },
+      "ids": [
+        "thinking.Fixture.{\"thinking\":{\"type\":\"disabled\"}}.v1",
+        "thinking.Fixture.{\"thinking\":{\"type\":\"enabled\"},\"reasoningEffort\":\"low\"}.v1",
+        "thinking.provider-default.v1"
+      ]
+    }
+  ]
+}

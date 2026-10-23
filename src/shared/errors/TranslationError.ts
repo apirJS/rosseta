@@ -7,6 +7,7 @@ export class TranslationError extends AppError {
       ...options,
       code: options.code ?? ErrorCode.TRANSLATION_FAILED,
     });
+
     this.name = 'TranslationError';
   }
 
@@ -16,6 +17,18 @@ export class TranslationError extends AppError {
       message: cause?.message,
       cause,
     });
+  }
+
+  public static cancelled(): TranslationError {
+    return new TranslationError({ code: ErrorCode.TRANSLATION_CANCELLED });
+  }
+
+  public static interrupted(): TranslationError {
+    return new TranslationError({ code: ErrorCode.TRANSLATION_INTERRUPTED });
+  }
+
+  public static responseLimit(): TranslationError {
+    return new TranslationError({ code: ErrorCode.TRANSLATION_RESPONSE_LIMIT });
   }
 
   public static rateLimited(retryAfterMs?: number): TranslationError {
@@ -46,9 +59,12 @@ export class TranslationError extends AppError {
 
   public static aiRejected(reason: string): TranslationError {
     const noText = /NO_TEXT_FOUND/i.test(reason);
-    const blocked = /(?:content|safety|moderation).{0,30}(?:blocked|policy|filter)/i.test(
-      reason,
-    );
+
+    const blocked =
+      /(?:content|safety|moderation).{0,30}(?:blocked|policy|filter)/i.test(
+        reason,
+      );
+
     return new TranslationError({
       code: ErrorCode.TRANSLATION_AI_REJECTED,
       userMessage: noText
@@ -72,11 +88,15 @@ export class TranslationError extends AppError {
   }
 
   public static modelNotFound(): TranslationError {
-    return new TranslationError({ code: ErrorCode.TRANSLATION_MODEL_NOT_FOUND });
+    return new TranslationError({
+      code: ErrorCode.TRANSLATION_MODEL_NOT_FOUND,
+    });
   }
 
   public static contentBlocked(): TranslationError {
-    return new TranslationError({ code: ErrorCode.TRANSLATION_CONTENT_BLOCKED });
+    return new TranslationError({
+      code: ErrorCode.TRANSLATION_CONTENT_BLOCKED,
+    });
   }
 
   public static contextLimit(): TranslationError {

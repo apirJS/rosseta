@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon, EmptyState } from '../../../../shared/components';
+  import { EmptyState } from '../../../../shared/components';
   import type { CustomProviderConfig } from '../../../../../../../core/domain/provider/CustomProviderConfig';
   import CustomProviderListItem from './CustomProviderListItem.svelte';
 

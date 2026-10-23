@@ -8,6 +8,7 @@ describe('Domain: UserPreferences', () => {
   describe('createDefault', () => {
     test('creates with sensible defaults', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
+
       expect(prefs.id).toBe('prefs-1');
       expect(prefs.theme.value).toBe('system');
       expect(prefs.targetLanguage.code).toBe('en-US');
@@ -23,6 +24,7 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         selectedModels: { google: 'gemini-2.0-flash' },
       });
+
       expect(prefs.success && prefs.data.getModelIdFor('google')).toBe(
         'gemini-2.0-flash',
       );
@@ -30,20 +32,21 @@ describe('Domain: UserPreferences', () => {
 
     test('falls back to the provider default when nothing is saved', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
+
       expect(prefs.getModelIdFor('google')).toBe('gemini-2.5-flash');
-      expect(prefs.getModelIdFor('anthropic')).toBe(
-        'claude-sonnet-4-20250514',
-      );
+      expect(prefs.getModelIdFor('anthropic')).toBe('claude-sonnet-4-20250514');
     });
 
     test('returns empty string for providers without a default', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
+
       expect(prefs.getModelIdFor('custom-unknown')).toBe('');
       expect(prefs.hasSelectedModel('custom-unknown')).toBe(false);
     });
 
     test('hasSelectedModel is true when a model resolves', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
+
       expect(prefs.hasSelectedModel('google')).toBe(true);
     });
   });
@@ -56,7 +59,10 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         selectedModels: { google: 'm1' },
       });
-      expect(prefs.success && prefs.data.resolveModelIdFor('google', MODELS)).toBe('m1');
+
+      expect(
+        prefs.success && prefs.data.resolveModelIdFor('google', MODELS),
+      ).toBe('m1');
     });
 
     test('falls back to the registry default when the saved selection is stale', () => {
@@ -64,6 +70,7 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         selectedModels: { google: 'dead-model' },
       });
+
       expect(
         prefs.success && prefs.data.resolveModelIdFor('google', MODELS),
       ).toBe('gemini-2.5-flash');
@@ -74,6 +81,7 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         selectedModels: { google: 'dead-model' },
       });
+
       expect(
         prefs.success &&
           prefs.data.resolveModelIdFor('google', [{ id: 'm1' }, { id: 'm2' }]),
@@ -82,6 +90,7 @@ describe('Domain: UserPreferences', () => {
 
     test('resolves the default for a provider with nothing saved', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
+
       expect(prefs.resolveModelIdFor('google', MODELS)).toBe(
         'gemini-2.5-flash',
       );
@@ -92,11 +101,13 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         selectedModels: { google: 'stale-model' },
       });
-      expect(
-        saved.success && saved.data.resolveModelIdFor('google', []),
-      ).toBe('stale-model');
+
+      expect(saved.success && saved.data.resolveModelIdFor('google', [])).toBe(
+        'stale-model',
+      );
 
       const unsaved = UserPreferences.createDefault('prefs-1');
+
       expect(unsaved.resolveModelIdFor('google', [])).toBe('gemini-2.5-flash');
     });
   });
@@ -109,10 +120,13 @@ describe('Domain: UserPreferences', () => {
         targetLanguage: 'ja-JP',
         selectedModels: { google: 'gemini-2.0-flash', groq: 'llama-4' },
       });
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.theme.isDark).toBe(true);
         expect(result.data.targetLanguage.code).toBe('ja-JP');
+
         expect(result.data.selectedModels).toEqual({
           google: 'gemini-2.0-flash',
           groq: 'llama-4',
@@ -122,7 +136,9 @@ describe('Domain: UserPreferences', () => {
 
     test('uses defaults for missing fields', () => {
       const result = UserPreferences.fromRaw({ id: 'prefs-1' });
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.theme.value).toBe('system');
         expect(result.data.targetLanguage.code).toBe('en-US');
@@ -139,7 +155,9 @@ describe('Domain: UserPreferences', () => {
           xai: 42,
         },
       });
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.selectedModels).toEqual({
           google: 'gemini-2.0-flash',
@@ -152,7 +170,9 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         includeDescription: false,
       });
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.includeDescription).toBe(false);
       }
@@ -160,12 +180,14 @@ describe('Domain: UserPreferences', () => {
 
     test('defaults includeDescription to true when missing or invalid', () => {
       const missing = UserPreferences.fromRaw({ id: 'prefs-1' });
+
       expect(missing.success && missing.data.includeDescription).toBe(true);
 
       const invalid = UserPreferences.fromRaw({
         id: 'prefs-1',
         includeDescription: 'no',
       } as unknown as Parameters<typeof UserPreferences.fromRaw>[0]);
+
       expect(invalid.success && invalid.data.includeDescription).toBe(true);
     });
 
@@ -174,7 +196,9 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         selectedModel: 'gpt-4o',
       } as Parameters<typeof UserPreferences.fromRaw>[0]);
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.selectedModels).toEqual({});
       }
@@ -182,7 +206,9 @@ describe('Domain: UserPreferences', () => {
 
     test('fails on missing ID', () => {
       const result = UserPreferences.fromRaw({});
+
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBeInstanceOf(DomainError);
         expect(result.error.message).toContain('ID');
@@ -194,6 +220,7 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         theme: 'neon',
       });
+
       expect(result.success).toBe(false);
     });
 
@@ -202,6 +229,7 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         targetLanguage: 'xx-FAKE',
       });
+
       expect(result.success).toBe(false);
     });
   });
@@ -210,6 +238,7 @@ describe('Domain: UserPreferences', () => {
     test('withTheme returns new preferences with updated theme', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
       const updated = prefs.withTheme(Theme.create('dark'));
+
       expect(updated.theme.isDark).toBe(true);
       expect(updated.targetLanguage.code).toBe(prefs.targetLanguage.code);
       expect(prefs.theme.value).toBe('system');
@@ -218,6 +247,7 @@ describe('Domain: UserPreferences', () => {
     test('withTargetLanguage returns new preferences with updated language', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
       const updated = prefs.withTargetLanguage(Language.create('ja-JP'));
+
       expect(updated.targetLanguage.code).toBe('ja-JP');
       expect(prefs.targetLanguage.code).toBe('en-US');
     });
@@ -227,15 +257,19 @@ describe('Domain: UserPreferences', () => {
         id: 'prefs-1',
         selectedModels: { google: 'gemini-2.0-flash' },
       });
+
       expect(prefs.success).toBe(true);
       if (!prefs.success) return;
 
       const updated = prefs.data.withSelectedModel('groq', 'llama-4');
+
       expect(updated.selectedModels).toEqual({
         google: 'gemini-2.0-flash',
         groq: 'llama-4',
       });
+
       expect(updated.getModelIdFor('groq')).toBe('llama-4');
+
       expect(prefs.data.selectedModels).toEqual({
         google: 'gemini-2.0-flash',
       });
@@ -244,6 +278,7 @@ describe('Domain: UserPreferences', () => {
     test('withIncludeDescription returns new preferences with the flag set', () => {
       const prefs = UserPreferences.createDefault('prefs-1');
       const updated = prefs.withIncludeDescription(false);
+
       expect(updated.includeDescription).toBe(false);
       expect(prefs.includeDescription).toBe(true);
       expect(updated.targetLanguage.code).toBe(prefs.targetLanguage.code);
@@ -256,10 +291,13 @@ describe('Domain: UserPreferences', () => {
         .withTargetLanguage(Language.create('ja-JP'))
         .withSelectedModel('xai', 'grok-3')
         .withIncludeDescription(false);
+
       const props = prefs.toProps();
 
       const result = UserPreferences.fromRaw(props);
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.targetLanguage.code).toBe('ja-JP');
         expect(result.data.selectedModels).toEqual({ xai: 'grok-3' });

@@ -5,31 +5,25 @@ import { KeySelectionMode } from '../../../../../../core/domain/credential/KeySe
 import type { StoredModel } from '../../../../../../core/ports/outbound/IModelStorage';
 import type { Result } from '../../../../../../shared/types/Result';
 import { ERROR_TITLES, type AppError } from '../../../../../../shared/errors';
-import type { PopupToastController } from '../../../shared/toast/PopupToastController.svelte';
+import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 const UNDO_WINDOW_MS = 5000;
 
 class ManageKeysState {
   selectedProvider = $state<AnyProvider>('google');
   keyInput = $state('');
-  viewingKeyId = $state<string | null>(null);
   pendingDeleteId = $state<string | null>(null);
 }
 
 export interface ManageKeysDeps {
   credentials: () => Credentials | null;
-  addApiKey: (
-    rawKey: string,
-    provider: AnyProvider,
-  ) => Promise<string | null>;
+  addApiKey: (rawKey: string, provider: AnyProvider) => Promise<string | null>;
   removeApiKey: (credentialId: string) => Promise<string | null>;
   setActiveKey: (credentialId: string) => Promise<string | null>;
   currentKeySelectionMode: () => KeySelectionMode;
   setKeySelectionMode: (mode: KeySelectionMode) => Promise<string | null>;
   modelsFor: (provider: string) => StoredModel[];
-  fetchModels: (
-    provider: string,
-  ) => Promise<Result<StoredModel[], AppError>>;
+  fetchModels: (provider: string) => Promise<Result<StoredModel[], AppError>>;
   clearAllModels: () => Promise<void>;
   toast: PopupToastController;
 }
@@ -39,8 +33,12 @@ export function createManageKeysController(
   initialProvider: AnyProvider = 'google',
 ) {
   const state = new ManageKeysState();
+
   state.selectedProvider = initialProvider;
+
   let deleteTimer: ReturnType<typeof setTimeout> | null = null;
+  let committingDeleteIds = $state<string[]>([]);
+  let deleteQueue: Promise<void> = Promise.resolve();
 
   const allKeys = $derived(deps.credentials()?.items ?? []);
 
@@ -50,29 +48,28 @@ export function createManageKeysController(
 
   const visibleKeys = $derived.by(() => {
     const pending = state.pendingDeleteId;
-    const base = pending
-      ? providerKeys.filter((c) => c.id !== pending)
-      : providerKeys;
-    const query = state.keyInput.trim().toLowerCase();
-    if (!query) return base;
-    return base.filter((c) =>
-      c.apiKey.value.toLowerCase().includes(query),
+
+    const base = providerKeys.filter(
+      (c) => c.id !== pending && !committingDeleteIds.includes(c.id),
     );
+
+    const query = state.keyInput.trim().toLowerCase();
+
+    if (!query) return base;
+
+    return base.filter((c) => c.apiKey.value.toLowerCase().includes(query));
   });
 
   const canAddKey = $derived.by(() => {
     const key = state.keyInput.trim();
-    return key !== '' && !allKeys.some((c) => c.apiKey.value === key);
-  });
 
-  const viewingKey = $derived.by(() => {
-    if (!state.viewingKeyId) return null;
-    const match = allKeys.find((c) => c.id === state.viewingKeyId);
-    return match ? match.apiKey.value : null;
+    return key !== '' && !allKeys.some((c) => c.apiKey.value === key);
   });
 
   async function addApiKey() {
     const trimmed = state.keyInput.trim();
+    const provider = state.selectedProvider;
+
     if (!trimmed) return;
 
     if (allKeys.some((c) => c.apiKey.value === trimmed)) {
@@ -81,29 +78,50 @@ export function createManageKeysController(
         message: 'Key already added',
         description: 'This API key is already in your list.',
       });
+
       return;
     }
 
-    const error = await deps.addApiKey(trimmed, state.selectedProvider);
+    const error = await deps.addApiKey(trimmed, provider);
+
     if (error) {
       deps.toast.show({
         type: 'error',
         message: 'Could not add key',
         description: error,
       });
+
       return;
     }
 
-    state.keyInput = '';
+    if (
+      state.selectedProvider === provider &&
+      state.keyInput.trim() === trimmed
+    )
+      state.keyInput = '';
     deps.toast.show({ type: 'success', message: 'API key added' });
 
-    if (deps.modelsFor(state.selectedProvider).length === 0) {
-      void autoFetchModels(state.selectedProvider);
+    if (deps.modelsFor(provider).length === 0) {
+      void autoFetchModels(provider);
     }
   }
 
   async function autoFetchModels(provider: AnyProvider) {
-    const result = await deps.fetchModels(provider);
+    let result: Result<StoredModel[], AppError>;
+
+    try {
+      result = await deps.fetchModels(provider);
+    } catch {
+      deps.toast.show({
+        type: 'error',
+        message: 'Could not fetch models',
+        description:
+          'Your API key was saved. Try Fetch Models under Manage Models.',
+      });
+
+      return;
+    }
+
     if (result.success) {
       deps.toast.show({
         type: 'success',
@@ -120,37 +138,69 @@ export function createManageKeysController(
   }
 
   function requestDelete(credentialId: string) {
-    cancelPendingDelete();
+    if (
+      state.pendingDeleteId === credentialId ||
+      committingDeleteIds.includes(credentialId)
+    )
+      return;
+    void commitPendingDelete();
     state.pendingDeleteId = credentialId;
+
     deleteTimer = setTimeout(() => {
-      commitPendingDelete();
+      void commitPendingDelete();
     }, UNDO_WINDOW_MS);
   }
 
-  async function commitPendingDelete() {
+  function commitPendingDelete(): Promise<void> {
     const id = state.pendingDeleteId;
-    if (!id) return;
 
-    if (deleteTimer) {
-      clearTimeout(deleteTimer);
-      deleteTimer = null;
-    }
-    state.pendingDeleteId = null;
+    if (!id) return deleteQueue;
 
-    const error = await deps.removeApiKey(id);
-    if (error) {
-      deps.toast.show({
-        type: 'error',
-        message: 'Could not delete key',
-        description: error,
+    committingDeleteIds = [...committingDeleteIds, id];
+    cancelPendingDelete();
+
+    // Credential removal saves the complete collection; serialize writes so
+    // rapid deletes cannot overwrite another deletion with an older snapshot.
+    deleteQueue = deleteQueue
+      .then(() => persistDelete(id))
+      .catch((error: unknown) => {
+        showDeleteError(
+          error instanceof Error
+            ? error.message
+            : 'Please try deleting the key again.',
+        );
+      })
+      .finally(() => {
+        committingDeleteIds = committingDeleteIds.filter(
+          (keyId) => keyId !== id,
+        );
       });
+
+    return deleteQueue;
+  }
+
+  async function persistDelete(id: string) {
+    const error = await deps.removeApiKey(id);
+
+    if (error) {
+      showDeleteError(error);
+
       return;
     }
 
     const remaining = deps.credentials();
+
     if (!remaining || remaining.items.length === 0) {
       await deps.clearAllModels();
     }
+  }
+
+  function showDeleteError(description: string) {
+    deps.toast.show({
+      type: 'error',
+      message: 'Could not delete key',
+      description,
+    });
   }
 
   function cancelPendingDelete() {
@@ -158,6 +208,7 @@ export function createManageKeysController(
       clearTimeout(deleteTimer);
       deleteTimer = null;
     }
+
     state.pendingDeleteId = null;
   }
 
@@ -175,17 +226,20 @@ export function createManageKeysController(
       const modeError = await deps.setKeySelectionMode(
         KeySelectionMode.manual(),
       );
+
       if (modeError) {
         deps.toast.show({
           type: 'error',
           message: 'Could not switch to manual key selection',
           description: modeError,
         });
+
         return;
       }
     }
 
     const error = await deps.setActiveKey(credential.id);
+
     if (error) {
       deps.toast.show({
         type: 'error',
@@ -195,21 +249,8 @@ export function createManageKeysController(
     }
   }
 
-  function viewKey(credentialId: string) {
-    state.viewingKeyId = credentialId;
-  }
-
-  function closeViewer() {
-    state.viewingKeyId = null;
-  }
-
   function destroy() {
-    if (state.pendingDeleteId) {
-      void commitPendingDelete();
-    } else if (deleteTimer) {
-      clearTimeout(deleteTimer);
-      deleteTimer = null;
-    }
+    void commitPendingDelete();
   }
 
   return {
@@ -226,17 +267,12 @@ export function createManageKeysController(
     get canAddKey() {
       return canAddKey;
     },
-    get viewingKey() {
-      return viewingKey;
-    },
     addApiKey,
     setProvider,
     requestDelete,
     commitPendingDelete,
     cancelPendingDelete,
     setActiveKey,
-    viewKey,
-    closeViewer,
     destroy,
   };
 }

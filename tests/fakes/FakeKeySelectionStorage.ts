@@ -25,20 +25,26 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
 
   private consumeError(): AppError | null {
     const e = this.injectedError;
+
     this.injectedError = null;
+
     return e;
   }
 
   async getMode(): Promise<Result<KeySelectionMode, AppError>> {
     const error = this.consumeError();
+
     if (error) return failure(error);
+
     return success(this.selectionMode);
   }
 
   async setMode(mode: KeySelectionMode): Promise<Result<void, AppError>> {
     const error = this.consumeError();
+
     if (error) return failure(error);
     this.selectionMode = mode;
+
     return success(undefined);
   }
 
@@ -46,7 +52,9 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
     provider: AnyProvider,
   ): Promise<Result<string | null, AppError>> {
     const error = this.consumeError();
+
     if (error) return failure(error);
+
     return success(this.lastUsedIdValues.get(provider) ?? null);
   }
 
@@ -55,16 +63,29 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
     credentialId: string,
   ): Promise<Result<void, AppError>> {
     const error = this.consumeError();
+
     if (error) return failure(error);
     this.lastUsedIdValues.set(provider, credentialId);
+
     return success(undefined);
   }
 
-  async getAllLastUsedIds(): Promise<
-    Result<Record<string, string>, AppError>
-  > {
+  async clearLastUsedId(
+    provider: AnyProvider,
+  ): Promise<Result<void, AppError>> {
     const error = this.consumeError();
+
     if (error) return failure(error);
+    this.lastUsedIdValues.delete(provider);
+
+    return success(undefined);
+  }
+
+  async getAllLastUsedIds(): Promise<Result<Record<string, string>, AppError>> {
+    const error = this.consumeError();
+
+    if (error) return failure(error);
+
     return success(Object.fromEntries(this.lastUsedIdValues));
   }
 
@@ -72,8 +93,10 @@ export class FakeKeySelectionStorage implements IKeySelectionStorage {
     ids: Record<string, string>,
   ): Promise<Result<void, AppError>> {
     const error = this.consumeError();
+
     if (error) return failure(error);
     this.lastUsedIdValues = new Map(Object.entries(ids));
+
     return success(undefined);
   }
 }

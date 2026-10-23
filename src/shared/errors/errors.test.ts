@@ -48,6 +48,7 @@ describe('Shared: AppError', () => {
 
   test('stores cause', () => {
     const cause = new Error('root cause');
+
     const error = new AppError({
       code: ErrorCode.UNKNOWN_ERROR,
       cause,
@@ -114,6 +115,7 @@ describe('Shared: AppError', () => {
       code: ErrorCode.UNKNOWN_ERROR,
       context: { detail: 'test' },
     });
+
     const json = error.toJSON();
 
     expect(json.name).toBe('AppError');
@@ -181,6 +183,7 @@ describe('Shared: TranslationError', () => {
 
   test('invalidImage()', () => {
     const error = TranslationError.invalidImage();
+
     expect(error.code).toBe(ErrorCode.TRANSLATION_INVALID_IMAGE);
   });
 
@@ -193,6 +196,7 @@ describe('Shared: TranslationError', () => {
 
   test('malformedResponse()', () => {
     const error = TranslationError.malformedResponse();
+
     expect(error.code).toBe(ErrorCode.TRANSLATION_MALFORMED_RESPONSE);
   });
 
@@ -227,6 +231,7 @@ describe('Shared: NetworkError', () => {
     const error = NetworkError.serverError(500, 'https://api.example.com');
 
     expect(error.code).toBe(ErrorCode.NETWORK_SERVER_ERROR);
+
     expect(error.context).toEqual({
       status: 500,
       url: 'https://api.example.com',
@@ -264,6 +269,7 @@ describe('Shared: NetworkError', () => {
       });
 
       const abortError = new Error('The operation was aborted');
+
       abortError.name = 'AbortError';
 
       const error = NetworkError.fromFetchError(
@@ -272,6 +278,7 @@ describe('Shared: NetworkError', () => {
       );
 
       expect(error.code).toBe(ErrorCode.NETWORK_TIMEOUT);
+
       expect(error.context).toEqual({
         url: 'https://api.example.com/translate',
       });
@@ -365,6 +372,20 @@ describe('Shared: BrowserError', () => {
 // Inheritance chain
 // =============================================================
 describe('Shared: Error hierarchy', () => {
+  test('translation lifecycle errors retain distinct safe messages', () => {
+    const cases = [
+      [TranslationError.cancelled(), ErrorCode.TRANSLATION_CANCELLED],
+      [TranslationError.interrupted(), ErrorCode.TRANSLATION_INTERRUPTED],
+      [TranslationError.responseLimit(), ErrorCode.TRANSLATION_RESPONSE_LIMIT],
+    ] as const;
+
+    for (const [error, code] of cases) {
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.code).toBe(code);
+      expect(error.userMessage).toBeTruthy();
+    }
+  });
+
   test('all subclasses are instanceof AppError', () => {
     const errors = [
       AuthError.notAuthenticated(),

@@ -31,6 +31,7 @@
 
   function handleChange(e: Event) {
     const target = e.target as HTMLSelectElement;
+
     onchange?.(target.value);
   }
 

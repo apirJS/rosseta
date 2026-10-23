@@ -11,7 +11,9 @@ function makeApiKey(
   provider: 'google' | 'groq' = 'google',
 ): ApiKey {
   const r = ApiKey.createWithProvider(raw, provider);
+
   if (!r.success) throw new Error('Test helper: invalid API key');
+
   return r.data;
 }
 
@@ -20,7 +22,9 @@ describe('Domain: Credential', () => {
     test('creates a valid credential', () => {
       const apiKey = makeApiKey();
       const result = Credential.create('cred-1', apiKey, 'google');
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.id).toBe('cred-1');
         expect(result.data.provider).toBe('google');
@@ -32,7 +36,9 @@ describe('Domain: Credential', () => {
     test('rejects empty ID', () => {
       const apiKey = makeApiKey();
       const result = Credential.create('', apiKey, 'google');
+
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBeInstanceOf(DomainError);
         expect(result.error.message).toContain('ID');
@@ -42,6 +48,7 @@ describe('Domain: Credential', () => {
     test('rejects whitespace-only ID', () => {
       const apiKey = makeApiKey();
       const result = Credential.create('   ', apiKey, 'google');
+
       expect(result.success).toBe(false);
     });
   });
@@ -54,7 +61,9 @@ describe('Domain: Credential', () => {
         provider: 'google',
         apiKey: VALID_GOOGLE_KEY,
       });
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.id).toBe('cred-1');
         expect(result.data.provider).toBe('google');
@@ -68,6 +77,7 @@ describe('Domain: Credential', () => {
         provider: 'groq',
         apiKey: VALID_GROQ_KEY,
       });
+
       expect(result.success).toBe(false);
     });
 
@@ -78,6 +88,7 @@ describe('Domain: Credential', () => {
         provider: 'google',
         apiKey: '',
       });
+
       expect(result.success).toBe(false);
     });
   });

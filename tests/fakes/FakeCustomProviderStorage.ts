@@ -23,30 +23,36 @@ export class FakeCustomProviderStorage implements ICustomProviderStorage {
   private checkFailure(): AppError | null {
     if (this.nextFailure) {
       const err = this.nextFailure;
+
       this.nextFailure = null;
+
       return err;
     }
+
     return null;
   }
 
   async load(): Promise<Result<CustomProviderConfig[], AppError>> {
     const err = this.checkFailure();
+
     if (err) return failure(err);
+
     return success([...this.providers]);
   }
 
-  async save(
-    config: CustomProviderConfig,
-  ): Promise<Result<void, AppError>> {
+  async save(config: CustomProviderConfig): Promise<Result<void, AppError>> {
     const err = this.checkFailure();
+
     if (err) return failure(err);
 
     const index = this.providers.findIndex((p) => p.id === config.id);
+
     if (index >= 0) {
       this.providers[index] = config;
     } else {
       this.providers.push(config);
     }
+
     return success(undefined);
   }
 
@@ -54,16 +60,20 @@ export class FakeCustomProviderStorage implements ICustomProviderStorage {
     configs: CustomProviderConfig[],
   ): Promise<Result<void, AppError>> {
     const err = this.checkFailure();
+
     if (err) return failure(err);
     this.providers = [...configs];
+
     return success(undefined);
   }
 
   async remove(id: string): Promise<Result<void, AppError>> {
     const err = this.checkFailure();
+
     if (err) return failure(err);
 
     this.providers = this.providers.filter((p) => p.id !== id);
+
     return success(undefined);
   }
 }
@@ -78,7 +88,9 @@ export function makeCustomProviderConfig(
     headers: overrides.headers,
     queryParams: overrides.queryParams,
   });
+
   if (!result.success) throw result.error;
+
   return result.data;
 }
 

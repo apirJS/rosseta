@@ -5,7 +5,7 @@ import { Credentials } from '../src/core/domain/credential/Credentials';
 import { UserPreferences } from '../src/core/domain/preferences/UserPreferences';
 import { EncodedImage } from '../src/core/domain/image/EncodedImage';
 import { Language } from '../src/core/domain/translation/Language';
-import type { TranslationSchemaOutput } from '../src/adapters/secondary/shared/translation-schema';
+import type { NormalizedTranslationResponse } from '../src/adapters/secondary/translation/output/translation-schema';
 import { seedStore } from './browser-mock';
 import type { Provider } from '../src/core/domain/credential/Provider';
 
@@ -14,13 +14,15 @@ export const VALID_IMAGE_BASE64 =
 
 export const VALID_IMAGE = (() => {
   const result = EncodedImage.create(VALID_IMAGE_BASE64);
+
   if (!result.success) throw new Error('Failed to create test image');
+
   return result.data;
 })();
 
 export const TARGET_LANGUAGE = Language.create('en-US');
 
-export const VALID_TRANSLATION_RESPONSE: TranslationSchemaOutput = {
+export const VALID_TRANSLATION_RESPONSE: NormalizedTranslationResponse = {
   success: true,
   error: null,
   data: {
@@ -54,14 +56,15 @@ const GOOGLE_KEY = 'AIza' + 'X'.repeat(35);
 const GROQ_KEY = 'gsk_' + 'X'.repeat(52);
 const XAI_KEY = 'a'.repeat(32) + '.abcdefghijklmn';
 
-function createCredentialFor(
-  rawKey: string,
-  provider: Provider,
-): Credential {
+function createCredentialFor(rawKey: string, provider: Provider): Credential {
   const apiKey = ApiKey.createWithProvider(rawKey, provider);
+
   if (!apiKey.success) throw apiKey.error;
+
   const credential = Credential.create(uuidv4(), apiKey.data, provider);
+
   if (!credential.success) throw credential.error;
+
   return credential.data;
 }
 
@@ -89,6 +92,7 @@ export function seedCredentialsAndPreferences(
     groq: createGroqCredential,
     xai: createXaiCredential,
   };
+
   const credential = credentialFactories[provider]();
 
   const credentials = Credentials.createEmpty(uuidv4()).add(credential);
@@ -101,3 +105,21 @@ export function seedCredentialsAndPreferences(
 
   return { credentials, credential, userPreferences };
 }
+
+// Model wire fixtures use paired segments; legacy fixtures above stay explicit for history/parser compatibility.
+export const VALID_PAIRED_TRANSLATION_RESPONSE = {
+  success: true,
+  error: null,
+  data: {
+    segments: [
+      {
+        blockIndex: 0,
+        originalText: '\u3053\u3093\u306b\u3061\u306f',
+        translatedText: 'Hello',
+        originalLanguageBcp47Code: 'ja-JP',
+        romanization: 'konnichiwa',
+      },
+    ],
+    description: 'A greeting in Japanese',
+  },
+};

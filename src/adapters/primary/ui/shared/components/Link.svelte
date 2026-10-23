@@ -8,7 +8,12 @@
     children: import('svelte').Snippet;
   }
 
-  const { href, external = false, class: className, children }: Props = $props();
+  const {
+    href,
+    external = false,
+    class: className,
+    children,
+  }: Props = $props();
 </script>
 
 <a

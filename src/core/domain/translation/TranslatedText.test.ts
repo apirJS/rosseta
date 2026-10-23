@@ -7,7 +7,9 @@ describe('Domain: TranslatedText', () => {
   describe('create — valid', () => {
     test('creates from non-empty string', () => {
       const result = TranslatedText.create('Hello, world!');
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.value).toBe('Hello, world!');
       }
@@ -15,7 +17,9 @@ describe('Domain: TranslatedText', () => {
 
     test('trims whitespace', () => {
       const result = TranslatedText.create('  trimmed  ');
+
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.data.value).toBe('trimmed');
       }
@@ -26,7 +30,9 @@ describe('Domain: TranslatedText', () => {
   describe('create — invalid', () => {
     test('rejects empty string', () => {
       const result = TranslatedText.create('');
+
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBeInstanceOf(DomainError);
         expect(result.error.message).toContain('empty');
@@ -35,6 +41,7 @@ describe('Domain: TranslatedText', () => {
 
     test('rejects whitespace-only string', () => {
       const result = TranslatedText.create('   ');
+
       expect(result.success).toBe(false);
     });
   });
@@ -44,6 +51,7 @@ describe('Domain: TranslatedText', () => {
     test('same values are equal', () => {
       const a = TranslatedText.create('Hello');
       const b = TranslatedText.create('Hello');
+
       if (a.success && b.success) {
         expect(a.data.equals(b.data)).toBe(true);
       }
@@ -52,6 +60,7 @@ describe('Domain: TranslatedText', () => {
     test('different values are not equal', () => {
       const a = TranslatedText.create('Hello');
       const b = TranslatedText.create('World');
+
       if (a.success && b.success) {
         expect(a.data.equals(b.data)).toBe(false);
       }

@@ -28,6 +28,7 @@ const HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 function containsControlCharacter(value: string): boolean {
   return Array.from(value).some((character) => {
     const codePoint = character.codePointAt(0);
+
     return codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f);
   });
 }
@@ -41,6 +42,7 @@ function validateHeaders(
     if (!HEADER_NAME_PATTERN.test(name)) {
       return failure(new DomainError(`Invalid header name: "${name}"`));
     }
+
     if (containsControlCharacter(value)) {
       return failure(
         new DomainError(`Header "${name}" contains control characters`),
@@ -60,10 +62,8 @@ function validateQueryParams(
     if (!name.trim()) {
       return failure(new DomainError('Query parameter names cannot be empty'));
     }
-    if (
-      containsControlCharacter(name) ||
-      containsControlCharacter(value)
-    ) {
+
+    if (containsControlCharacter(name) || containsControlCharacter(value)) {
       return failure(
         new DomainError(
           `Query parameter "${name}" contains control characters`,
@@ -127,11 +127,13 @@ export class CustomProviderConfig extends ValueObject {
     }
 
     const name = props.name.trim();
+
     if (!name) {
       return failure(new DomainError('Provider name is required'));
     }
 
     const baseURL = props.baseURL.trim();
+
     if (!URL_PATTERN.test(baseURL)) {
       return failure(
         new DomainError('Base URL must start with http:// or https://'),
@@ -147,9 +149,11 @@ export class CustomProviderConfig extends ValueObject {
     }
 
     const headersResult = validateHeaders(props.headers);
+
     if (!headersResult.success) return failure(headersResult.error);
 
     const queryParamsResult = validateQueryParams(props.queryParams);
+
     if (!queryParamsResult.success) return failure(queryParamsResult.error);
 
     return success(

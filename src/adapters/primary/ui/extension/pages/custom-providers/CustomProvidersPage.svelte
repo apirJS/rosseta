@@ -1,9 +1,11 @@
 <script lang="ts">
   import {
+    getAuthStateContext,
     getCustomProvidersStateContext,
+    getModelsStateContext,
     getPreferencesStateContext,
     getPopupToastContext,
-  } from '../../../shared/context';
+  } from '../../context';
   import { Icon, PageShell } from '../../../shared/components';
   import {
     createCustomProvidersController,
@@ -19,6 +21,8 @@
   const { onback }: Props = $props();
 
   const customProviders = getCustomProvidersStateContext();
+  const auth = getAuthStateContext();
+  const models = getModelsStateContext();
   const preferences = getPreferencesStateContext();
   const toast = getPopupToastContext();
 
@@ -26,23 +30,22 @@
     providers: () => customProviders.state.providers,
     save: (props) => customProviders.save(props),
     remove: (id) => customProviders.remove(id),
+    refresh: async () => {
+      await Promise.all([
+        auth.hydrate(),
+        preferences.hydrate(),
+        models.hydrate(),
+      ]);
+    },
     toast,
   };
 
   const controller = createCustomProvidersController(deps);
-
-  const title = $derived(
-    controller.state.view === 'form'
-      ? controller.state.editingId
-        ? 'Edit Provider'
-        : 'New Provider'
-      : 'Custom Providers',
-  );
 </script>
 
 <PageShell
   onback={controller.state.view === 'form' ? controller.showList : onback}
-  {title}
+  title={controller.title}
   isDark={preferences.state.resolvedTheme === 'dark'}
   onToggleTheme={preferences.toggleTheme}
 >

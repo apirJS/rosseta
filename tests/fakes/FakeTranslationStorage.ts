@@ -24,28 +24,38 @@ export class FakeTranslationStorage implements ITranslationStorage {
   async save(translation: Translation): Promise<Result<void, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     this.storageValue.set(translation.id, translation);
+
     return success(undefined);
   }
 
   async getById(id: string): Promise<Result<Translation | null, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     return success(this.storageValue.get(id) ?? null);
   }
 
   async getAll(): Promise<Result<Translation[], AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     return success([...this.storageValue.values()]);
   }
 
@@ -54,32 +64,44 @@ export class FakeTranslationStorage implements ITranslationStorage {
   ): Promise<Result<void, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     this.storageValue = new Map(
       translations.map((translation) => [translation.id, translation]),
     );
+
     return success(undefined);
   }
 
   async delete(id: string): Promise<Result<void, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     this.storageValue.delete(id);
+
     return success(undefined);
   }
 
   async clear(): Promise<Result<void, AppError>> {
     if (this.injectedError) {
       const error = this.injectedError;
+
       this.injectedError = null;
+
       return failure(error);
     }
+
     this.storageValue.clear();
+
     return success(undefined);
   }
 }

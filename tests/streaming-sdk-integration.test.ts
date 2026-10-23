@@ -407,7 +407,9 @@ describe('Production custom adapters against deterministic provider HTTP streams
   )(
     '$protocol/$scenario completes through real SDKs and reuses durable fallback',
     async ({ protocol, scenario }) => {
-      const fixture = createTranslationFixture({ delayMs: 1 });
+      // Plain fallback previews are sampled every 75 ms. Keep this stream long
+      // enough to exercise them; 1 ms chunks can finish sooner on Linux.
+      const fixture = createTranslationFixture({ delayMs: 5 });
 
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')

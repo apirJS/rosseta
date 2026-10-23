@@ -7588,9 +7588,9 @@ The test saves Node's `process` before replacing globals. Its `finally` block re
 
 The production custom adapters use the installed OpenAI and Anthropic clients. A replacement `fetch` passes their HTTP requests to the fixture handler:
 
-Source: [streaming-sdk-integration.test.ts:403–426](tests/streaming-sdk-integration.test.ts#L403-L426).
+Source: [streaming-sdk-integration.test.ts:403–428](tests/streaming-sdk-integration.test.ts#L403-L428).
 
-<!-- source: tests/streaming-sdk-integration.test.ts:403-426 -->
+<!-- source: tests/streaming-sdk-integration.test.ts:403-428 -->
 
 ```typescript
   test.each(
@@ -7600,7 +7600,9 @@ Source: [streaming-sdk-integration.test.ts:403–426](tests/streaming-sdk-integr
   )(
     '$protocol/$scenario completes through real SDKs and reuses durable fallback',
     async ({ protocol, scenario }) => {
-      const fixture = createTranslationFixture({ delayMs: 1 });
+      // Plain fallback previews are sampled every 75 ms. Keep this stream long
+      // enough to exercise them; 1 ms chunks can finish sooner on Linux.
+      const fixture = createTranslationFixture({ delayMs: 5 });
 
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')

@@ -391,18 +391,19 @@ describe('UI Controller: TranslationModalController', () => {
     expect(writeTextMock).toHaveBeenCalledWith('Hello');
   });
 
-  test('copyDescription sets descriptionCopy to "copied"', async () => {
+  test('copyDescription preserves Markdown and sets copy feedback', async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
 
     Object.assign(navigator, {
       clipboard: { writeText: writeTextMock },
     });
 
-    const ctrl = createController({ description: 'Test desc' });
+    const description = '**Context**\n\n- A useful detail';
+    const ctrl = createController({ description });
 
     await ctrl.copy('description');
     expect(ctrl.clipboard.states.description).toBe('copied');
-    expect(writeTextMock).toHaveBeenCalledWith('Test desc');
+    expect(writeTextMock).toHaveBeenCalledWith(description);
   });
 
   test('clipboard fallback copies the final text and removes its temporary textarea', async () => {

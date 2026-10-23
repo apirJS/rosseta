@@ -60,6 +60,7 @@
     "@ai-sdk/xai": "^4.0.58",
     "@ai-sdk/zai": "^3.0.10",
     "@heyputer/puter.js": "^2.6.3",
+    "@humanspeak/svelte-markdown": "^2.1.3",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@openrouter/sdk": "^1.2.123",
     "@tailwindcss/vite": "^4.3.3",

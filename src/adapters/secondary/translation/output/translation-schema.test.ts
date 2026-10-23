@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
-import { buildPlainPrompt } from './prompt-base';
+import { buildBasePrompt, buildPlainPrompt } from './prompt-base';
 import {
   createGenerationResponseSchema,
   legacyResponseSchema,
@@ -96,6 +96,51 @@ describe('Adapter: translation schema', () => {
 
     expect(dataSchema.properties).toHaveProperty('description');
     expect(dataSchema.required).toContain('description');
+  });
+
+  test('keeps Markdown description content inside the JSON string', () => {
+    const description =
+      '**Context**\n\nA compact explanation.\n\n- A useful detail\n- A second detail';
+
+    const response = {
+      ...VALID_PAIRED_TRANSLATION_RESPONSE,
+      data: { ...VALID_PAIRED_TRANSLATION_RESPONSE.data, description },
+    };
+
+    const parsed = createGenerationResponseSchema().parse(
+      JSON.parse(JSON.stringify(response)),
+    );
+
+    expect(parsed.data).toHaveProperty('description', description);
+  });
+
+  test('requests Markdown only for enabled descriptions', () => {
+    const params = {
+      targetLanguageCode: 'en-US',
+      targetLanguageName: 'English',
+    };
+
+    expect(buildBasePrompt({ ...params, includeDescription: true })).toContain(
+      'Markdown',
+    );
+
+    expect(
+      buildBasePrompt({ ...params, includeDescription: false }),
+    ).not.toContain('Markdown');
+
+    const descriptionSchema = z.toJSONSchema(
+      createGenerationResponseSchema().shape.data.unwrap(),
+    );
+
+    expect(descriptionSchema.properties).toHaveProperty(
+      'description.type',
+      'string',
+    );
+
+    expect(descriptionSchema.properties).toHaveProperty(
+      'description.description',
+      expect.stringContaining('Markdown'),
+    );
   });
 
   test('wire schema omits description entirely when not requested', () => {

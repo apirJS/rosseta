@@ -73,7 +73,7 @@ export function createGenerationResponseSchema(includeDescription = true) {
           description: z
             .string()
             .describe(
-              'Compact, factual explanation in the target language of relevant meaning, context and nuance needed to interpret the selected image. Exclude repeated translations, unrelated details and unverified claims. Use an empty string when no explanation is needed.',
+              'Compact, factual Markdown explanation in the target language of relevant meaning, context and nuance needed to interpret the selected image. Use short paragraphs, bold key terms and bullet lists when helpful; do not use HTML. Exclude repeated translations, unrelated details and unverified claims. Use an empty string when no explanation is needed.',
             ),
         })
         .strict()

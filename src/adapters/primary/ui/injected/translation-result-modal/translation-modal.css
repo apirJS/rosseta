@@ -405,10 +405,112 @@
 }
 
 .description-text {
+  min-width: 0;
   font-size: 13px;
   color: var(--modal-muted);
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.description-text > * + * {
+  margin-top: 8px;
+}
+
+.description-text :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--modal-fg);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.description-text :is(h1, h2) {
+  font-size: 15px;
+}
+
+.description-text :is(strong, th) {
+  color: var(--modal-fg);
+  font-weight: 600;
+}
+
+.description-text ul,
+.description-text ol {
+  padding-left: 20px;
+}
+
+.description-text ul {
+  list-style: disc;
+}
+
+.description-text ol {
+  list-style: decimal;
+}
+
+.description-text li + li,
+.description-text li > :is(p, ul, ol) + * {
+  margin-top: 4px;
+}
+
+.description-text blockquote {
+  padding-left: 10px;
+  border-left: 2px solid var(--modal-border);
+}
+
+.description-text a {
+  color: var(--modal-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.description-text a:focus-visible {
+  outline: 2px solid var(--modal-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.description-text code {
+  color: var(--modal-fg);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.92em;
+}
+
+.description-text :not(pre) > code {
+  padding: 1px 4px;
+  border: 1px solid var(--modal-border);
+  border-radius: 4px;
+  background: var(--modal-bg);
+}
+
+.description-text pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 10px;
+  border: 1px solid var(--modal-border);
+  border-radius: 6px;
+  background: var(--modal-bg);
+}
+
+.description-text pre code {
+  font-size: 12px;
+}
+
+.description-text table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.description-text th,
+.description-text td {
+  padding: 6px 8px;
+  border: 1px solid var(--modal-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.description-text hr {
+  border: 0;
+  border-top: 1px solid var(--modal-border);
 }
 
 .resize-handle {

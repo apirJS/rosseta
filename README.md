@@ -2,7 +2,7 @@
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/flbdkalgeiekpnchpakdpaabcehpnlln?style=flat&logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/rosseta/flbdkalgeiekpnchpakdpaabcehpnlln) [![Firefox Add-ons](https://img.shields.io/amo/v/rosseta?style=flat&logo=firefox&logoColor=white&label=Firefox%20Add-ons)](https://addons.mozilla.org/en-US/firefox/addon/rosseta/)
 
-A browser extension that translates text from any region of a webpage. Draw a selection box over the text, images, or UI elements on screen. The extension captures that region as a screenshot, sends it to a vision LLM for OCR, and renders the translated text in an overlay on the page.
+A browser extension that translates text from any region of a webpage. Draw a selection box over the text, images, or UI elements on screen. The extension captures that region as a screenshot, sends it to a vision LLM for translation, and renders the translated text in an overlay on the page.
 
 Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone). Successor of [select-and-translate](https://github.com/apirJS/select-and-translate), rebuilt from scratch.
 
@@ -10,15 +10,18 @@ Named after the [Rosetta Stone](https://en.wikipedia.org/wiki/Rosetta_Stone). Su
 
 ## Demo
 
-![Rosseta demo banner 1](demo/chrome_banner_big_1.png)
+![Rosseta translation demo](demo/translation-demo.gif)
 
-![Rosseta demo banner 4](demo/chrome_banner_big_5.png)
+<details>
+<summary>Screenshots</summary>
+
+![Rosseta demo banner 1](demo/translation-demo.png)
 
 ![Rosseta demo banner 2](demo/chrome_banner_big_2.png)
 
-![Rosseta demo banner 4](demo/chrome_banner_big_4.png)
+![Rosseta demo banner 3](demo/chrome_banner_big_4.png)
 
-## ![Rosseta demo banner 3](demo/chrome_banner_big_3.png)
+</details>
 
 ## Features
 
@@ -87,7 +90,6 @@ Runs on both Chrome and Firefox as a Manifest V3 extension.
 
 - Explore [awesome-free-llm-apis](https://github.com/mnfst/awesome-free-llm-apis) for providers offering free API access or trial quotas. Limits and availability can change, so check each provider's current terms before adding a key.
 - Choose a model that supports **image or vision input**. Rosseta sends a screenshot of the selected region, so text-only models cannot perform the translation.
-- If a provider's model list is incomplete, add a compatible vision model manually from **Manage Models**.
 
 ---
 

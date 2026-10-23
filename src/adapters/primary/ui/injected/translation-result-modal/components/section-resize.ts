@@ -1,11 +1,13 @@
 function freezeSiblingSections(currentSection: HTMLElement): () => void {
-  const parent = currentSection.parentElement;
+  const parent =
+    currentSection.closest('.translation-sections') ??
+    currentSection.parentElement;
 
   if (!parent) return () => {};
 
-  const siblings = Array.from(
-    parent.querySelectorAll(':scope > .section'),
-  ).filter((el): el is HTMLElement => el !== currentSection);
+  const siblings = Array.from(parent.querySelectorAll('.section')).filter(
+    (el): el is HTMLElement => el !== currentSection,
+  );
 
   const saved = siblings.map((el) => ({
     el,

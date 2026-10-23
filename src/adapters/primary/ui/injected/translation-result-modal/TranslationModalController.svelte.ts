@@ -47,7 +47,7 @@ export class TranslationModalController {
     code: 'unknown',
     name: '',
   });
-  private revision = 0;
+  private revision = $state(0);
   private disposed = false;
   private showStatus = $state(true);
   private statusTimer?: ReturnType<typeof setTimeout>;
@@ -150,6 +150,10 @@ export class TranslationModalController {
   });
 
   public readonly highlightedSegmentIndex = $derived(this.hoveredSegmentIndex);
+
+  public get attemptRevision(): number {
+    return this.revision;
+  }
 
   public hoverSegment = (index: number | null) => {
     this.hoveredSegmentIndex = index;

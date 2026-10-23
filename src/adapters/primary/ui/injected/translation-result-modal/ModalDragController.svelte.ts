@@ -5,6 +5,29 @@ export class ModalDragController {
   private stopDrag?: () => void;
   private disposed = false;
 
+  public constrainToViewport(
+    bounds: Pick<
+      DOMRect,
+      'left' | 'top' | 'right' | 'bottom' | 'width' | 'height'
+    >,
+    viewport: { width: number; height: number },
+  ): void {
+    if (this.disposed) return;
+
+    const left = Math.min(
+      Math.max(0, bounds.left),
+      Math.max(0, viewport.width - bounds.width),
+    );
+
+    const top = Math.min(
+      Math.max(0, bounds.top),
+      Math.max(0, viewport.height - bounds.height),
+    );
+
+    this.x += left - bounds.left;
+    this.y += top - bounds.top;
+  }
+
   public start = (event: PointerEvent): void => {
     if (this.disposed || event.button !== 0) return;
     this.stopDrag?.();

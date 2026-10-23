@@ -70,4 +70,4 @@ Change prompt/schema behavior in `output/` together with final and preview mappi
 
 Run targeted Bun tests while editing. Integrated verification remains `bun run format:check`, `bun run lint`, `bun run check`, all three test suites and `bun run build:prod`. No tests make paid/live provider calls.
 
-See [the maintainer guide](../../../../docs/MAINTAINER_GUIDE.md), [contributing](../../../../CONTRIBUTING.md) and [the phase/error ownership decision](../../../../docs/decisions/0005-explicit-generation-phases.md).
+See [contributing and maintenance](../../../../CONTRIBUTING.md), its [translation reading path](../../../../CONTRIBUTING.md#read-a-normal-translation) and the [boundaries to preserve](../../../../CONTRIBUTING.md#contracts-to-preserve).

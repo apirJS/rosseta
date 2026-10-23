@@ -16,6 +16,82 @@ afterEach(() => {
 });
 
 describe('ModalDragController', () => {
+  test.each([
+    {
+      name: 'leaves an onscreen modal in place',
+      left: 100,
+      top: 100,
+      width: 300,
+      height: 200,
+      position: [40, -20],
+    },
+    {
+      name: 'moves an expanded modal away from the right and bottom edges',
+      left: 600,
+      top: 400,
+      width: 300,
+      height: 300,
+      position: [-60, -120],
+    },
+    {
+      name: 'moves a modal away from the left and top edges',
+      left: -60,
+      top: -30,
+      width: 300,
+      height: 200,
+      position: [100, 10],
+    },
+    {
+      name: 'keeps the top left accessible when the modal exceeds the viewport',
+      left: -100,
+      top: 50,
+      width: 900,
+      height: 700,
+      position: [140, -70],
+    },
+  ])('$name', ({ left, top, width, height, position }) => {
+    const controller = createController();
+
+    controller.x = 40;
+    controller.y = -20;
+
+    controller.constrainToViewport(
+      {
+        left,
+        top,
+        right: left + width,
+        bottom: top + height,
+        width,
+        height,
+      },
+      { width: 800, height: 600 },
+    );
+
+    expect([controller.x, controller.y]).toEqual(position);
+  });
+
+  test('does not constrain position after disposal', () => {
+    const controller = createController();
+
+    controller.x = 40;
+    controller.y = -20;
+    controller.dispose();
+
+    controller.constrainToViewport(
+      {
+        left: -60,
+        top: -30,
+        right: 240,
+        bottom: 170,
+        width: 300,
+        height: 200,
+      },
+      { width: 800, height: 600 },
+    );
+
+    expect([controller.x, controller.y]).toEqual([40, -20]);
+  });
+
   test('moving preserves the pointer offset across successive drags', () => {
     const controller = createController();
 

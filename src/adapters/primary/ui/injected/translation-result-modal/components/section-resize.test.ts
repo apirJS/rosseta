@@ -33,6 +33,41 @@ function createSections() {
 }
 
 describe('section resize', () => {
+  test('preserves the description height when resizing text inside the shared wrapper', () => {
+    const { box, handle, sibling } = createSections();
+    const parent = sibling.parentElement!;
+    const wrapper = document.createElement('div');
+    const description = document.createElement('div');
+
+    parent.className = 'translation-sections';
+    wrapper.className = 'translation-text-sections';
+    wrapper.append(box.closest('.section')!, sibling);
+    description.className = 'section';
+    description.style.height = '90px';
+    parent.append(wrapper, description);
+
+    vi.spyOn(description, 'getBoundingClientRect').mockReturnValue({
+      height: 140,
+    } as DOMRect);
+
+    const stop = startSectionResize({
+      event: {
+        button: 0,
+        clientY: 0,
+        pointerId: 1,
+        currentTarget: handle,
+      } as unknown as PointerEvent,
+      box,
+      minHeight: 60,
+    });
+
+    expect(sibling.style.height).toBe('120px');
+    expect(description.style.height).toBe('140px');
+    stop();
+    expect(sibling.style.height).toBe('100px');
+    expect(description.style.height).toBe('90px');
+  });
+
   test('resizes only the chosen section, clamps height, and restores siblings on completion', () => {
     const { box, handle, sibling } = createSections();
     const onEnd = vi.fn();

@@ -40,7 +40,7 @@ const segmentSchema = z
     translatedText: z
       .string()
       .describe(
-        'Complete translation of originalText into the requested target language using natural wording. Translate titles by meaning. Source-language pronunciation belongs only in romanization.',
+        'Complete translation of originalText, including titles and names, into the requested target language using natural wording. Preserve numbers, emoji and nonlinguistic symbols unchanged. Put source-language pronunciation in romanization.',
       ),
     originalLanguageBcp47Code: z
       .string()
@@ -51,7 +51,7 @@ const segmentSchema = z
       .string()
       .nullable()
       .describe(
-        'Latin-script transcription of the source-language pronunciation of originalText. This field contains pronunciation, not translation. Use null for Latin-script text, numbers or symbols.',
+        'Latin-script transcription of the non-Latin source text in originalText, retaining existing Latin words as written. This field contains pronunciation, not translation. Use null for Latin-only text, numbers or symbols.',
       ),
   })
   .strict();
@@ -73,7 +73,7 @@ export function createGenerationResponseSchema(includeDescription = true) {
           description: z
             .string()
             .describe(
-              'Compact, factual Markdown explanation in the target language of relevant meaning, context and nuance needed to interpret the selected image. Use short paragraphs, bold key terms and bullet lists when helpful; do not use HTML. Exclude repeated translations, unrelated details and unverified claims. Use an empty string when no explanation is needed.',
+              'Compact Markdown in the target language explaining useful meaning, context or nuance beyond the translation. Ground explanations in the selected image and text, identify uncertainty when relevant, and omit unsupported claims and unrelated details. Use paragraphs, bold or lists when helpful; do not use HTML. Use an empty string when nothing needs explanation.',
             ),
         })
         .strict()

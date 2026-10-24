@@ -2,11 +2,11 @@
   "schemaFingerprints": [
     {
       "includeDescription": false,
-      "digest": "067a392be790b96f682a13eaf2504f7040471a7504c9c71391eef67cc95ca3cf"
+      "digest": "8d024106508a0164c5fd7522c0e437c10cd9d94fb796b4477ef185f72bba5259"
     },
     {
       "includeDescription": true,
-      "digest": "4d0b99aad7b14dc8182964a463e9ce7e4d6fe7cd1baf05ea2179da7bc79d692f"
+      "digest": "2f827f0f190387c73c2d16b255db713952e60369f1f1a0ea28d3b9a77c23827c"
     }
   ],
   "identities": [

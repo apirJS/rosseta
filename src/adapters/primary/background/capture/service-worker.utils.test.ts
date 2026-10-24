@@ -93,18 +93,15 @@ describe('service-worker.utils', () => {
   });
 
   describe('captureVisibleTab', () => {
-    test('captures with JPEG format at quality 85', async () => {
-      tabs.captureVisibleTab.mockResolvedValueOnce(
-        'data:image/jpeg;base64,...',
-      );
+    test('captures a lossless PNG without a quality reduction', async () => {
+      tabs.captureVisibleTab.mockResolvedValueOnce('data:image/png;base64,...');
 
       const result = await captureVisibleTab();
 
-      expect(result).toBe('data:image/jpeg;base64,...');
+      expect(result).toBe('data:image/png;base64,...');
 
       expect(tabs.captureVisibleTab).toHaveBeenCalledWith(undefined, {
-        format: 'jpeg',
-        quality: 85,
+        format: 'png',
       });
     });
   });

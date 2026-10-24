@@ -2,11 +2,11 @@
 
 ### ⚠ BREAKING CHANGES
 
-* parse partial JSON stream from LLM's output for better UX (#11)
+- parse partial JSON stream from LLM's output for better UX (#11)
 
 ### Features
 
-* parse partial JSON stream from LLM's output for better UX ([#11](https://github.com/apirJS/rosseta/issues/11)) ([64330c1](https://github.com/apirJS/rosseta/commit/64330c1087d2d0edd937c62bda86d9e4e70e3c74))
+- parse partial JSON stream from LLM's output for better UX ([#11](https://github.com/apirJS/rosseta/issues/11)) ([64330c1](https://github.com/apirJS/rosseta/commit/64330c1087d2d0edd937c62bda86d9e4e70e3c74))
 
 ## [2.2.1](https://github.com/apirJS/rosseta/compare/v2.2.0...v2.2.1) (2026-09-20)
 

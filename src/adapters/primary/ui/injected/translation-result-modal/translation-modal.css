@@ -32,6 +32,8 @@
   --modal-muted: #6b7280;
   --modal-primary: #ff9940;
   --modal-primary-fg: #ffffff;
+  --modal-highlight-fg: #92400e;
+  --modal-highlight-bg: #fef3c7;
   --modal-scrollbar-thumb: #c0c4c8;
   --modal-scrollbar-track: transparent;
   --modal-shadow:
@@ -55,6 +57,8 @@
   --modal-muted: #6b7280;
   --modal-primary: #e6b450;
   --modal-primary-fg: #0f1419;
+  --modal-highlight-fg: #e6b450;
+  --modal-highlight-bg: transparent;
   --modal-scrollbar-thumb: #3d434c;
   --modal-scrollbar-track: transparent;
   --modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -281,11 +285,19 @@
 }
 
 .section-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
   color: var(--modal-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.section-header > .icon-btn {
+  flex-shrink: 0;
 }
 
 .section-label-tag {
@@ -336,11 +348,14 @@
   cursor: default;
   transition:
     color 0.15s ease,
+    background-color 0.15s ease,
     filter 0.15s ease;
 }
 
-.text-segment.seg-highlight {
-  color: var(--modal-primary) !important;
+.text-segment.seg-highlight,
+.rom-segment.rom-highlight {
+  color: var(--modal-highlight-fg) !important;
+  background-color: var(--modal-highlight-bg);
 }
 
 .lang-gray-0 {
@@ -377,12 +392,9 @@
 
 .rom-segment {
   cursor: default;
-  transition: font-size 0.15s ease;
-}
-
-.rom-segment.rom-highlight {
-  font-size: 14px;
-  color: var(--modal-fg);
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .description-box {

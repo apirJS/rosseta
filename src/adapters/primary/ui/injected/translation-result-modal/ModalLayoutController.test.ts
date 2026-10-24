@@ -53,6 +53,47 @@ function useThreeColumns(controller: ModalLayoutController): void {
 }
 
 describe('ModalLayoutController', () => {
+  test('uses a measured width without replacing the readable minimum or preferred limit', () => {
+    const controller = createController();
+
+    expect(controller.setAutomaticWidth('stacked', 340)).toBe(true);
+    expect(controller.width).toBe('340px');
+    expect(controller.minimumWidth).toBe(320);
+    expect(controller.preferredWidth).toBe(520);
+    expect(controller.setAutomaticWidth('stacked', 340)).toBe(false);
+
+    expand(controller);
+    expect(controller.width).toBe('850px');
+    expect(controller.minimumWidth).toBe(610);
+    expect(controller.preferredWidth).toBe(850);
+    expect(controller.setAutomaticWidth('text-columns', 650)).toBe(true);
+    expect(controller.width).toBe('650px');
+    expect(controller.setAutomaticWidth('stacked', 320)).toBe(false);
+    expect(controller.width).toBe('650px');
+  });
+
+  test.each([0, -1, NaN, Infinity])(
+    'ignores an unusable automatic width %s',
+    (width) => {
+      const controller = createController();
+
+      expect(controller.setAutomaticWidth('stacked', width)).toBe(false);
+      expect(controller.width).toBeUndefined();
+    },
+  );
+
+  test('clears the automatic width on a new attempt or description change', () => {
+    const controller = createController();
+
+    controller.setAutomaticWidth('stacked', 340);
+    setContent(controller, { revision: 1, hasDescription: false });
+    expect(controller.width).toBeUndefined();
+
+    controller.setAutomaticWidth('stacked', 360);
+    setContent(controller, { revision: 1, hasDescription: true });
+    expect(controller.width).toBeUndefined();
+  });
+
   test('keeps short results stacked even when columns would fit', () => {
     const controller = createController(true);
 

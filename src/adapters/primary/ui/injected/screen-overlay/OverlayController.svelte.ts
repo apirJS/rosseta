@@ -203,25 +203,32 @@ export class OverlayController {
         const scaleX = img.naturalWidth / window.innerWidth;
         const scaleY = img.naturalHeight / window.innerHeight;
 
-        const cropW = Math.round(width * scaleX);
-        const cropH = Math.round(height * scaleY);
+        // Copy whole source pixels without resampling at fractional display scales.
+        const cropX = Math.floor(x * scaleX);
+        const cropY = Math.floor(y * scaleY);
+
+        const cropW =
+          Math.min(img.naturalWidth, Math.ceil((x + width) * scaleX)) - cropX;
+
+        const cropH =
+          Math.min(img.naturalHeight, Math.ceil((y + height) * scaleY)) - cropY;
 
         canvas.width = cropW;
         canvas.height = cropH;
 
         ctx.drawImage(
           img,
-          x * scaleX,
-          y * scaleY,
-          width * scaleX,
-          height * scaleY,
+          cropX,
+          cropY,
+          cropW,
+          cropH,
           0,
           0,
           canvas.width,
           canvas.height,
         );
 
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/png'));
       });
 
       img.addEventListener('error', (event) => reject(event));

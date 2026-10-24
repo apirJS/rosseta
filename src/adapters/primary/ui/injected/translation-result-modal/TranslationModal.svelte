@@ -2,7 +2,10 @@
   import { untrack } from 'svelte';
   import type { TranslationModalController } from './TranslationModalController.svelte';
   import { ModalLayoutController } from './ModalLayoutController.svelte';
-  import { measureDescriptionLayout } from './modal-layout-measurement';
+  import {
+    measureCompactModalWidth,
+    measureDescriptionLayout,
+  } from './modal-layout-measurement';
   import ModalHeader from './components/ModalHeader.svelte';
   import ModalSection from './components/ModalSection.svelte';
   import TextSection from './components/TextSection.svelte';
@@ -59,6 +62,27 @@
       frame = requestAnimationFrame(() => {
         frame = undefined;
 
+        const compactWidth = content.hasContent
+          ? measureCompactModalWidth({
+              modal,
+              sections,
+              viewportWidth: viewport.width,
+              viewportHeight: viewport.height,
+              preferredModalWidth: layout.preferredWidth,
+              minimumModalWidth: layout.minimumWidth,
+            })
+          : undefined;
+
+        if (
+          compactWidth !== undefined &&
+          layout.setAutomaticWidth(renderedMode, compactWidth)
+        ) {
+          // Wait for reflow before deciding whether this layout still overflows.
+          scheduleMeasure();
+
+          return;
+        }
+
         const descriptionLayout =
           renderedMode === 'three-columns'
             ? measureDescriptionLayout({
@@ -102,11 +126,12 @@
 
   $effect(() => {
     const mode = layout.mode;
+    const automaticallySized = layout.width !== undefined;
     const modal = modalEl;
     const body = bodyEl;
     const viewport = { width: viewportWidth, height: viewportHeight };
 
-    if (!modal || !body || mode === 'stacked') return;
+    if (!modal || !body || (mode === 'stacked' && !automaticallySized)) return;
     body.scrollTop = 0;
 
     const frame = requestAnimationFrame(() => {

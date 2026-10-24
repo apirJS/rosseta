@@ -27,7 +27,7 @@
 
 <div class="section">
   <div class="section-header">
-    <span class="section-label">
+    <span class="section-label" title={labelTag}>
       {label}
       {#if labelTag !== undefined}
         <span class="section-label-tag">— {labelTag}</span>

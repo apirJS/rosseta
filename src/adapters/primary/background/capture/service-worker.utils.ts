@@ -45,7 +45,6 @@ export async function getActiveTab(): Promise<browser.Tabs.Tab | null> {
 
 export async function captureVisibleTab(): Promise<string> {
   return await browser.tabs.captureVisibleTab(undefined, {
-    format: 'jpeg',
-    quality: 85,
+    format: 'png',
   });
 }

@@ -39,46 +39,55 @@ describe('UI Controller: OverlayController', () => {
   let detachMock: Mock;
   let onReadyMock: Mock;
   const mockImageBase64 = 'data:image/png;base64,fakeimage';
+  let drawImage: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
     detachMock = vi.fn();
     onReadyMock = vi.fn();
+    drawImage = vi.fn();
 
     // Mock Browser Globals
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 
     // Mock Image API (for decodeImage)
-    global.Image = class {
-      src: string = '';
-      naturalWidth = 100;
-      naturalHeight = 100;
-      decode = vi.fn().mockResolvedValue(undefined);
-      addEventListener = vi.fn((type: string, listener: EventListener) => {
-        if (type === 'load') {
-          setTimeout(() => listener(new Event('load')), 10);
-        }
-      });
-    } as unknown as typeof Image;
+    vi.stubGlobal(
+      'Image',
+      class {
+        src: string = '';
+        naturalWidth = 1920;
+        naturalHeight = 1080;
+        decode = vi.fn().mockResolvedValue(undefined);
+        addEventListener = vi.fn((type: string, listener: EventListener) => {
+          if (type === 'load') {
+            setTimeout(() => listener(new Event('load')), 10);
+          }
+        });
+      },
+    );
 
     // Mock Fetch (for loadBlob)
-    global.fetch = vi.fn().mockResolvedValue({
-      blob: () => Promise.resolve(new Blob(['fake-content'])),
-    }) as any;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        blob: () => Promise.resolve(new Blob(['fake-content'])),
+      }),
+    );
 
     // Mock Canvas API (for cropImage)
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-      drawImage: vi.fn(),
+      drawImage,
     } as unknown as CanvasRenderingContext2D);
 
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
-      'data:image/jpeg;base64,CROPPED_RESULT',
+      'data:image/png;base64,CROPPED_RESULT',
     );
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   /**
@@ -260,7 +269,7 @@ describe('UI Controller: OverlayController', () => {
       expect(sendMessageToRuntime).toHaveBeenCalledWith({
         action: 'TRANSLATE_IMAGE',
         payload: {
-          imageBase64: 'data:image/jpeg;base64,CROPPED_RESULT',
+          imageBase64: 'data:image/png;base64,CROPPED_RESULT',
           requestId: expect.any(String),
           documentSessionId: 'test-session',
         },
@@ -269,6 +278,113 @@ describe('UI Controller: OverlayController', () => {
       expect(detachMock).toHaveBeenCalled();
       cleanup();
     });
+
+    test.each([
+      {
+        display: 'standard density',
+        viewport: [1920, 1080],
+        start: [50, 40],
+        end: [150, 120],
+        source: [50, 40, 100, 80],
+      },
+      {
+        display: 'high density',
+        viewport: [960, 540],
+        start: [50, 40],
+        end: [150, 120],
+        source: [100, 80, 200, 160],
+      },
+      {
+        display: 'fractional scaling',
+        viewport: [1536, 864],
+        start: [51, 41],
+        end: [152, 122],
+        source: [63, 51, 127, 102],
+      },
+      {
+        display: 'different horizontal and vertical scales',
+        viewport: [960, 720],
+        start: [50, 40],
+        end: [150, 120],
+        source: [100, 60, 200, 120],
+      },
+      {
+        display: 'full viewport',
+        viewport: [960, 540],
+        start: [0, 0],
+        end: [960, 540],
+        source: [0, 0, 1920, 1080],
+      },
+      {
+        display: 'full viewport with floating-point rounding at the edges',
+        viewport: [337, 532],
+        start: [0, 0],
+        end: [337, 532],
+        source: [0, 0, 1920, 1080],
+      },
+      {
+        display: 'reverse drag',
+        viewport: [960, 540],
+        start: [150, 120],
+        end: [50, 40],
+        source: [100, 80, 200, 160],
+      },
+    ])(
+      'sends a lossless native-resolution crop for $display',
+      async ({ viewport, start, end, source }) => {
+        vi.stubGlobal('innerWidth', viewport[0]);
+        vi.stubGlobal('innerHeight', viewport[1]);
+
+        const { controller, cleanup } = createController(detachMock);
+
+        try {
+          controller.handlePointerDown({
+            currentTarget: mockTarget,
+            pointerId: 1,
+            clientX: start[0],
+            clientY: start[1],
+          } as unknown as PointerEvent);
+
+          await eventListeners['pointerup']({
+            clientX: end[0],
+            clientY: end[1],
+            pointerId: 1,
+          } as unknown as PointerEvent);
+
+          const [, , cropWidth, cropHeight] = source;
+
+          expect(drawImage).toHaveBeenCalledExactlyOnceWith(
+            expect.any(Image),
+            ...source,
+            0,
+            0,
+            cropWidth,
+            cropHeight,
+          );
+
+          const canvas = vi.mocked(HTMLCanvasElement.prototype.toDataURL).mock
+            .contexts[0] as HTMLCanvasElement;
+
+          expect(canvas.width).toBe(cropWidth);
+          expect(canvas.height).toBe(cropHeight);
+
+          expect(
+            HTMLCanvasElement.prototype.toDataURL,
+          ).toHaveBeenCalledExactlyOnceWith('image/png');
+
+          expect(sendMessageToRuntime).toHaveBeenCalledWith({
+            action: 'TRANSLATE_IMAGE',
+            payload: {
+              imageBase64: 'data:image/png;base64,CROPPED_RESULT',
+              requestId: expect.any(String),
+              documentSessionId: 'test-session',
+            },
+          });
+        } finally {
+          cleanup();
+        }
+      },
+    );
 
     test('zero-size selection (click) does NOT translate', async () => {
       const { controller, cleanup } = createController(detachMock);

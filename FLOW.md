@@ -5519,9 +5519,9 @@ The result modal has a minimum height of 240 pixels, capped at 85% of the window
 
 Automatic width uses `--modal-preferred-width`, starting from the preferred size until content can be measured. As text streams in, the width can shrink or grow within the current layout's limits. Browser resizing writes inline width and height, which take priority, so content updates and layout changes preserve the user's dimensions. If only an inline height is set, that height becomes the vertical budget for automatic width.
 
-Source: [translation-modal.css:84–102](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L84-L102).
+Source: [translation-modal.css:88–106](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L88-L106).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:84-102 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:88-106 -->
 
 ```css
 .modal-container {
@@ -5547,9 +5547,9 @@ Source: [translation-modal.css:84–102](src/adapters/primary/ui/injected/transl
 
 The grid keeps the header visible. Original and Translated stay in the same wrapper in every layout, so changing columns preserves their DOM elements, highlights and manually set heights. In the two-column description layout, the left column scrolls as a whole when needed, and Description scrolls separately. In three columns, each section scrolls separately. Section resize handles are hidden in the grid. Existing manual section heights apply again when the layout returns to a stack. Compact error and cancellation cards keep their own layout.
 
-Source: [translation-modal.css:217–265](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L217-L265).
+Source: [translation-modal.css:221–269](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L221-L269).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:217-265 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:221-269 -->
 
 ```css
 .translation-sections {
@@ -5673,9 +5673,9 @@ Source: [DescriptionSection.svelte:1–55](src/adapters/primary/ui/injected/tran
 
 The description keeps the modal's 13-pixel body text, line height, muted color, surface and borders. Headings and bold terms use the normal foreground color. Lists have visible markers and compact spacing; links keep their underline; code blocks and tables can scroll horizontally inside the panel. These styles live in the modal's shared CSS, so they also apply to hidden copies used to measure the layout.
 
-Source: [translation-modal.css:407–452](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L407-L452).
+Source: [translation-modal.css:419–464](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L419-L464).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:407-452 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:419-464 -->
 
 ```css
 .description-text {
@@ -5879,7 +5879,49 @@ Source: [TranslationModal.svelte:198–250](src/adapters/primary/ui/injected/tra
       {/if}
 ```
 
-`TextSection.svelte` renders text through Svelte interpolation and never uses `{@html}`. It places romanization below each block. Missing text gets a placeholder while work is in progress. Preview rows use keys that include the attempt revision; final rows use their indexes.
+`TextSection.svelte` renders text through Svelte interpolation and never uses `{@html}`. It places romanization below each block. Missing text gets a placeholder while work is in progress. Preview rows use keys that include the attempt revision; final rows use their indexes. Hovering a source segment, its translation or its romanization highlights the paired text. The source, translation and romanization share the same highlight colors. Light mode uses dark amber text (`#92400e`) on a pale amber background (`#fef3c7`); dark mode uses gold text (`#e6b450`) on a transparent background. The dedicated `--modal-highlight-fg` and `--modal-highlight-bg` variables keep this separate from button colors. Hover changes text and background colors without changing font size or spacing. Romanization remains 13 pixels, so long sentences keep the same wrapping and do not resize the modal on hover.
+
+Source: [translation-modal.css:345–359](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L345-L359).
+
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:345-359 -->
+
+```css
+.text-segment {
+  display: inline;
+  position: relative;
+  cursor: default;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    filter 0.15s ease;
+}
+
+.text-segment.seg-highlight,
+.rom-segment.rom-highlight {
+  color: var(--modal-highlight-fg) !important;
+  background-color: var(--modal-highlight-bg);
+}
+```
+
+Source: [translation-modal.css:386–398](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L386-L398).
+
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:386-398 -->
+
+```css
+.text-romanization {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--modal-muted);
+  margin-top: 4px;
+}
+
+.rom-segment {
+  cursor: default;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+```
 
 Source: [TextSection.svelte:49–112](src/adapters/primary/ui/injected/translation-result-modal/components/TextSection.svelte#L49-L112).
 
@@ -5952,7 +5994,7 @@ Source: [TextSection.svelte:49–112](src/adapters/primary/ui/injected/translati
 {/if}
 ```
 
-The section components disable the copy buttons. Before writing to the clipboard, the controller checks again that copying is allowed.
+Section labels stay on one line and use an ellipsis when the full language name does not fit. This prevents hover updates from wrapping narrow headers or resizing the modal. The copy button keeps its size, and the label's `title` contains the full language name. The section components disable copy while work is in progress. Before writing to the clipboard, the controller checks again that copying is allowed.
 
 Source: [ModalSection.svelte:28–45](src/adapters/primary/ui/injected/translation-result-modal/components/ModalSection.svelte#L28-L45).
 
@@ -5961,7 +6003,7 @@ Source: [ModalSection.svelte:28–45](src/adapters/primary/ui/injected/translati
 ```svelte
 <div class="section">
   <div class="section-header">
-    <span class="section-label">
+    <span class="section-label" title={labelTag}>
       {label}
       {#if labelTag !== undefined}
         <span class="section-label-tag">— {labelTag}</span>
@@ -5977,6 +6019,35 @@ Source: [ModalSection.svelte:28–45](src/adapters/primary/ui/injected/translati
   </div>
   {@render children()}
 </div>
+```
+
+Source: [translation-modal.css:287–308](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L287-L308).
+
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:287-308 -->
+
+```css
+.section-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--modal-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.section-header > .icon-btn {
+  flex-shrink: 0;
+}
+
+.section-label-tag {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.7;
+}
 ```
 
 Source: [TranslationModalController.svelte.ts:274–285](src/adapters/primary/ui/injected/translation-result-modal/TranslationModalController.svelte.ts#L274-L285).
@@ -6133,9 +6204,9 @@ Source: [ModalHeader.svelte:18–40](src/adapters/primary/ui/injected/translatio
 
 The dot animation shows one, two and then three dots in a repeating 1.2-second cycle. If the user prefers reduced motion, it shows three still dots.
 
-Source: [translation-modal.css:609–645](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L609-L645).
+Source: [translation-modal.css:621–657](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L621-L657).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:609-645 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:621-657 -->
 
 ```css
 .translation-status {
@@ -6179,9 +6250,9 @@ Source: [translation-modal.css:609–645](src/adapters/primary/ui/injected/trans
 
 The error styles override dimensions left by native resizing. This lets a previously large result modal shrink to a compact error card.
 
-Source: [translation-modal.css:104–125](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L104-L125).
+Source: [translation-modal.css:108–129](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L108-L129).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:104-125 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css:108-129 -->
 
 ```css
 .modal-container-compact {
@@ -7507,17 +7578,17 @@ Compilation enables runes in `.svelte.ts` controllers and state modules. A test 
 
 `@testing-library/svelte` mounts real components in jsdom. `flushSync()` applies rune updates before a synchronous assertion. Awaited handlers and `fireEvent` test interactions that finish asynchronously. [TranslationModal.test.ts](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts) checks that the same dialog and text-box nodes, including manually set heights, remain in place across preview updates:
 
-Source: [TranslationModal.test.ts:712–714](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts#L712-L714).
+Source: [TranslationModal.test.ts:715–717](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts#L715-L717).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts:712-714 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts:715-717 -->
 
 ```typescript
+
     expect(container.querySelector('[role="dialog"]')).toBe(dialog);
     expect(container.querySelector('.text-box')).toBe(textBox);
-    expect(textBox.style.height).toBe('145px');
 ```
 
-The test also checks that preview copy stays disabled until the final result is accepted. Other cases cover compact errors, the failure header, hidden source and translation sections on error, status beside the title, decorative dots hidden from screen readers, Escape, row identity, focus, resizing and cleared hover state after fallback.
+The test also checks that preview copy stays disabled until the final result is accepted. Other cases cover compact errors, the failure header, hidden source and translation sections on error, status beside the title, decorative dots hidden from screen readers, Escape, row identity, focus, resizing and cleared hover state after fallback. The mixed-language hover case also checks that the Original label's title shows the full source language when hovering its translation.
 
 [ModalLayoutController.test.ts](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.test.ts) checks short and overflowing results, measured automatic widths, unchanged readable limits, invalid and outdated width measurements, the two-column description arrangement, promotion to three columns only when Original and Translated overflow, descriptions arriving later, narrow windows and resets between attempts. It also checks that a long description alone keeps two columns, limited width keeps the two-column layout scrollable, and a return to two columns requires the measured text stack to fit with eight pixels to spare. Small resize steps and changing widths must not cause repeated visible layout changes. The modal component suite checks compact short results with and without a description, waiting for a new width to take effect before testing overflow, stable text-box elements, keeping dragged modals visible and removing observers and queued measurements on close.
 
@@ -7940,7 +8011,7 @@ Check these behaviors in the browser:
 3. A working fallback clears the previous attempt's preview and completes. The next translation skips the rejected configuration.
 4. Closing during streaming cancels the work, saves no partial history entry and does not reopen the modal when late events arrive.
 5. Valid final output is saved once and can be reopened from history. No-text and error results show compact feedback with one action to select again.
-6. Light and dark styles, resizing, focus, progress beside the title and animated dots work in Chrome and Firefox. Check description Markdown while streaming and from history: paragraphs, bold text and lists match the modal's typography, code and tables stay inside their panel, links stay underlined, and copying retains Markdown. Check long results with and without a description: Original above Translated beside Description when they fit vertically; three separate columns when that left column overflows; a long Description scrolling without forcing three columns; readable columns; stacked sections in narrow windows; and a visible header after the modal expands. Increase the height a little at a time: three columns should remain steady until the Original/Translated stack can fit in two. Check that the result cannot be resized below its minimum height, short results stay compact with or without a description, automatic width grows only when narrower content would exceed the height budget, shorter panels fill their row, and user-resized width and height survive content updates and layout changes.
+6. Light and dark styles, resizing, focus, progress beside the title and animated dots work in Chrome and Firefox. Check description Markdown while streaming and from history: paragraphs, bold text and lists match the modal's typography, code and tables stay inside their panel, links stay underlined, and copying retains Markdown. Check long results with and without a description: Original above Translated beside Description when they fit vertically; three separate columns when that left column overflows; a long Description scrolling without forcing three columns; readable columns; stacked sections in narrow windows; and a visible header after the modal expands. Increase the height a little at a time: three columns should remain steady until the Original/Translated stack can fit in two. Check that the result cannot be resized below its minimum height, short results stay compact with or without a description, automatic width grows only when narrower content would exceed the height budget, shorter panels fill their row, and user-resized width and height survive content updates and layout changes. Hover long romanization and mixed-language segments in both themes: the source, translation and romanization should share a readable highlight; font size and text wrapping should stay unchanged; narrow language headers should use an ellipsis while retaining the copy button; and hovering the label should expose the full language name.
 7. Reopening the popup, deleting the selected custom provider and rapidly deleting keys leave valid selections and correctly saved state.
 8. Restarting the background during a request ends the content session or recovers its final status. It must not leave an endless spinner or treat a draft as a final result.
 

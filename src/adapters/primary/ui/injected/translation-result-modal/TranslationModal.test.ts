@@ -580,7 +580,10 @@ describe('UI: live translation modal', () => {
       detachModal: vi.fn(),
     });
 
-    const { container, getByText } = render(TranslationModal, { controller });
+    const { container, getByText, getByTitle } = render(TranslationModal, {
+      controller,
+    });
+
     const sections = container.querySelectorAll('.section');
     const originalLabel = sections[0].querySelector('.section-label-tag');
     const translatedLabel = sections[1].querySelector('.section-label-tag');
@@ -594,6 +597,7 @@ describe('UI: live translation modal', () => {
 
     await fireEvent.pointerMove(getByText('Japanese translation'));
     expect(originalLabel?.textContent).toContain('Japanese (ja-JP)');
+    expect(getByTitle('Japanese (ja-JP)').textContent).toContain('Original');
     expect(translatedLabel?.textContent).toContain('English (en-US)');
     expect(container.querySelectorAll('.seg-highlight')).toHaveLength(2);
 

@@ -1,3 +1,9 @@
+## [3.1.0](https://github.com/apirJS/rosseta/compare/v3.0.0...v3.1.0) (2026-10-24)
+
+### Features
+
+* layout behavior opmizations ([#12](https://github.com/apirJS/rosseta/issues/12)) ([f045873](https://github.com/apirJS/rosseta/commit/f04587357f0bf353d0fee416edef70998734fbae))
+
 ## [3.0.0](https://github.com/apirJS/rosseta/compare/v2.2.1...v3.0.0) (2026-10-23)
 
 ### ⚠ BREAKING CHANGES

@@ -4749,8 +4749,8 @@ Each module has a specific job:
 | `TranslationSession`            | Orders events, sends acknowledgements and handles cancellation, deadlines and recovery.                                     |
 | `TranslationModalController`    | Stores translation content and its current phase; computes labels, grouping and copy availability; times the header status. |
 | `ModalDragController`           | Stores the modal position, keeps an expanded grid within the window and manages temporary pointer listeners.                |
-| `ModalLayoutController`         | Chooses a stack, two columns or three from measured overflow, available width and height, and the sections present.         |
-| `modal-layout-measurement.ts`   | Measures the proposed two-column text stack without changing the visible modal.                                             |
+| `ModalLayoutController`         | Chooses the layout and stores its measured automatic width, using the available space and sections present.                 |
+| `modal-layout-measurement.ts`   | Finds a compact automatic width and measures the proposed two-column text stack without changing the visible modal.         |
 | `TranslationCopyController`     | Writes to the clipboard, times feedback for each section and ignores copy results that belong to an older attempt.          |
 | `TranslationModal.svelte`       | Chooses the success or error display and connects its child components.                                                     |
 | Modal components and stylesheet | Display the header, failure message, text, romanization and copy buttons; handle local DOM events and appearance.           |
@@ -5009,9 +5009,9 @@ export class ModalDragController {
 
 [section-resize.ts](src/adapters/primary/ui/injected/translation-result-modal/components/section-resize.ts) handles DOM resizing for `ResizeHandle.svelte`. It keeps height within bounds, holds neighbouring sections in place during a drag and restores their layout afterward. Unmounting, pointer cancellation and loss of pointer capture also end resizing.
 
-### Long results switch to columns when there is room
+### Short results stay compact and long results use columns
 
-`TranslationModal.svelte` measures the body and the Original/Translated wrapper after content changes and uses `ResizeObserver` to notice size changes. It passes the measurements to [ModalLayoutController.svelte.ts](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.svelte.ts). The component owns the DOM observers and animation frames; the layout controller only chooses the layout and width.
+`TranslationModal.svelte` measures the body and the Original/Translated wrapper after content changes and uses `ResizeObserver` to notice size changes. It first finds a compact automatic width, then passes overflow measurements to [ModalLayoutController.svelte.ts](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.svelte.ts). The component owns the DOM observers and animation frames; the layout controller chooses the layout and stores the measured width. This works with or without a description.
 
 When the stacked body needs vertical scrolling, the controller first tries two columns. Without a description, Original and Translated sit beside each other. With a description, Original stays above Translated in the left column, and Description fills the right column:
 
@@ -5024,9 +5024,9 @@ Only the height of Original and Translated determines whether this arrangement n
 
 Every column needs at least 280 pixels within the modal's 90% window-width limit. Narrow windows keep the stacked layout. An overflowing result can switch to columns later if the window becomes wide enough. A three-column result switches back only after a hidden measurement confirms that Original and Translated fit at the proposed two-column width, with eight pixels to spare. While three columns still fit the window, small height or width changes do not visibly try a layout that still cannot fit. The controller remembers that the original stack overflowed, so changing to columns does not immediately switch it back. A new attempt, empty content, failure or cancellation resets that choice.
 
-Source: [ModalLayoutController.svelte.ts:1–111](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.svelte.ts#L1-L111).
+Source: [ModalLayoutController.svelte.ts:1–138](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.svelte.ts#L1-L138).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.svelte.ts:1-111 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.svelte.ts:1-138 -->
 
 ```typescript
 const MIN_COLUMN_WIDTH = 280;
@@ -5049,6 +5049,7 @@ export class ModalLayoutController {
   private textColumnOverflowed = $state(false);
   private hasDescription = $state(false);
   private viewportWidth = $state(0);
+  private automaticWidth = $state<{ mode: ModalLayoutMode; width: number }>();
   private revision = 0;
 
   public readonly descriptionSideWidth = columnsWidth(
@@ -5071,10 +5072,20 @@ export class ModalLayoutController {
     this.mode === 'stacked' ? 1 : this.mode === 'three-columns' ? 3 : 2,
   );
 
+  public readonly preferredWidth = $derived(
+    this.columns > 1 ? columnsWidth(this.columns, PREFERRED_COLUMN_WIDTH) : 520,
+  );
+
+  public readonly minimumWidth = $derived(
+    this.columns > 1 ? columnsWidth(this.columns, MIN_COLUMN_WIDTH) : 320,
+  );
+
   public readonly width = $derived(
-    this.columns > 1
-      ? `${columnsWidth(this.columns, PREFERRED_COLUMN_WIDTH)}px`
-      : undefined,
+    this.automaticWidth?.mode === this.mode
+      ? `${this.automaticWidth.width}px`
+      : this.columns > 1
+        ? `${this.preferredWidth}px`
+        : undefined,
   );
 
   public readonly minWidth = $derived(
@@ -5091,6 +5102,7 @@ export class ModalLayoutController {
   }): void {
     if (content.hasDescription !== this.hasDescription) {
       this.textColumnOverflowed = false;
+      this.automaticWidth = undefined;
     }
 
     this.hasDescription = content.hasDescription;
@@ -5102,9 +5114,24 @@ export class ModalLayoutController {
     ) {
       this.bodyOverflowed = false;
       this.textColumnOverflowed = false;
+      this.automaticWidth = undefined;
     }
 
     this.revision = content.revision;
+  }
+
+  public setAutomaticWidth(mode: ModalLayoutMode, width: number): boolean {
+    if (mode !== this.mode || !Number.isFinite(width) || width <= 0)
+      return false;
+    if (
+      this.automaticWidth?.mode === mode &&
+      this.automaticWidth.width === width
+    )
+      return false;
+
+    this.automaticWidth = { mode, width };
+
+    return true;
   }
 
   public measure(measurement: {
@@ -5142,23 +5169,30 @@ export class ModalLayoutController {
 }
 ```
 
-[modal-layout-measurement.ts](src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.ts) measures a hidden copy of the Original/Translated wrapper at the width it would have in two columns. The copy stays in the same Shadow DOM so it uses the real text styles. It is hidden from screen readers and cannot receive clicks or focus. A `finally` block always removes it, including when measurement throws. Missing or unusable sizes keep the current layout.
+[modal-layout-measurement.ts](src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.ts) makes hidden copies in the same Shadow DOM so measurements use the real text styles, romanization and rendered Markdown. The copies are hidden from screen readers and cannot receive clicks or focus. A `finally` block always removes each copy, including when measurement throws. Missing or unusable sizes keep the current dimensions.
+
+`measureCompactModalWidth` measures a copy of the whole modal with its height limits removed. This includes the header, footer, padding and borders, even when the visible body is scrolling. It searches between the readable minimum and preferred width, capped at 90% of the window width. The stack uses 320 to 520 pixels; grids use 280 to 400 pixels per column plus gaps and padding. It chooses the narrowest whole-pixel width that leaves eight pixels below the natural content within the 85% window-height limit. If content already requires scrolling at the preferred width, it removes only width that does not increase that natural height. A saved inline width skips automatic sizing.
+
+`measureDescriptionLayout` separately measures the Original/Translated wrapper at the width it would have in two columns, before allowing a three-column result to return to that arrangement.
 
 For automatic sizing, available height is the window's 85% height limit minus the header, footer, padding and borders. The current content height may be smaller than this limit, so using it would incorrectly keep short results in three columns. If the user has resized the modal, measurement instead uses the actual section height and the saved width after applying the two-column minimum and window maximum. It does not reuse a visible three-column width that the browser may have enlarged to meet the three-column minimum. The helper includes the gap between Original and Translated in their measured height.
 
-Source: [modal-layout-measurement.ts:1–124](src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.ts#L1-L124).
+Source: [modal-layout-measurement.ts:1–213](src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.ts#L1-L213).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.ts:1-124 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.ts:1-213 -->
 
 ```typescript
-interface DescriptionLayoutOptions {
+interface ModalMeasurementOptions {
   modal: HTMLElement;
   sections: HTMLElement;
-  textColumn: HTMLElement;
   viewportWidth: number;
   viewportHeight: number;
   preferredModalWidth: number;
   minimumModalWidth: number;
+}
+
+interface DescriptionLayoutOptions extends ModalMeasurementOptions {
+  textColumn: HTMLElement;
 }
 
 interface DescriptionLayoutMeasurement {
@@ -5173,6 +5207,92 @@ const UNAVAILABLE_MEASUREMENT: DescriptionLayoutMeasurement = {
 
 function positiveFinite(...values: number[]): boolean {
   return values.every((value) => Number.isFinite(value) && value > 0);
+}
+
+/** Finds the narrowest automatic width whose natural content fits vertically. */
+export function measureCompactModalWidth({
+  modal,
+  viewportWidth,
+  viewportHeight,
+  preferredModalWidth,
+  minimumModalWidth,
+}: ModalMeasurementOptions): number | undefined {
+  // Native resizing owns inline dimensions; automatic sizing only supplies CSS defaults.
+  if (modal.style.width) return undefined;
+
+  const modalRect = modal.getBoundingClientRect();
+
+  if (
+    !positiveFinite(
+      viewportWidth,
+      viewportHeight,
+      preferredModalWidth,
+      minimumModalWidth,
+      modalRect.width,
+      modalRect.height,
+    )
+  )
+    return undefined;
+
+  const availableHeight = modal.style.height
+    ? modalRect.height
+    : viewportHeight * 0.85;
+
+  let upper = Math.floor(Math.min(preferredModalWidth, viewportWidth * 0.9));
+  let lower = Math.min(Math.ceil(minimumModalWidth), upper);
+
+  if (!positiveFinite(availableHeight, lower, upper) || !modal.parentNode)
+    return undefined;
+
+  const probe = modal.cloneNode(true) as HTMLElement;
+
+  probe.setAttribute('aria-hidden', 'true');
+  probe.setAttribute('inert', '');
+
+  Object.assign(probe.style, {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    height: 'auto',
+    minHeight: '0',
+    maxHeight: 'none',
+    overflow: 'visible',
+    flex: 'none',
+    transform: 'none',
+    resize: 'none',
+  });
+
+  const naturalHeight = (width: number): number => {
+    probe.style.width = `${width}px`;
+
+    return probe.getBoundingClientRect().height;
+  };
+
+  try {
+    modal.parentNode.appendChild(probe);
+
+    const upperHeight = naturalHeight(upper);
+
+    if (!positiveFinite(upperHeight)) return undefined;
+
+    // If scrolling is unavoidable, remove width that does not reduce it.
+    const heightLimit = Math.max(availableHeight - 8, upperHeight);
+
+    while (lower < upper) {
+      const middle = Math.floor((lower + upper) / 2);
+      const middleHeight = naturalHeight(middle);
+
+      if (!positiveFinite(middleHeight)) return undefined;
+      if (middleHeight <= heightLimit) upper = middle;
+      else lower = middle + 1;
+    }
+
+    return upper;
+  } finally {
+    probe.remove();
+  }
 }
 
 /** Measures the two-column layout without changing the visible layout. */
@@ -5277,11 +5397,11 @@ export function measureDescriptionLayout({
 }
 ```
 
-These effects schedule one measurement per animation frame and remove observers and queued frames when they rerun or the modal closes. Each measurement identifies the layout it measured; the controller ignores measurements from a layout that has already changed. Before returning from three columns to two, it measures the proposed arrangement without changing the visible modal, so resizing does not repeatedly flip between layouts. After switching to columns or resizing the window, the component clears the old body scroll position and asks the drag controller to move the grid back within the visible window.
+These effects schedule one measurement per animation frame and remove observers and queued frames when they rerun or the modal closes. After updating the automatic width, they wait for the next frame before checking overflow, so old measurements do not force unnecessary columns. Each measurement identifies the layout it measured; the controller ignores measurements from a layout that has already changed. Before returning from three columns to two, it measures the proposed arrangement without changing the visible modal, so resizing does not repeatedly flip between layouts. After automatic sizing, switching to columns or resizing the window, the component clears the old body scroll position and asks the drag controller to keep the modal within the visible window.
 
-Source: [TranslationModal.svelte:31–117](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte#L31-L117).
+Source: [TranslationModal.svelte:34–142](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte#L34-L142).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte:31-117 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte:34-142 -->
 
 ```typescript
   $effect(() => {
@@ -5314,6 +5434,27 @@ Source: [TranslationModal.svelte:31–117](src/adapters/primary/ui/injected/tran
 
       frame = requestAnimationFrame(() => {
         frame = undefined;
+
+        const compactWidth = content.hasContent
+          ? measureCompactModalWidth({
+              modal,
+              sections,
+              viewportWidth: viewport.width,
+              viewportHeight: viewport.height,
+              preferredModalWidth: layout.preferredWidth,
+              minimumModalWidth: layout.minimumWidth,
+            })
+          : undefined;
+
+        if (
+          compactWidth !== undefined &&
+          layout.setAutomaticWidth(renderedMode, compactWidth)
+        ) {
+          // Wait for reflow before deciding whether this layout still overflows.
+          scheduleMeasure();
+
+          return;
+        }
 
         const descriptionLayout =
           renderedMode === 'three-columns'
@@ -5358,11 +5499,12 @@ Source: [TranslationModal.svelte:31–117](src/adapters/primary/ui/injected/tran
 
   $effect(() => {
     const mode = layout.mode;
+    const automaticallySized = layout.width !== undefined;
     const modal = modalEl;
     const body = bodyEl;
     const viewport = { width: viewportWidth, height: viewportHeight };
 
-    if (!modal || !body || mode === 'stacked') return;
+    if (!modal || !body || (mode === 'stacked' && !automaticallySized)) return;
     body.scrollTop = 0;
 
     const frame = requestAnimationFrame(() => {
@@ -5375,7 +5517,7 @@ Source: [TranslationModal.svelte:31–117](src/adapters/primary/ui/injected/tran
 
 The result modal has a minimum height of 240 pixels, capped at 85% of the window height on small windows. Above that minimum, automatic height follows the tallest column up to the same limit. In the description layout, the required height is the larger of the Original/Translated stack (including its gap) and Description. Shorter panels stretch to fill the same row, including after a manual section resize. Compact error and cancellation cards keep no minimum height.
 
-Automatic width uses `--modal-preferred-width`. Browser resizing writes inline width and height, which take priority, so content updates and layout changes preserve the user's dimensions.
+Automatic width uses `--modal-preferred-width`, starting from the preferred size until content can be measured. As text streams in, the width can shrink or grow within the current layout's limits. Browser resizing writes inline width and height, which take priority, so content updates and layout changes preserve the user's dimensions. If only an inline height is set, that height becomes the vertical budget for automatic width.
 
 Source: [translation-modal.css:84–102](src/adapters/primary/ui/injected/translation-result-modal/translation-modal.css#L84-L102).
 
@@ -5620,9 +5762,9 @@ Source: [TranslationModalController.svelte.ts:237–257](src/adapters/primary/ui
 
 The template handles Escape and uses `Translation failed` as the failure header. [TranslationFailure.svelte](src/adapters/primary/ui/injected/translation-result-modal/components/TranslationFailure.svelte) shows the specific error title and description in the body and focuses **Select area again**. Other branches show the source, translation and description. If translation succeeds but saving history fails, the modal shows a history warning.
 
-Source: [TranslationModal.svelte:125–172](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte#L125-L172).
+Source: [TranslationModal.svelte:150–197](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte#L150-L197).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte:125-172 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte:150-197 -->
 
 ```svelte
 <div
@@ -5677,9 +5819,9 @@ Source: [TranslationModal.svelte:125–172](src/adapters/primary/ui/injected/tra
 
 The source and translated sections receive the grouped blocks and copy callbacks. They also receive `pending` for empty or waiting states. Copy remains disabled until completion.
 
-Source: [TranslationModal.svelte:173–225](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte#L173-L225).
+Source: [TranslationModal.svelte:198–250](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte#L198-L250).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte:173-225 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.svelte:198-250 -->
 
 ```svelte
         <div class="translation-sections" bind:this={sectionsEl}>
@@ -7365,9 +7507,9 @@ Compilation enables runes in `.svelte.ts` controllers and state modules. A test 
 
 `@testing-library/svelte` mounts real components in jsdom. `flushSync()` applies rune updates before a synchronous assertion. Awaited handlers and `fireEvent` test interactions that finish asynchronously. [TranslationModal.test.ts](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts) checks that the same dialog and text-box nodes, including manually set heights, remain in place across preview updates:
 
-Source: [TranslationModal.test.ts:662–664](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts#L662-L664).
+Source: [TranslationModal.test.ts:712–714](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts#L712-L714).
 
-<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts:662-664 -->
+<!-- source: src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts:712-714 -->
 
 ```typescript
     expect(container.querySelector('[role="dialog"]')).toBe(dialog);
@@ -7377,9 +7519,11 @@ Source: [TranslationModal.test.ts:662–664](src/adapters/primary/ui/injected/tr
 
 The test also checks that preview copy stays disabled until the final result is accepted. Other cases cover compact errors, the failure header, hidden source and translation sections on error, status beside the title, decorative dots hidden from screen readers, Escape, row identity, focus, resizing and cleared hover state after fallback.
 
-[ModalLayoutController.test.ts](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.test.ts) checks short and overflowing results, the two-column description arrangement, promotion to three columns only when Original and Translated overflow, descriptions arriving later, narrow windows and resets between attempts. It also checks that a long description alone keeps two columns, limited width keeps the two-column layout scrollable, and a return to two columns requires the measured text stack to fit with eight pixels to spare. Small resize steps and changing widths must not cause repeated visible layout changes. The modal component suite checks these measurements, stable text-box elements, keeping dragged grids visible and removing observers and queued measurements on close.
+[ModalLayoutController.test.ts](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.test.ts) checks short and overflowing results, measured automatic widths, unchanged readable limits, invalid and outdated width measurements, the two-column description arrangement, promotion to three columns only when Original and Translated overflow, descriptions arriving later, narrow windows and resets between attempts. It also checks that a long description alone keeps two columns, limited width keeps the two-column layout scrollable, and a return to two columns requires the measured text stack to fit with eight pixels to spare. Small resize steps and changing widths must not cause repeated visible layout changes. The modal component suite checks compact short results with and without a description, waiting for a new width to take effect before testing overflow, stable text-box elements, keeping dragged modals visible and removing observers and queued measurements on close.
 
 [modal-layout-measurement.test.ts](src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.test.ts) checks the proposed two-column width, window limits, saved manual dimensions under two-column limits, automatic height limits and the real Shadow DOM styles. It verifies that measuring leaves the visible content unchanged and always removes the hidden copy, even when reading its size fails.
+
+[modal-width-measurement.test.ts](src/adapters/primary/ui/injected/translation-result-modal/modal-width-measurement.test.ts) checks compact widths for stacks and grids with and without a description, the eight-pixel height margin, and shrinking only when unavoidable scrolling does not increase. It also covers narrow windows, native resizing, invalid sizes, detached elements, romanization and rendered Markdown, and removal of the full-modal copy after success or failure.
 
 [DescriptionSection.test.ts](src/adapters/primary/ui/injected/translation-result-modal/components/DescriptionSection.test.ts) mounts the real Markdown renderer. It checks headings, emphasis, lists, code and tables; old plain text; inactive raw HTML; allowed and rejected link destinations; image alternative text without image elements; and unfinished Markdown replaced by later snapshots. The same description box and its manually set height survive updates and resets. Modal and controller tests also check that final copying retains the Markdown source.
 
@@ -7723,7 +7867,7 @@ Start with the test beside the code you are changing, then check tests for the p
 - **Home configuration and a deleted custom provider:** [HomeController.svelte.test.ts](src/adapters/primary/ui/extension/pages/home/HomeController.svelte.test.ts), [PopupNavigationController.test.ts](src/adapters/primary/ui/extension/PopupNavigationController.test.ts), [model-selection.test.ts](src/core/domain/preferences/model-selection.test.ts), [CustomProvidersController.test.ts](src/adapters/primary/ui/extension/pages/custom-providers/CustomProvidersController.test.ts)
 - **Popup navigation, menu and provider selection across screens:** [PopupNavigationController.test.ts](src/adapters/primary/ui/extension/PopupNavigationController.test.ts)
 - **Key dropdown and manual or auto-balance selection:** [KeySelectionController.test.ts](src/adapters/primary/ui/extension/pages/home/KeySelectionController.test.ts)
-- **Adaptive modal columns:** [ModalLayoutController.test.ts](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.test.ts), [modal-layout-measurement.test.ts](src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.test.ts), [TranslationModal.test.ts](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts)
+- **Compact modal sizing and adaptive columns:** [ModalLayoutController.test.ts](src/adapters/primary/ui/injected/translation-result-modal/ModalLayoutController.test.ts), [modal-width-measurement.test.ts](src/adapters/primary/ui/injected/translation-result-modal/modal-width-measurement.test.ts), [modal-layout-measurement.test.ts](src/adapters/primary/ui/injected/translation-result-modal/modal-layout-measurement.test.ts), [TranslationModal.test.ts](src/adapters/primary/ui/injected/translation-result-modal/TranslationModal.test.ts)
 - **Modal movement, copy feedback and section resize cleanup:** [ModalDragController.test.ts](src/adapters/primary/ui/injected/translation-result-modal/ModalDragController.test.ts), [TranslationCopyController.test.ts](src/adapters/primary/ui/injected/translation-result-modal/TranslationCopyController.test.ts), [section-resize.test.ts](src/adapters/primary/ui/injected/translation-result-modal/components/section-resize.test.ts)
 - **Rapid key deletion and Undo for the latest deletion:** [ManageKeysController.test.ts](src/adapters/primary/ui/extension/pages/manage-keys/ManageKeysController.test.ts)
 - **Browser shortcut link and command display:** [TranslateButton.test.ts](src/adapters/primary/ui/extension/pages/home/components/TranslateButton.test.ts), [shortcut-settings.test.ts](src/adapters/primary/ui/extension/browser/shortcut-settings.test.ts), [GetShortcutUseCase.test.ts](src/core/application/shortcuts/GetShortcutUseCase.test.ts)
@@ -7796,7 +7940,7 @@ Check these behaviors in the browser:
 3. A working fallback clears the previous attempt's preview and completes. The next translation skips the rejected configuration.
 4. Closing during streaming cancels the work, saves no partial history entry and does not reopen the modal when late events arrive.
 5. Valid final output is saved once and can be reopened from history. No-text and error results show compact feedback with one action to select again.
-6. Light and dark styles, resizing, focus, progress beside the title and animated dots work in Chrome and Firefox. Check description Markdown while streaming and from history: paragraphs, bold text and lists match the modal's typography, code and tables stay inside their panel, links stay underlined, and copying retains Markdown. Check long results with and without a description: Original above Translated beside Description when they fit vertically; three separate columns when that left column overflows; a long Description scrolling without forcing three columns; readable columns; stacked sections in narrow windows; and a visible header after the modal expands. Increase the height a little at a time: three columns should remain steady until the Original/Translated stack can fit in two. Check that the result cannot be resized below its minimum height, short results stay compact, shorter panels fill their row, and user-resized width and height survive content updates and layout changes.
+6. Light and dark styles, resizing, focus, progress beside the title and animated dots work in Chrome and Firefox. Check description Markdown while streaming and from history: paragraphs, bold text and lists match the modal's typography, code and tables stay inside their panel, links stay underlined, and copying retains Markdown. Check long results with and without a description: Original above Translated beside Description when they fit vertically; three separate columns when that left column overflows; a long Description scrolling without forcing three columns; readable columns; stacked sections in narrow windows; and a visible header after the modal expands. Increase the height a little at a time: three columns should remain steady until the Original/Translated stack can fit in two. Check that the result cannot be resized below its minimum height, short results stay compact with or without a description, automatic width grows only when narrower content would exceed the height budget, shorter panels fill their row, and user-resized width and height survive content updates and layout changes.
 7. Reopening the popup, deleting the selected custom provider and rapidly deleting keys leave valid selections and correctly saved state.
 8. Restarting the background during a request ends the content session or recovers its final status. It must not leave an endless spinner or treat a draft as a final result.
 

@@ -18,6 +18,7 @@ export class ModalLayoutController {
   private textColumnOverflowed = $state(false);
   private hasDescription = $state(false);
   private viewportWidth = $state(0);
+  private automaticWidth = $state<{ mode: ModalLayoutMode; width: number }>();
   private revision = 0;
 
   public readonly descriptionSideWidth = columnsWidth(
@@ -40,10 +41,20 @@ export class ModalLayoutController {
     this.mode === 'stacked' ? 1 : this.mode === 'three-columns' ? 3 : 2,
   );
 
+  public readonly preferredWidth = $derived(
+    this.columns > 1 ? columnsWidth(this.columns, PREFERRED_COLUMN_WIDTH) : 520,
+  );
+
+  public readonly minimumWidth = $derived(
+    this.columns > 1 ? columnsWidth(this.columns, MIN_COLUMN_WIDTH) : 320,
+  );
+
   public readonly width = $derived(
-    this.columns > 1
-      ? `${columnsWidth(this.columns, PREFERRED_COLUMN_WIDTH)}px`
-      : undefined,
+    this.automaticWidth?.mode === this.mode
+      ? `${this.automaticWidth.width}px`
+      : this.columns > 1
+        ? `${this.preferredWidth}px`
+        : undefined,
   );
 
   public readonly minWidth = $derived(
@@ -60,6 +71,7 @@ export class ModalLayoutController {
   }): void {
     if (content.hasDescription !== this.hasDescription) {
       this.textColumnOverflowed = false;
+      this.automaticWidth = undefined;
     }
 
     this.hasDescription = content.hasDescription;
@@ -71,9 +83,24 @@ export class ModalLayoutController {
     ) {
       this.bodyOverflowed = false;
       this.textColumnOverflowed = false;
+      this.automaticWidth = undefined;
     }
 
     this.revision = content.revision;
+  }
+
+  public setAutomaticWidth(mode: ModalLayoutMode, width: number): boolean {
+    if (mode !== this.mode || !Number.isFinite(width) || width <= 0)
+      return false;
+    if (
+      this.automaticWidth?.mode === mode &&
+      this.automaticWidth.width === width
+    )
+      return false;
+
+    this.automaticWidth = { mode, width };
+
+    return true;
   }
 
   public measure(measurement: {

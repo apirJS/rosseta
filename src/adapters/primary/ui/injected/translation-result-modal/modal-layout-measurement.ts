@@ -1,11 +1,14 @@
-interface DescriptionLayoutOptions {
+interface ModalMeasurementOptions {
   modal: HTMLElement;
   sections: HTMLElement;
-  textColumn: HTMLElement;
   viewportWidth: number;
   viewportHeight: number;
   preferredModalWidth: number;
   minimumModalWidth: number;
+}
+
+interface DescriptionLayoutOptions extends ModalMeasurementOptions {
+  textColumn: HTMLElement;
 }
 
 interface DescriptionLayoutMeasurement {
@@ -20,6 +23,92 @@ const UNAVAILABLE_MEASUREMENT: DescriptionLayoutMeasurement = {
 
 function positiveFinite(...values: number[]): boolean {
   return values.every((value) => Number.isFinite(value) && value > 0);
+}
+
+/** Finds the narrowest automatic width whose natural content fits vertically. */
+export function measureCompactModalWidth({
+  modal,
+  viewportWidth,
+  viewportHeight,
+  preferredModalWidth,
+  minimumModalWidth,
+}: ModalMeasurementOptions): number | undefined {
+  // Native resizing owns inline dimensions; automatic sizing only supplies CSS defaults.
+  if (modal.style.width) return undefined;
+
+  const modalRect = modal.getBoundingClientRect();
+
+  if (
+    !positiveFinite(
+      viewportWidth,
+      viewportHeight,
+      preferredModalWidth,
+      minimumModalWidth,
+      modalRect.width,
+      modalRect.height,
+    )
+  )
+    return undefined;
+
+  const availableHeight = modal.style.height
+    ? modalRect.height
+    : viewportHeight * 0.85;
+
+  let upper = Math.floor(Math.min(preferredModalWidth, viewportWidth * 0.9));
+  let lower = Math.min(Math.ceil(minimumModalWidth), upper);
+
+  if (!positiveFinite(availableHeight, lower, upper) || !modal.parentNode)
+    return undefined;
+
+  const probe = modal.cloneNode(true) as HTMLElement;
+
+  probe.setAttribute('aria-hidden', 'true');
+  probe.setAttribute('inert', '');
+
+  Object.assign(probe.style, {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    height: 'auto',
+    minHeight: '0',
+    maxHeight: 'none',
+    overflow: 'visible',
+    flex: 'none',
+    transform: 'none',
+    resize: 'none',
+  });
+
+  const naturalHeight = (width: number): number => {
+    probe.style.width = `${width}px`;
+
+    return probe.getBoundingClientRect().height;
+  };
+
+  try {
+    modal.parentNode.appendChild(probe);
+
+    const upperHeight = naturalHeight(upper);
+
+    if (!positiveFinite(upperHeight)) return undefined;
+
+    // If scrolling is unavoidable, remove width that does not reduce it.
+    const heightLimit = Math.max(availableHeight - 8, upperHeight);
+
+    while (lower < upper) {
+      const middle = Math.floor((lower + upper) / 2);
+      const middleHeight = naturalHeight(middle);
+
+      if (!positiveFinite(middleHeight)) return undefined;
+      if (middleHeight <= heightLimit) upper = middle;
+      else lower = middle + 1;
+    }
+
+    return upper;
+  } finally {
+    probe.remove();
+  }
 }
 
 /** Measures the two-column layout without changing the visible layout. */

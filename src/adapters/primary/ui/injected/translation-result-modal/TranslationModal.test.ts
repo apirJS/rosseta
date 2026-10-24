@@ -3,9 +3,13 @@ import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import TranslationModal from './TranslationModal.svelte';
 import { TranslationModalController } from './TranslationModalController.svelte';
-import { measureDescriptionLayout } from './modal-layout-measurement';
+import {
+  measureCompactModalWidth,
+  measureDescriptionLayout,
+} from './modal-layout-measurement';
 
 vi.mock('./modal-layout-measurement', () => ({
+  measureCompactModalWidth: vi.fn(),
   measureDescriptionLayout: vi.fn(),
 }));
 
@@ -15,6 +19,7 @@ let nextFrame = 0;
 
 beforeEach(() => {
   vi.stubGlobal('innerWidth', 1440);
+  vi.mocked(measureCompactModalWidth).mockReturnValue(undefined);
 
   vi.mocked(measureDescriptionLayout).mockImplementation(
     ({ sections, textColumn }) => ({
@@ -132,6 +137,51 @@ function mountOverflowingResult(description = '') {
 }
 
 describe('UI: adaptive translation layout', () => {
+  test.each(['', 'Useful context'])(
+    'compacts a short result with description %j',
+    (description) => {
+      const { controller, dialog, setContentHeight } =
+        mountOverflowingResult(description);
+
+      setContentHeight(400);
+      vi.mocked(measureCompactModalWidth).mockReturnValue(320);
+      flushLayout();
+
+      expect(dialog.style.getPropertyValue('--modal-preferred-width')).toBe(
+        '320px',
+      );
+
+      expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
+
+      // Streaming or wrapping can require more room without changing modes.
+      vi.mocked(measureCompactModalWidth).mockReturnValue(410);
+      resizeCallbacks.forEach((callback) => callback());
+      flushLayout();
+
+      expect(dialog.style.getPropertyValue('--modal-preferred-width')).toBe(
+        '410px',
+      );
+
+      expect(dialog.style.width).toBe('');
+      expect(dialog.style.height).toBe('');
+      controller.dispose();
+    },
+  );
+
+  test('waits for the fitted width to reflow before deciding to add columns', () => {
+    const { controller, dialog, setContentHeight } =
+      mountOverflowingResult('Useful context');
+
+    vi.mocked(measureCompactModalWidth).mockReturnValue(500);
+    flushLayoutFrame();
+    expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
+
+    setContentHeight(400);
+    flushLayout();
+    expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
+    controller.dispose();
+  });
+
   test.each([
     { description: '', columns: 2 },
     { description: 'Useful context', columns: 2 },

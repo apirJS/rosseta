@@ -683,17 +683,16 @@ Source: [OverlayService.ts:17–50](src/adapters/primary/background/capture/Over
 
 [injectContentScriptIfNeeded](src/adapters/primary/background/capture/service-worker.utils.ts) reuses the content script if it answers `PING`. A failed ping causes the background to inject the built content-script entry. The manifest also injects it at document start. If injection fails, the helper returns `false`; later browser operations can still fail on restricted pages. A missing ping is not a provider error.
 
-The screenshot is taken before the selection overlay is mounted, so the rectangle is not included in the image. `captureVisibleTab` returns the visible part of the page as a JPEG data URL at quality 85:
+The screenshot is taken before the selection overlay is mounted, so the rectangle is not included in the image. `captureVisibleTab` returns the visible part of the page as a lossless PNG data URL at the browser's captured resolution:
 
-Source: [service-worker.utils.ts:46–51](src/adapters/primary/background/capture/service-worker.utils.ts#L46-L51).
+Source: [service-worker.utils.ts:46–50](src/adapters/primary/background/capture/service-worker.utils.ts#L46-L50).
 
-<!-- source: src/adapters/primary/background/capture/service-worker.utils.ts:46-51 -->
+<!-- source: src/adapters/primary/background/capture/service-worker.utils.ts:46-50 -->
 
 ```typescript
 export async function captureVisibleTab(): Promise<string> {
   return await browser.tabs.captureVisibleTab(undefined, {
-    format: 'jpeg',
-    quality: 85,
+    format: 'png',
   });
 }
 ```
@@ -751,38 +750,45 @@ Source: [OverlayController.svelte.ts:131–143](src/adapters/primary/ui/injected
       }
 ```
 
-Cropping converts each axis separately from CSS pixels in the visible page to pixels in the image's original size. For example, 100 CSS pixels can correspond to 200 image pixels on a high-density display. The canvas crops that scaled area and produces a JPEG data URL at quality 0.8:
+Cropping converts each axis separately from CSS pixels in the visible page to pixels in the image's original size. For example, 100 CSS pixels can correspond to 200 image pixels on a high-density display. The crop includes whole source pixels, rounding its outer edges outward when display scaling is fractional. The canvas copies those pixels at their original size and produces a lossless PNG data URL, without resizing or reducing quality:
 
-Source: [OverlayController.svelte.ts:203–224](src/adapters/primary/ui/injected/screen-overlay/OverlayController.svelte.ts#L203-L224).
+Source: [OverlayController.svelte.ts:203–231](src/adapters/primary/ui/injected/screen-overlay/OverlayController.svelte.ts#L203-L231).
 
-<!-- source: src/adapters/primary/ui/injected/screen-overlay/OverlayController.svelte.ts:203-224 -->
+<!-- source: src/adapters/primary/ui/injected/screen-overlay/OverlayController.svelte.ts:203-231 -->
 
 ```typescript
         const scaleX = img.naturalWidth / window.innerWidth;
         const scaleY = img.naturalHeight / window.innerHeight;
 
-        const cropW = Math.round(width * scaleX);
-        const cropH = Math.round(height * scaleY);
+        // Copy whole source pixels without resampling at fractional display scales.
+        const cropX = Math.floor(x * scaleX);
+        const cropY = Math.floor(y * scaleY);
+
+        const cropW =
+          Math.min(img.naturalWidth, Math.ceil((x + width) * scaleX)) - cropX;
+
+        const cropH =
+          Math.min(img.naturalHeight, Math.ceil((y + height) * scaleY)) - cropY;
 
         canvas.width = cropW;
         canvas.height = cropH;
 
         ctx.drawImage(
           img,
-          x * scaleX,
-          y * scaleY,
-          width * scaleX,
-          height * scaleY,
+          cropX,
+          cropY,
+          cropW,
+          cropH,
           0,
           0,
           canvas.width,
           canvas.height,
         );
 
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/png'));
 ```
 
-Cropping reads the current `window.innerWidth` and `innerHeight`; it does not save both viewport dimensions from before a resize. Keep the relationship between display coordinates and image coordinates intact when changing rendering or resize behavior. The cropped value includes `data:image/jpeg;base64,`, although later code calls it `imageBase64`. Each transport converts it as needed.
+Cropping reads the current `window.innerWidth` and `innerHeight`; it does not save both viewport dimensions from before a resize. Keep the relationship between display coordinates and image coordinates intact when changing rendering or resize behavior. The cropped value includes `data:image/png;base64,`, although later code calls it `imageBase64`. Each transport wraps the original image data in its provider's request format without resizing or re-encoding it. Providers may apply their own image processing after receiving the request.
 
 After a successful crop, the controller removes the overlay, creates a request UUID and calls the callback. A crop failure is logged without sending a request. Escape also removes the overlay without sending:
 

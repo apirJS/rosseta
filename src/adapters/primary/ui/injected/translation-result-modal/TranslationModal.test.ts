@@ -152,8 +152,6 @@ describe('UI: adaptive translation layout', () => {
       );
 
       expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
-
-      // Streaming or wrapping can require more room without changing modes.
       vi.mocked(measureCompactModalWidth).mockReturnValue(410);
       resizeCallbacks.forEach((callback) => callback());
       flushLayout();
@@ -213,13 +211,10 @@ describe('UI: adaptive translation layout', () => {
         ...container.querySelectorAll('.text-box, .description-box'),
       ]).toEqual(boxes);
 
-      // A successful reflow must not immediately switch back to the stacked layout.
       setContentHeight(400);
       resizeCallbacks.forEach((callback) => callback());
       flushLayout();
       expect(dialog.classList.contains('modal-container-columns')).toBe(true);
-
-      // Native resizing should survive ordinary streaming/content updates.
       dialog.style.width = '950px';
       flushSync(() => controller.started({ code: 'en-US', name: 'English' }));
       resizeCallbacks.forEach((callback) => callback());
@@ -304,7 +299,6 @@ describe('UI: adaptive translation layout', () => {
       snapshot(null);
     });
 
-    // No resize event: the content update itself must schedule a measurement.
     flushLayout();
     expect(dialog.style.getPropertyValue('--translation-columns')).toBe('2');
 

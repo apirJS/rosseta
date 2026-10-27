@@ -1,5 +1,5 @@
 <script lang="ts">
-  type CopyState = 'idle' | 'copied';
+  import type { CopyState } from '../TranslationCopyController.svelte';
 
   interface Props {
     state: CopyState;
@@ -19,6 +19,7 @@
 </script>
 
 <button
+  type="button"
   class="icon-btn"
   class:icon-btn-sm={small}
   class:copy-feedback={state === 'copied'}

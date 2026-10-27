@@ -2,8 +2,6 @@ import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { TranslationModalController } from './TranslationModalController.svelte';
 import type { SegmentPayload } from './translation-modal-segments';
 
-// ── Helpers ──────────────────────────────────────────────────────
-
 function makeSegments(
   items: {
     code: string;
@@ -48,8 +46,6 @@ function createController(overrides?: {
   });
 }
 
-// ── Tests ────────────────────────────────────────────────────────
-
 describe('UI Controller: TranslationModalController', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -59,8 +55,6 @@ describe('UI Controller: TranslationModalController', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
-
-  // ── Initial state ──────────────────────────────────────────
 
   test('initial position is (0, 0)', () => {
     const ctrl = createController();
@@ -105,8 +99,6 @@ describe('UI Controller: TranslationModalController', () => {
     ctrl.dispose();
   });
 
-  // ── Derived text ───────────────────────────────────────────
-
   test('originalText joins all original segment texts', () => {
     const ctrl = createController({
       original: makeSegments([
@@ -115,7 +107,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.originalText).toBe('こんにちは 世界');
+    expect(ctrl.segments.originalText).toBe('こんにちは 世界');
   });
 
   test('translatedText joins all translated segment texts', () => {
@@ -126,10 +118,8 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.translatedText).toBe('Hello World');
+    expect(ctrl.segments.translatedText).toBe('Hello World');
   });
-
-  // ── Block grouping ─────────────────────────────────────────
 
   test('originalText joins segments in the same block with a space', () => {
     const ctrl = createController({
@@ -139,7 +129,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.originalText).toBe('OK ボタン');
+    expect(ctrl.segments.originalText).toBe('OK ボタン');
   });
 
   test('originalText separates distinct blocks with a newline', () => {
@@ -150,7 +140,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.originalText).toBe('こんにちは\n世界');
+    expect(ctrl.segments.originalText).toBe('こんにちは\n世界');
   });
 
   test('originalBlocks groups consecutive segments sharing a blockIndex', () => {
@@ -162,11 +152,20 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.originalBlocks).toHaveLength(2);
-    expect(ctrl.originalBlocks[0].map((s) => s.text)).toEqual(['OK', 'ボタン']);
-    expect(ctrl.originalBlocks[0].map((s) => s.index)).toEqual([0, 1]);
-    expect(ctrl.originalBlocks[1].map((s) => s.text)).toEqual(['3.50']);
-    expect(ctrl.originalBlocks[1][0].index).toBe(2);
+    expect(ctrl.segments.originalBlocks).toHaveLength(2);
+
+    expect(ctrl.segments.originalBlocks[0].map((s) => s.text)).toEqual([
+      'OK',
+      'ボタン',
+    ]);
+
+    expect(ctrl.segments.originalBlocks[0].map((s) => s.index)).toEqual([0, 1]);
+
+    expect(ctrl.segments.originalBlocks[1].map((s) => s.text)).toEqual([
+      '3.50',
+    ]);
+
+    expect(ctrl.segments.originalBlocks[1][0].index).toBe(2);
   });
 
   test('translatedBlocks groups translated segments', () => {
@@ -177,11 +176,9 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.translatedBlocks).toHaveLength(2);
-    expect(ctrl.translatedText).toBe('Hello\nWorld');
+    expect(ctrl.segments.translatedBlocks).toHaveLength(2);
+    expect(ctrl.segments.translatedText).toBe('Hello\nWorld');
   });
-
-  // ── Romanization detection ─────────────────────────────────
 
   test('originalHasRomanization is true when any segment has romanization', () => {
     const ctrl = createController({
@@ -196,7 +193,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.originalHasRomanization).toBe(true);
+    expect(ctrl.segments.originalHasRomanization).toBe(true);
   });
 
   test('originalHasRomanization is false when no segment has romanization', () => {
@@ -206,7 +203,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.originalHasRomanization).toBe(false);
+    expect(ctrl.segments.originalHasRomanization).toBe(false);
   });
 
   test('translatedHasRomanization reflects translated segments', () => {
@@ -221,10 +218,8 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.translatedHasRomanization).toBe(true);
+    expect(ctrl.segments.translatedHasRomanization).toBe(true);
   });
-
-  // ── Language detection labels ──────────────────────────────
 
   test('detectedLanguageLabel shows single language with code', () => {
     const ctrl = createController({
@@ -233,7 +228,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.detectedLanguageLabel).toBe('Japanese (ja-JP)');
+    expect(ctrl.segments.detectedLanguageLabel).toBe('Japanese (ja-JP)');
   });
 
   test('detectedLanguageLabel shows "Mixed" for multi-language', () => {
@@ -244,7 +239,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.detectedLanguageLabel).toBe('Mixed');
+    expect(ctrl.segments.detectedLanguageLabel).toBe('Mixed');
   });
 
   test('detectedLanguageLabel ignores non-language codes (number, symbol)', () => {
@@ -255,7 +250,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.detectedLanguageLabel).toBe('Japanese (ja-JP)');
+    expect(ctrl.segments.detectedLanguageLabel).toBe('Japanese (ja-JP)');
   });
 
   test('isMultiLang is true when multiple real languages detected', () => {
@@ -266,7 +261,7 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.isMultiLang).toBe(true);
+    expect(ctrl.segments.isMultiLang).toBe(true);
   });
 
   test('hover uses the paired source index for the label and resets to Mixed on leave', () => {
@@ -293,18 +288,18 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.displayedLangLabel).toBe('Mixed');
-    ctrl.hoverSegment(10);
-    expect(ctrl.displayedLangLabel).toBe('Japanese (ja-JP)');
-    expect(ctrl.highlightedSegmentIndex).toBe(10);
-    ctrl.hoverSegment(20);
-    expect(ctrl.displayedLangLabel).toBe('Korean (ko-KR)');
-    expect(ctrl.targetLanguageLabel).toBe('English (en-US)');
-    ctrl.hoverSegment(99);
-    expect(ctrl.displayedLangLabel).toBe('Mixed');
-    ctrl.hoverSegment(null);
-    expect(ctrl.displayedLangLabel).toBe('Mixed');
-    expect(ctrl.highlightedSegmentIndex).toBeNull();
+    expect(ctrl.segments.displayedLangLabel).toBe('Mixed');
+    ctrl.segments.hoverSegment(10);
+    expect(ctrl.segments.displayedLangLabel).toBe('Japanese (ja-JP)');
+    expect(ctrl.segments.highlightedSegmentIndex).toBe(10);
+    ctrl.segments.hoverSegment(20);
+    expect(ctrl.segments.displayedLangLabel).toBe('Korean (ko-KR)');
+    expect(ctrl.segments.targetLanguageLabel).toBe('English (en-US)');
+    ctrl.segments.hoverSegment(99);
+    expect(ctrl.segments.displayedLangLabel).toBe('Mixed');
+    ctrl.segments.hoverSegment(null);
+    expect(ctrl.segments.displayedLangLabel).toBe('Mixed');
+    expect(ctrl.segments.highlightedSegmentIndex).toBeNull();
     ctrl.dispose();
   });
 
@@ -319,11 +314,11 @@ describe('UI Controller: TranslationModalController', () => {
         ]),
       });
 
-      ctrl.hoverSegment(0);
-      expect(ctrl.displayedLangLabel).toBe('Japanese (ja-JP)');
-      ctrl.hoverSegment(2);
-      expect(ctrl.displayedLangLabel).toBe('Mixed');
-      expect(ctrl.highlightedSegmentIndex).toBe(2);
+      ctrl.segments.hoverSegment(0);
+      expect(ctrl.segments.displayedLangLabel).toBe('Japanese (ja-JP)');
+      ctrl.segments.hoverSegment(2);
+      expect(ctrl.segments.displayedLangLabel).toBe('Mixed');
+      expect(ctrl.segments.highlightedSegmentIndex).toBe(2);
       ctrl.dispose();
     },
   );
@@ -337,10 +332,8 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.isMultiLang).toBe(false);
+    expect(ctrl.segments.isMultiLang).toBe(false);
   });
-
-  // ── targetLanguageLabel ────────────────────────────────────
 
   test('targetLanguageLabel shows first translated segment language', () => {
     const ctrl = createController({
@@ -349,16 +342,14 @@ describe('UI Controller: TranslationModalController', () => {
       ]),
     });
 
-    expect(ctrl.targetLanguageLabel).toBe('Indonesian (id-ID)');
+    expect(ctrl.segments.targetLanguageLabel).toBe('Indonesian (id-ID)');
   });
 
   test('targetLanguageLabel returns empty string when no translations', () => {
     const ctrl = createController({ translated: [] });
 
-    expect(ctrl.targetLanguageLabel).toBe('');
+    expect(ctrl.segments.targetLanguageLabel).toBe('');
   });
-
-  // ── Copy methods ───────────────────────────────────────────
 
   test('copyOriginal sets originalCopy to "copied", resets after 2s', async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
@@ -504,8 +495,6 @@ describe('UI Controller: TranslationModalController', () => {
     expect(ctrl.drag.y).toBe(27);
   });
 
-  // ── Close ──────────────────────────────────────────────────
-
   test('close() calls detachModal', () => {
     const detachMock = vi.fn();
     const ctrl = createController({ detachModal: detachMock });
@@ -515,20 +504,18 @@ describe('UI Controller: TranslationModalController', () => {
     expect(detachMock).toHaveBeenCalled();
   });
 
-  // ── langColorMap ───────────────────────────────────────────
-
   test('langColorMap assigns consistent indices per language code', () => {
     const ctrl = createController({
       original: makeSegments([
         { code: 'ja-JP', name: 'Japanese', text: 'テスト' },
         { code: 'en-US', name: 'English', text: 'Hello' },
-        { code: 'ja-JP', name: 'Japanese', text: '世界' }, // duplicate code
+        { code: 'ja-JP', name: 'Japanese', text: '世界' },
       ]),
     });
 
-    expect(ctrl.langColorMap.get('ja-JP')).toBe(0);
-    expect(ctrl.langColorMap.get('en-US')).toBe(1);
-    expect(ctrl.langColorMap.size).toBe(2); // no duplicate
+    expect(ctrl.segments.langColorMap.get('ja-JP')).toBe(0);
+    expect(ctrl.segments.langColorMap.get('en-US')).toBe(1);
+    expect(ctrl.segments.langColorMap.size).toBe(2);
   });
 
   test('live rows stay paired and preserve indexes while metadata arrives', () => {
@@ -572,7 +559,7 @@ describe('UI Controller: TranslationModalController', () => {
 
     const originalKey = ctrl.original[1].rowKey;
 
-    ctrl.hoverSegment(1);
+    ctrl.segments.hoverSegment(1);
 
     ctrl.snapshot({
       segments: [
@@ -597,11 +584,11 @@ describe('UI Controller: TranslationModalController', () => {
     });
 
     expect(ctrl.original[1].rowKey).toBe(originalKey);
-    expect(ctrl.originalBlocks).toHaveLength(2);
-    expect(ctrl.displayedLangLabel).toBe('Korean (ko-KR)');
-    expect(ctrl.highlightedSegmentIndex).toBe(1);
+    expect(ctrl.segments.originalBlocks).toHaveLength(2);
+    expect(ctrl.segments.displayedLangLabel).toBe('Korean (ko-KR)');
+    expect(ctrl.segments.highlightedSegmentIndex).toBe(1);
     ctrl.reset();
-    expect(ctrl.highlightedSegmentIndex).toBeNull();
+    expect(ctrl.segments.highlightedSegmentIndex).toBeNull();
     expect(ctrl.original).toEqual([]);
     ctrl.dispose();
   });

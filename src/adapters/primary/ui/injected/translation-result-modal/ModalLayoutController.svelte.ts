@@ -12,7 +12,6 @@ function columnsWidth(count: number, columnWidth: number): number {
   );
 }
 
-/** Switches overflowing results to columns without bouncing between layouts. */
 export class ModalLayoutController {
   private bodyOverflowed = $state(false);
   private textColumnOverflowed = $state(false);

@@ -1,9 +1,9 @@
+import { TranslationSegmentsController } from './TranslationSegmentsController.svelte';
+import type { TranslationView } from './TranslationView';
 import type { TranslationDraft } from '../../../../../core/ports/outbound/TranslationExecutionOptions';
 import type { TranslationModalPayload } from '../../../../../shared/types/TranslationModalPayload';
 import type { SafeTranslationError } from '../../../../../shared/messaging/MessageSchema';
 import {
-  groupSegmentsIntoBlocks,
-  joinSegmentBlocks,
   mapDraftSegments,
   type SegmentPayload,
 } from './translation-modal-segments';
@@ -13,7 +13,7 @@ import {
   type CopyTarget,
 } from './TranslationCopyController.svelte';
 
-export class TranslationModalController {
+export class TranslationModalController implements TranslationView {
   public readonly drag = new ModalDragController();
   public readonly clipboard = new TranslationCopyController();
 
@@ -31,6 +31,12 @@ export class TranslationModalController {
   public status = $state('Complete');
   public errorMessage = $state('');
   public historySaved = $state(true);
+  public readonly title = $derived(
+    this.phase === 'failed' ? 'Translation failed' : 'Translation',
+  );
+  public readonly showHistoryWarning = $derived(
+    this.phase === 'completed' && !this.historySaved,
+  );
   public readonly canCopy = $derived(this.phase === 'completed');
   public readonly isUnsuccessful = $derived(
     this.phase === 'failed' || this.phase === 'cancelled',
@@ -57,107 +63,14 @@ export class TranslationModalController {
   private readonly onretry?: () => void;
   private readonly detachModal: () => void;
 
-  public readonly originalBlocks = $derived.by(() =>
-    groupSegmentsIntoBlocks(this.original),
-  );
-
-  public readonly translatedBlocks = $derived.by(() =>
-    groupSegmentsIntoBlocks(this.translated),
-  );
-
-  public readonly originalText = $derived.by(() =>
-    joinSegmentBlocks(this.originalBlocks),
-  );
-
-  public readonly translatedText = $derived.by(() =>
-    joinSegmentBlocks(this.translatedBlocks),
-  );
-
-  public readonly originalHasRomanization = $derived.by(() =>
-    this.original.some((s) => s.romanization != null),
-  );
-
-  public readonly translatedHasRomanization = $derived.by(() =>
-    this.translated.some((s) => s.romanization != null),
-  );
-
-  public readonly langColorMap = $derived.by(() => {
-    const map = new Map<string, number>();
-    let idx = 0;
-
-    for (const seg of this.original) {
-      if (!map.has(seg.language.code)) {
-        map.set(seg.language.code, idx++ % 8);
-      }
-    }
-
-    return map;
-  });
-
-  private static readonly NON_LANG_CODES = new Set([
-    'number',
-    'symbol',
-    'unknown',
-  ]);
-
-  private readonly realLangCodes = $derived.by(() => {
-    return [...this.langColorMap.keys()].filter(
-      (c) => !TranslationModalController.NON_LANG_CODES.has(c),
-    );
-  });
-
-  public readonly isMultiLang = $derived.by(
-    () => this.realLangCodes.length > 1,
-  );
-
-  public readonly detectedLanguageLabel = $derived.by(() => {
-    if (this.realLangCodes.length > 1) return 'Mixed';
-
-    const first = this.original.find(
-      (s) => !TranslationModalController.NON_LANG_CODES.has(s.language.code),
-    );
-
-    if (!first) return '';
-
-    return `${first.language.name} (${first.language.code})`;
-  });
-
-  public readonly targetLanguageLabel = $derived.by(() => {
-    const first = this.translated[0];
-
-    if (!first) return '';
-
-    return `${first.language.name} (${first.language.code})`;
-  });
-
-  private hoveredSegmentIndex = $state<number | null>(null);
-
-  public readonly displayedLangLabel = $derived.by(() => {
-    if (this.hoveredSegmentIndex !== null && this.isMultiLang) {
-      const segment = this.original.find(
-        (value, index) => (value.index ?? index) === this.hoveredSegmentIndex,
-      );
-
-      if (
-        segment &&
-        !TranslationModalController.NON_LANG_CODES.has(segment.language.code)
-      ) {
-        return `${segment.language.name} (${segment.language.code})`;
-      }
-    }
-
-    return this.detectedLanguageLabel;
-  });
-
-  public readonly highlightedSegmentIndex = $derived(this.hoveredSegmentIndex);
+  public readonly segments = new TranslationSegmentsController(() => ({
+    original: this.original,
+    translated: this.translated,
+  }));
 
   public get attemptRevision(): number {
     return this.revision;
   }
-
-  public hoverSegment = (index: number | null) => {
-    this.hoveredSegmentIndex = index;
-  };
 
   constructor(props: {
     original: SegmentPayload[];
@@ -267,18 +180,22 @@ export class TranslationModalController {
   }
 
   private resetFeedback(): void {
-    this.hoveredSegmentIndex = null;
+    this.segments.hoverSegment(null);
     this.clipboard.reset();
   }
+
+  public copyOriginal = (): Promise<void> => this.copy('original');
+  public copyTranslated = (): Promise<void> => this.copy('translated');
+  public copyDescription = (): Promise<void> => this.copy('description');
 
   public copy = async (target: CopyTarget): Promise<void> => {
     if (!this.canCopy || this.disposed) return;
 
     const text =
       target === 'original'
-        ? this.originalText
+        ? this.segments.originalText
         : target === 'translated'
-          ? this.translatedText
+          ? this.segments.translatedText
           : this.description;
 
     await this.clipboard.copy(target, text);

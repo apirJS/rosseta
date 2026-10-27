@@ -3,7 +3,6 @@ import { writeToClipboard } from './write-to-clipboard';
 export type CopyTarget = 'original' | 'translated' | 'description';
 export type CopyState = 'idle' | 'copied';
 
-/** Owns clipboard feedback; the modal decides which content is safe to copy. */
 export class TranslationCopyController {
   public states = $state<Record<CopyTarget, CopyState>>({
     original: 'idle',

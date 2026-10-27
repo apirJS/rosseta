@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { CopyState } from '../TranslationCopyController.svelte';
   import CopyButton from './CopyButton.svelte';
-
-  type CopyState = 'idle' | 'copied';
 
   interface Props {
     label: string;

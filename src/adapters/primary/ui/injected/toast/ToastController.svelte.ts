@@ -8,30 +8,40 @@ export interface ToastItem {
   duration?: number;
   dismissing?: boolean;
   actionLabel?: string;
-  onAction?: () => void;
+  onAction?: () => void | Promise<unknown>;
 }
 
-interface ShowOptions {
+export interface ToastShowOptions {
   type: ToastType;
   message: string;
   description?: string;
   id?: string;
   duration?: number;
   actionLabel?: string;
-  onAction?: () => void;
+  onAction?: () => void | Promise<unknown>;
 }
+
+export type ToastUpdateOptions = Partial<Omit<ToastShowOptions, 'id'>>;
 
 const MAX_TOASTS = 5;
 const DISMISS_ANIMATION_MS = 250;
+const DEFAULT_DURATION_MS = 4000;
 
 let nextId = 0;
 
 export class ToastController {
   public toasts = $state<ToastItem[]>([]);
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
-  show(opts: ShowOptions): string {
+  private disposed = false;
+
+  public show(opts: ToastShowOptions): string {
     const id = opts.id ?? `toast-${nextId++}`;
-    const duration = opts.duration ?? (opts.type === 'loading' ? 0 : 4000);
+
+    if (this.disposed) return id;
+
+    this.clearTimer(id);
+
+    const duration = this.durationFor(opts.type, opts.duration);
 
     const item: ToastItem = {
       id,
@@ -43,16 +53,24 @@ export class ToastController {
       onAction: opts.onAction,
     };
 
-    this.toasts = [item, ...this.toasts].slice(0, MAX_TOASTS);
+    const toasts = [item, ...this.toasts.filter((toast) => toast.id !== id)];
+
+    for (const evicted of toasts.slice(MAX_TOASTS)) {
+      this.clearTimer(evicted.id);
+    }
+
+    this.toasts = toasts.slice(0, MAX_TOASTS);
 
     if (duration > 0) {
-      this.startTimer(id, duration);
+      this.schedule(id, duration, () => this.dismiss(id));
     }
 
     return id;
   }
 
-  update(id: string, opts: Partial<ShowOptions>): void {
+  public update(id: string, opts: ToastUpdateOptions): void {
+    if (this.disposed) return;
+
     const idx = this.toasts.findIndex((t) => t.id === id);
 
     if (idx === -1) return;
@@ -68,7 +86,7 @@ export class ToastController {
       dismissing: false,
     };
 
-    const duration = opts.duration ?? (updated.type === 'loading' ? 0 : 4000);
+    const duration = this.durationFor(updated.type, opts.duration);
 
     updated.duration = duration;
 
@@ -78,33 +96,65 @@ export class ToastController {
     this.toasts = copy;
 
     if (duration > 0) {
-      this.startTimer(id, duration);
+      this.schedule(id, duration, () => this.dismiss(id));
     }
   }
 
-  dismiss(id: string): void {
-    this.clearTimer(id);
+  public dismiss(id: string): void {
+    if (this.disposed) return;
 
     const idx = this.toasts.findIndex((t) => t.id === id);
 
     if (idx === -1) return;
-
     if (this.toasts[idx].dismissing) return;
+
+    this.clearTimer(id);
 
     const copy = [...this.toasts];
 
     copy[idx] = { ...copy[idx], dismissing: true };
     this.toasts = copy;
 
-    setTimeout(() => {
+    this.schedule(id, DISMISS_ANIMATION_MS, () => {
       this.toasts = this.toasts.filter((t) => t.id !== id);
-    }, DISMISS_ANIMATION_MS);
+    });
   }
 
-  private startTimer(id: string, duration: number): void {
+  public activate = async (id: string): Promise<void> => {
+    if (this.disposed) return;
+
+    const toast = this.toasts.find((item) => item.id === id);
+
+    if (!toast?.onAction || toast.dismissing) return;
+
+    this.dismiss(id);
+
+    try {
+      await toast.onAction();
+    } catch (error) {
+      console.error('Failed to run toast action:', error);
+    }
+  };
+
+  public dispose = (): void => {
+    this.disposed = true;
+    this.clear();
+  };
+
+  public clear = (): void => {
+    for (const timer of this.timers.values()) clearTimeout(timer);
+    this.timers.clear();
+    this.toasts = [];
+  };
+
+  private durationFor(type: ToastType, duration?: number): number {
+    return duration ?? (type === 'loading' ? 0 : DEFAULT_DURATION_MS);
+  }
+
+  private schedule(id: string, duration: number, action: () => void): void {
     const timer = setTimeout(() => {
-      this.dismiss(id);
       this.timers.delete(id);
+      action();
     }, duration);
 
     this.timers.set(id, timer);

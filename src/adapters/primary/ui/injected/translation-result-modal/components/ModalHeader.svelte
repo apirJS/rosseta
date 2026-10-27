@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TranslationStatus from './TranslationStatus.svelte';
+
   interface Props {
     title: string;
     status?: string;
@@ -14,32 +16,15 @@
     onclose,
     ondragstart,
   }: Props = $props();
-
-  const statusLabel = $derived(
-    busy ? status.replace(/(?:\.{3}|…)$/, '') : status,
-  );
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-header flex items-end gap-x-1" onpointerdown={ondragstart}>
   <span class="modal-header-title">{title}</span>
-  {#if status}
-    <span
-      class={`translation-status`}
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-    >
-      <span>{statusLabel}</span>
-      {#if busy}
-        <span class="translation-status-dots" aria-hidden="true"
-          ><span>...</span></span
-        >
-      {/if}
-    </span>
-  {/if}
+  <TranslationStatus {status} {busy} />
 
   <button
+    type="button"
     class="modal-close-btn"
     onclick={onclose}
     aria-label="Close"

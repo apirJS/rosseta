@@ -81,7 +81,7 @@ function createLayout(columns = 2, hasDescription = false) {
     preferredModalWidth:
       columns === 1 ? 520 : columns * 400 + (columns - 1) * 16 + 34,
     minimumModalWidth:
-      columns === 1 ? 320 : columns * 280 + (columns - 1) * 16 + 34,
+      columns === 1 ? 480 : columns * 280 + (columns - 1) * 16 + 34,
   };
 
   return {
@@ -98,8 +98,8 @@ function createLayout(columns = 2, hasDescription = false) {
 
 describe('measureCompactModalWidth', () => {
   test.each([
-    { columns: 1, hasDescription: false, expected: 320 },
-    { columns: 1, hasDescription: true, expected: 320 },
+    { columns: 1, hasDescription: false, expected: 480 },
+    { columns: 1, hasDescription: true, expected: 480 },
     { columns: 2, hasDescription: false, expected: 610 },
     { columns: 2, hasDescription: true, expected: 610 },
     { columns: 3, hasDescription: true, expected: 906 },
@@ -121,11 +121,9 @@ describe('measureCompactModalWidth', () => {
       (probe) => 1560 - Number.parseFloat(probe.style.width),
     );
 
-    expect(measureCompactModalWidth(layout.options)).toBe(718);
-    // At 718px width the natural modal is 842px high in an 850px budget.
-    // One pixel narrower would consume the required rounding margin.
-    expect(1560 - 718 + 8).toBe(850);
-    expect(1560 - 717 + 8).toBeGreaterThan(850);
+    expect(measureCompactModalWidth(layout.options)).toBe(668);
+    expect(1560 - 668 + 8).toBe(900);
+    expect(1560 - 667 + 8).toBeGreaterThan(900);
   });
 
   test('removes redundant width when unavoidable scrolling stays the same', () => {

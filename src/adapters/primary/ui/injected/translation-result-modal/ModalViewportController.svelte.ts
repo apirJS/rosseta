@@ -15,6 +15,7 @@ export class ModalViewportController {
   public textColumn = $state<HTMLDivElement>();
   public width = $state(0);
   public height = $state(0);
+  private sectionResize?: { width: string; height: string; revision: number };
 
   constructor(private readonly translation: () => TranslationModalController) {}
 
@@ -26,6 +27,23 @@ export class ModalViewportController {
     if (event.key !== 'Escape') return;
     event.stopPropagation();
     this.translation().close();
+  };
+
+  public handleSectionResize = (event: PointerEvent): void => {
+    if (
+      event.button !== 0 ||
+      this.layout.mode !== 'stacked' ||
+      !(event.target instanceof Element) ||
+      !event.target.closest('.resize-handle') ||
+      !this.modal
+    )
+      return;
+
+    this.sectionResize = {
+      width: this.modal.style.width,
+      height: this.modal.style.height,
+      revision: this.translation().attemptRevision,
+    };
   };
 
   public observeContent(): (() => void) | undefined {
@@ -55,6 +73,17 @@ export class ModalViewportController {
 
       frame = requestAnimationFrame(() => {
         frame = undefined;
+
+        if (this.sectionResize) {
+          if (
+            this.sectionResize.width === modal.style.width &&
+            this.sectionResize.height === modal.style.height &&
+            this.sectionResize.revision === content.revision
+          )
+            return;
+
+          this.sectionResize = undefined;
+        }
 
         const compactWidth = content.hasContent
           ? measureCompactModalWidth({
@@ -98,6 +127,9 @@ export class ModalViewportController {
           textColumnOverflowing:
             textColumn.scrollHeight > textColumn.clientHeight + 1,
           viewportWidth: viewport.width,
+          modalWidth: modal.style.width.endsWith('px')
+            ? Number.parseFloat(modal.style.width)
+            : undefined,
           ...descriptionLayout,
         });
       });
@@ -105,6 +137,7 @@ export class ModalViewportController {
 
     const observer = new ResizeObserver(scheduleMeasure);
 
+    observer.observe(modal);
     observer.observe(body);
     observer.observe(sections);
     observer.observe(textColumn);

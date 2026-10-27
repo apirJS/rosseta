@@ -52,7 +52,7 @@ export function measureCompactModalWidth({
 
   const availableHeight = modal.style.height
     ? modalRect.height
-    : viewportHeight * 0.85;
+    : viewportHeight * 0.9;
 
   let upper = Math.floor(Math.min(preferredModalWidth, viewportWidth * 0.9));
   let lower = Math.min(Math.ceil(minimumModalWidth), upper);
@@ -138,8 +138,6 @@ export function measureDescriptionLayout({
     return UNAVAILABLE_MEASUREMENT;
   }
 
-  // The current three-column minimum can make the modal wider than the user's
-  // requested size. Measure the width it would have under two-column limits.
   const nativeWidth = modal.style.width;
 
   const requestedWidth = nativeWidth
@@ -170,7 +168,7 @@ export function measureDescriptionLayout({
     ? sections.clientHeight
     : Math.max(
         0,
-        viewportHeight * 0.85 - (modalRect.height - sectionsRect.height),
+        viewportHeight * 0.9 - (modalRect.height - sectionsRect.height),
       );
 
   if (!positiveFinite(columnWidth, availableHeight)) {

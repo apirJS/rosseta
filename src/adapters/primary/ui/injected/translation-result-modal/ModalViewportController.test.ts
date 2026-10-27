@@ -93,7 +93,8 @@ describe('ModalViewportController', () => {
     const stop = viewport.observeContent();
     const observer = observers[0];
 
-    expect(observer.observe).toHaveBeenCalledTimes(3);
+    expect(observer.observe).toHaveBeenCalledTimes(4);
+    expect(observer.observe).toHaveBeenCalledWith(viewport.modal);
     observer.callback();
     observer.callback();
     expect(frames.size).toBe(1);
@@ -115,12 +116,12 @@ describe('ModalViewportController', () => {
       scrollHeight: { value: 900 },
     });
 
-    vi.mocked(measureCompactModalWidth).mockReturnValue(400);
+    vi.mocked(measureCompactModalWidth).mockReturnValue(480);
 
     const stop = viewport.observeContent();
 
     flushFrame();
-    expect(viewport.layout.width).toBe('400px');
+    expect(viewport.layout.width).toBe('480px');
     expect(viewport.layout.mode).toBe('stacked');
     expect(frames.size).toBe(1);
     flushFrame();
@@ -140,7 +141,7 @@ describe('ModalViewportController', () => {
   test('resets scrolling and constrains the measured modal after automatic sizing', () => {
     const { viewport, translation } = createViewport();
 
-    viewport.layout.setAutomaticWidth('stacked', 400);
+    viewport.layout.setAutomaticWidth('stacked', 480);
     viewport.body!.scrollTop = 70;
 
     const constrain = vi.spyOn(translation.drag, 'constrainToViewport');
@@ -176,5 +177,78 @@ describe('ModalViewportController', () => {
     viewport.handleKeydown(event);
     expect(stop).toHaveBeenCalledOnce();
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  test('preserves stacked layout and width after a section resize until the outer dialog is resized', () => {
+    const { viewport } = createViewport();
+    let contentHeight = 300;
+
+    Object.defineProperties(viewport.body!, {
+      clientHeight: { value: 300 },
+      scrollHeight: { get: () => contentHeight },
+    });
+
+    const stop = viewport.observeContent();
+
+    flushFrame();
+    viewport.layout.setAutomaticWidth('stacked', 480);
+
+    const handle = document.createElement('button');
+
+    handle.className = 'resize-handle';
+
+    viewport.handleSectionResize({
+      button: 0,
+      target: handle,
+    } as unknown as PointerEvent);
+
+    contentHeight = 900;
+    vi.mocked(measureCompactModalWidth).mockClear().mockReturnValue(520);
+    observers[0].callback();
+    flushFrame();
+    observers[0].callback();
+    flushFrame();
+    expect(measureCompactModalWidth).not.toHaveBeenCalled();
+    expect(viewport.layout.mode).toBe('stacked');
+    expect(viewport.layout.width).toBe('480px');
+
+    viewport.modal!.style.width = '850px';
+    vi.mocked(measureCompactModalWidth).mockReturnValue(undefined);
+    observers[0].callback();
+    flushFrame();
+    expect(viewport.layout.mode).toBe('description-side');
+    stop?.();
+  });
+
+  test('a new attempt clears the section resize preference', () => {
+    const { viewport, translation } = createViewport();
+    const stop = viewport.observeContent();
+    const handle = document.createElement('button');
+
+    handle.className = 'resize-handle';
+
+    viewport.handleSectionResize({
+      button: 0,
+      target: handle,
+    } as unknown as PointerEvent);
+
+    flushFrame();
+    expect(measureCompactModalWidth).not.toHaveBeenCalled();
+    stop?.();
+    translation.reset();
+    translation.snapshot({ segments: [], description: 'New result' });
+
+    Object.defineProperties(viewport.body!, {
+      clientHeight: { value: 300 },
+      scrollHeight: { value: 900 },
+    });
+
+    const stopNewAttempt = viewport.observeContent();
+
+    vi.mocked(measureCompactModalWidth).mockClear();
+    flushFrame();
+    expect(measureCompactModalWidth).toHaveBeenCalledOnce();
+    expect(viewport.layout.mode).toBe('description-side');
+    stopNewAttempt?.();
   });
 });

@@ -46,8 +46,8 @@
     tabindex="-1"
     style:transform="translate({controller.drag.x}px, {controller.drag.y}px)"
     style:--modal-preferred-width={layout.width}
-    style:min-width={layout.minWidth}
     style:--translation-columns={layout.columns}
+    onpointerdowncapture={viewport.handleSectionResize}
   >
     <ModalHeader
       title={controller.title}

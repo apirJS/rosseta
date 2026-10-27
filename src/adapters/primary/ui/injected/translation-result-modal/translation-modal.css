@@ -88,10 +88,10 @@
 .modal-container {
   position: relative;
   width: var(--modal-preferred-width, 520px);
-  min-width: min(320px, 90vw);
-  min-height: min(240px, 85vh);
+  min-width: min(480px, 90vw);
+  min-height: min(240px, 90vh);
   max-width: 90vw;
-  max-height: 85vh;
+  max-height: 90vh;
   background: var(--modal-bg);
   border: 1px solid var(--modal-border);
   border-radius: 12px;

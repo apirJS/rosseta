@@ -1,3 +1,9 @@
+## [3.2.0](https://github.com/apirJS/rosseta/compare/v3.1.0...v3.2.0) (2026-10-27)
+
+### Features
+
+* fluid & more intuitive result modal behavior ([#13](https://github.com/apirJS/rosseta/issues/13)) ([b6c18cb](https://github.com/apirJS/rosseta/commit/b6c18cbc87d162d7842c6adc6267379f5baf1e2b))
+
 ## [3.1.0](https://github.com/apirJS/rosseta/compare/v3.0.0...v3.1.0) (2026-10-24)
 
 ### Features

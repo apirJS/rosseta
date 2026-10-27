@@ -43,7 +43,8 @@
     <h3 class="text-sm font-semibold text-foreground">Import Settings</h3>
     <p class="mt-1 text-xs leading-relaxed text-muted">
       Restore a Rosseta JSON backup. Imported values replace your current API
-      keys, custom providers, models, preferences, and translation history.
+      keys, custom providers, models, and preferences. Translation history is
+      replaced only when the backup includes it.
     </p>
     <input
       bind:this={fileInput}

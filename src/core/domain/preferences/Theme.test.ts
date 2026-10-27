@@ -44,6 +44,13 @@ describe('Domain: Theme', () => {
 
   // ==================== FROM RAW ====================
   describe('fromRaw', () => {
+    test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty'])(
+      'rejects inherited object property %s',
+      (value) => {
+        expect(Theme.fromRaw(value).success).toBe(false);
+      },
+    );
+
     test('accepts valid theme strings', () => {
       for (const val of ['dark', 'light', 'system'] as const) {
         const result = Theme.fromRaw(val);

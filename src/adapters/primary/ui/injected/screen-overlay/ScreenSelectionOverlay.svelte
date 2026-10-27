@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { OverlayController } from './OverlayController.svelte';
+  import SelectionRectangle from './SelectionRectangle.svelte';
 
   interface Props {
     viewportImg: string;
@@ -9,7 +11,7 @@
     startTranslation: (requestId: string, imageBase64: string) => Promise<void>;
   }
 
-  const {
+  let {
     viewportImg,
     captureWidth,
     detachOverlay,
@@ -17,28 +19,21 @@
     startTranslation,
   }: Props = $props();
 
-  // svelte-ignore state_referenced_locally
-  const controller = new OverlayController(
-    viewportImg,
-    detachOverlay,
-    onReady,
-    startTranslation,
-  );
-
-  let overlayEl: HTMLDivElement;
-
-  $effect(() => {
-    if (overlayEl) {
-      controller.setContainer(overlayEl);
-    }
+  const controller = new OverlayController({
+    image: () => viewportImg,
+    detach: () => detachOverlay(),
+    onReady: () => onReady?.(),
+    startTranslation: (requestId, image) => startTranslation(requestId, image),
   });
+
+  onMount(controller.mount);
 </script>
 
 <svelte:window onkeydowncapture={controller.handleKeydown} />
 
 <div
-  bind:this={overlayEl}
   role="dialog"
+  aria-label="Select an area to translate"
   tabindex="-1"
   id="overlay"
   class="bg-no-repeat absolute inset-0 bg-top-left cursor-crosshair"
@@ -47,5 +42,16 @@
   style:touch-action="none"
   style:opacity={controller.isReady ? 1 : 0}
   style:transition="opacity 80ms ease-out"
-  onpointerdown={controller.handlePointerDown}
-></div>
+  onpointerdown={controller.selection.start}
+  onpointermove={controller.selection.move}
+  onpointerup={controller.selection.finish}
+  onpointercancel={controller.selection.cancelPointer}
+  onlostpointercapture={controller.selection.cancelPointer}
+>
+  {#if controller.selection.bounds}
+    <SelectionRectangle
+      bounds={controller.selection.bounds}
+      viewport={controller.selection.viewport}
+    />
+  {/if}
+</div>

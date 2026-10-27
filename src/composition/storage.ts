@@ -7,6 +7,7 @@ import { BrowserCommandStorageAdapter } from '../adapters/secondary/shortcuts/Br
 import { BrowserCustomProviderStorageAdapter } from '../adapters/secondary/storage/providers/BrowserCustomProviderStorageAdapter';
 import { BrowserTranslationCapabilityStorage } from '../adapters/secondary/storage/compatibility/BrowserTranslationCapabilityStorage';
 import { BrowserProviderMutationLock } from '../adapters/secondary/storage/providers/BrowserProviderMutationLock';
+import { BrowserSettingsBackupStorage } from '../adapters/secondary/storage/settings/BrowserSettingsBackupStorage';
 
 export const createCredentialStorage = () =>
   new BrowserCredentialStorageAdapter();
@@ -24,3 +25,5 @@ export const createTranslationCapabilityStorage = () =>
   new BrowserTranslationCapabilityStorage();
 export const createProviderMutationLock = () =>
   new BrowserProviderMutationLock();
+export const createSettingsBackupStorage = () =>
+  new BrowserSettingsBackupStorage();

@@ -129,6 +129,23 @@ describe('Adapter: BrowserUserPreferencesStorageAdapter', () => {
     }
   });
 
+  test('set() preserves stored preferences when the prerequisite read fails', async () => {
+    seedStore({ userPreferences: validPreferencesProps() });
+
+    storage.get.mockImplementationOnce(async () => {
+      throw new Error('read failed');
+    });
+
+    const result = await adapter.set({ theme: 'light' });
+
+    expect(result.success).toBe(false);
+    expect(storage.set).not.toHaveBeenCalled();
+
+    const loaded = await adapter.get();
+
+    expect(loaded.success && loaded.data?.theme.value).toBe('dark');
+  });
+
   test('set() persists per-provider model selections', async () => {
     const result = await adapter.set({
       selectedModels: { groq: 'llama-4', xai: 'grok-3' },

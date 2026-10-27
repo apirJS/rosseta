@@ -15,7 +15,8 @@
   --color-success: var(--success);
 }
 
-:root {
+:root,
+:host {
   --background: oklch(0.98 0.002 85);
   --foreground: oklch(0.45 0.02 260);
   --surface: oklch(0.96 0.005 260);
@@ -28,7 +29,8 @@
   --selection-frame: oklch(54.6% 0.245 262.881);
 }
 
-.dark {
+.dark,
+:host(.dark) {
   --background: oklch(0.18 0.03 260);
   --foreground: oklch(0.85 0.01 260);
   --surface: oklch(0.22 0.035 260);

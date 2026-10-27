@@ -1,4 +1,3 @@
-/** Browser clipboard I/O only; availability and user feedback belong to the controller. */
 export async function writeToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);

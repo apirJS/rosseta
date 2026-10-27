@@ -30,44 +30,62 @@ export interface RefreshProviderModelsDeps {
   mutationLock: IProviderMutationLock;
 }
 
+interface CatalogSnapshot {
+  config: CustomProviderConfig | undefined;
+  apiKey: string;
+  models: StoredModel[];
+  selectedModel: string | undefined;
+}
+
 /** Refresh one catalog and its compatibility window; no browser or SDK details. */
 export class RefreshProviderModelsUseCase implements IRefreshProviderModelsUseCase {
   constructor(private readonly deps: RefreshProviderModelsDeps) {}
 
   async execute(provider: string): Promise<Result<StoredModel[], AppError>> {
-    const config = await this.resolveConfig(provider);
+    const snapshot = await this.deps.mutationLock.run(provider, () =>
+      this.readSnapshot(provider),
+    );
 
-    if (!config.success) return failure(config.error);
-
-    const apiKey = await this.resolveApiKey(provider);
-
-    if (!apiKey.success) return failure(apiKey.error);
+    if (!snapshot.success) return failure(snapshot.error);
 
     const fetched = await this.deps.modelFetchService.fetchModels(
       provider,
-      apiKey.data,
-      config.data?.baseURL,
-      config.data?.headers,
-      config.data?.queryParams,
-      config.data?.type,
+      snapshot.data.apiKey,
+      snapshot.data.config?.baseURL,
+      snapshot.data.config?.headers,
+      snapshot.data.config?.queryParams,
+      snapshot.data.config?.type,
     );
 
     if (!fetched.success) return failure(fetched.error);
 
-    // Network latency never holds the lock. Recheck existence only after
-    // acquiring the same provider boundary used by staged deletion.
     return this.deps.mutationLock.run(provider, () =>
-      this.commitCatalog(provider, fetched.data),
+      this.commitCatalog(provider, fetched.data, snapshot.data),
     );
   }
 
   private async commitCatalog(
     provider: string,
     models: ModelInfo[],
+    snapshot: CatalogSnapshot,
   ): Promise<Result<StoredModel[], AppError>> {
-    const current = await this.ensureProviderStillExists(provider);
+    const current = await this.readSnapshot(provider);
 
     if (!current.success) return failure(current.error);
+
+    if (
+      current.data.apiKey !== snapshot.apiKey ||
+      current.data.selectedModel !== snapshot.selectedModel ||
+      JSON.stringify(current.data.config?.toProps()) !==
+        JSON.stringify(snapshot.config?.toProps()) ||
+      JSON.stringify(current.data.models) !== JSON.stringify(snapshot.models)
+    ) {
+      return failure(
+        ValidationError.invalidInput(
+          'Provider settings or models changed while fetching. Fetch models again.',
+        ),
+      );
+    }
 
     const saved = await this.persistCatalog(provider, models);
 
@@ -120,23 +138,31 @@ export class RefreshProviderModelsUseCase implements IRefreshProviderModelsUseCa
     return saved.success ? success(models) : failure(saved.error);
   }
 
-  private async ensureProviderStillExists(
+  private async readSnapshot(
     provider: string,
-  ): Promise<Result<void, AppError>> {
-    if (!isCustomProviderId(provider)) return success(undefined);
+  ): Promise<Result<CatalogSnapshot, AppError>> {
+    const config = await this.resolveConfig(provider);
 
-    const result = await this.deps.customProviderStorage.load();
+    if (!config.success) return failure(config.error);
 
-    if (!result.success) return failure(result.error);
+    const apiKey = await this.resolveApiKey(provider);
 
-    return result.data.some((config) => config.id === provider)
-      ? success(undefined)
-      : failure(
-          ValidationError.invalidInput(
-            'This custom provider was removed. Its model list was not saved.',
-            { provider },
-          ),
-        );
+    if (!apiKey.success) return failure(apiKey.error);
+
+    const models = await this.deps.modelStorage.getModels(provider);
+
+    if (!models.success) return failure(models.error);
+
+    const preferences = await this.deps.preferencesStorage.get();
+
+    if (!preferences.success) return failure(preferences.error);
+
+    return success({
+      config: config.data,
+      apiKey: apiKey.data,
+      models: models.data,
+      selectedModel: preferences.data?.getModelIdFor(provider),
+    });
   }
 
   private async resolveConfig(

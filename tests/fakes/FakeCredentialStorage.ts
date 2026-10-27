@@ -45,4 +45,20 @@ export class FakeCredentialStorage implements ICredentialStorage {
 
     return success(undefined);
   }
+
+  async update(
+    change: (credentials: Credentials | null) => Result<Credentials, AppError>,
+  ): Promise<Result<Credentials, AppError>> {
+    const current = await this.get();
+
+    if (!current.success) return current;
+
+    const updated = change(current.data);
+
+    if (!updated.success) return updated;
+
+    const saved = await this.save(updated.data);
+
+    return saved.success ? updated : failure(saved.error);
+  }
 }

@@ -144,22 +144,25 @@ describe('UI: adaptive translation layout', () => {
         mountOverflowingResult(description);
 
       setContentHeight(400);
-      vi.mocked(measureCompactModalWidth).mockReturnValue(320);
+      vi.mocked(measureCompactModalWidth).mockReturnValue(480);
       flushLayout();
 
       expect(dialog.style.getPropertyValue('--modal-preferred-width')).toBe(
-        '320px',
+        '480px',
       );
 
       expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
 
-      // Streaming or wrapping can require more room without changing modes.
-      vi.mocked(measureCompactModalWidth).mockReturnValue(410);
+      expect(measureCompactModalWidth).toHaveBeenCalledWith(
+        expect.objectContaining({ minimumModalWidth: 480 }),
+      );
+
+      vi.mocked(measureCompactModalWidth).mockReturnValue(510);
       resizeCallbacks.forEach((callback) => callback());
       flushLayout();
 
       expect(dialog.style.getPropertyValue('--modal-preferred-width')).toBe(
-        '410px',
+        '510px',
       );
 
       expect(dialog.style.width).toBe('');
@@ -181,6 +184,84 @@ describe('UI: adaptive translation layout', () => {
     expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
     controller.dispose();
   });
+
+  test.each([
+    { section: 'Original', index: 0 },
+    { section: 'Translated', index: 1 },
+    { section: 'Description', index: 2 },
+  ])(
+    'resizing $section preserves the stacked layout and automatic width',
+    async ({ index }) => {
+      const { controller, dialog, container, body, setContentHeight } =
+        mountOverflowingResult('Description');
+
+      setContentHeight(400);
+      vi.mocked(measureCompactModalWidth).mockReturnValue(480);
+      flushLayout();
+      expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
+
+      const boxes = [
+        ...container.querySelectorAll<HTMLElement>(
+          '.text-box, .description-box',
+        ),
+      ];
+
+      const handle =
+        container.querySelectorAll<HTMLElement>('.resize-handle')[index];
+
+      Object.assign(handle, {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: vi.fn(() => true),
+        releasePointerCapture: vi.fn(),
+      });
+
+      body.scrollTop = 90;
+      vi.mocked(measureCompactModalWidth).mockClear().mockReturnValue(520);
+
+      await fireEvent(
+        handle,
+        new MouseEvent('pointerdown', {
+          button: 0,
+          clientY: 100,
+          bubbles: true,
+        }),
+      );
+
+      await fireEvent(
+        handle,
+        new MouseEvent('pointermove', { clientY: 280, bubbles: true }),
+      );
+
+      setContentHeight(900);
+      resizeCallbacks.forEach((callback) => callback());
+      flushLayout();
+      expect(boxes[index].style.height).toBe('180px');
+      expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
+
+      expect(dialog.style.getPropertyValue('--modal-preferred-width')).toBe(
+        '480px',
+      );
+
+      expect(body.scrollTop).toBe(90);
+
+      await fireEvent(handle, new MouseEvent('pointerup', { bubbles: true }));
+      resizeCallbacks.forEach((callback) => callback());
+      flushLayout();
+      expect(dialog.classList.contains('modal-container-columns')).toBe(false);
+      expect(measureCompactModalWidth).not.toHaveBeenCalled();
+
+      expect([
+        ...container.querySelectorAll('.text-box, .description-box'),
+      ]).toEqual(boxes);
+
+      dialog.style.width = '850px';
+      vi.mocked(measureCompactModalWidth).mockReturnValue(undefined);
+      resizeCallbacks.forEach((callback) => callback());
+      flushLayout();
+      expect(dialog.style.getPropertyValue('--translation-columns')).toBe('2');
+      controller.dispose();
+    },
+  );
 
   test.each([
     { description: '', columns: 2 },
@@ -213,18 +294,61 @@ describe('UI: adaptive translation layout', () => {
         ...container.querySelectorAll('.text-box, .description-box'),
       ]).toEqual(boxes);
 
-      // A successful reflow must not immediately switch back to the stacked layout.
       setContentHeight(400);
       resizeCallbacks.forEach((callback) => callback());
       flushLayout();
       expect(dialog.classList.contains('modal-container-columns')).toBe(true);
-
-      // Native resizing should survive ordinary streaming/content updates.
       dialog.style.width = '950px';
       flushSync(() => controller.started({ code: 'en-US', name: 'English' }));
       resizeCallbacks.forEach((callback) => callback());
       flushLayout();
       expect(dialog.style.width).toBe('950px');
+      controller.dispose();
+    },
+  );
+
+  test.each(['', 'Description'])(
+    'allows resizing columns back to a stack and widening again with description %j',
+    (description) => {
+      const { controller, dialog, container } =
+        mountOverflowingResult(description);
+
+      flushLayout();
+      expect(dialog.style.getPropertyValue('--translation-columns')).toBe('2');
+      expect(dialog.style.minWidth).toBe('');
+
+      const boxes = [
+        ...container.querySelectorAll<HTMLElement>(
+          '.text-box, .description-box',
+        ),
+      ];
+
+      boxes[0].style.height = '145px';
+      dialog.style.width = '500px';
+      dialog.style.height = '600px';
+      resizeCallbacks.forEach((callback) => callback());
+      flushLayout();
+
+      expect(dialog.classList.contains('modal-container-columns')).toBe(false);
+      expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
+      expect(boxes[0].style.height).toBe('145px');
+
+      flushSync(() => controller.started({ code: 'en-US', name: 'English' }));
+      flushLayout();
+      expect(dialog.style.getPropertyValue('--translation-columns')).toBe('1');
+      expect(dialog.style.width).toBe('500px');
+      expect(dialog.style.height).toBe('600px');
+
+      expect([
+        ...container.querySelectorAll('.text-box, .description-box'),
+      ]).toEqual(boxes);
+
+      dialog.style.width = '850px';
+      resizeCallbacks.forEach((callback) => callback());
+      flushLayout();
+      expect(dialog.style.getPropertyValue('--translation-columns')).toBe('2');
+      expect(dialog.style.width).toBe('850px');
+      expect(dialog.style.height).toBe('600px');
       controller.dispose();
     },
   );
@@ -304,7 +428,6 @@ describe('UI: adaptive translation layout', () => {
       snapshot(null);
     });
 
-    // No resize event: the content update itself must schedule a measurement.
     flushLayout();
     expect(dialog.style.getPropertyValue('--translation-columns')).toBe('2');
 

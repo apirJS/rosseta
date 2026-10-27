@@ -56,11 +56,11 @@ describe('ModalLayoutController', () => {
   test('uses a measured width without replacing the readable minimum or preferred limit', () => {
     const controller = createController();
 
-    expect(controller.setAutomaticWidth('stacked', 340)).toBe(true);
-    expect(controller.width).toBe('340px');
-    expect(controller.minimumWidth).toBe(320);
+    expect(controller.setAutomaticWidth('stacked', 490)).toBe(true);
+    expect(controller.width).toBe('490px');
+    expect(controller.minimumWidth).toBe(480);
     expect(controller.preferredWidth).toBe(520);
-    expect(controller.setAutomaticWidth('stacked', 340)).toBe(false);
+    expect(controller.setAutomaticWidth('stacked', 490)).toBe(false);
 
     expand(controller);
     expect(controller.width).toBe('850px');
@@ -68,7 +68,7 @@ describe('ModalLayoutController', () => {
     expect(controller.preferredWidth).toBe(850);
     expect(controller.setAutomaticWidth('text-columns', 650)).toBe(true);
     expect(controller.width).toBe('650px');
-    expect(controller.setAutomaticWidth('stacked', 320)).toBe(false);
+    expect(controller.setAutomaticWidth('stacked', 480)).toBe(false);
     expect(controller.width).toBe('650px');
   });
 
@@ -85,11 +85,11 @@ describe('ModalLayoutController', () => {
   test('clears the automatic width on a new attempt or description change', () => {
     const controller = createController();
 
-    controller.setAutomaticWidth('stacked', 340);
+    controller.setAutomaticWidth('stacked', 490);
     setContent(controller, { revision: 1, hasDescription: false });
     expect(controller.width).toBeUndefined();
 
-    controller.setAutomaticWidth('stacked', 360);
+    controller.setAutomaticWidth('stacked', 500);
     setContent(controller, { revision: 1, hasDescription: true });
     expect(controller.width).toBeUndefined();
   });
@@ -101,8 +101,9 @@ describe('ModalLayoutController', () => {
 
     expect(controller.mode).toBe('stacked');
     expect(controller.columns).toBe(1);
+    expect(controller.minimumWidth).toBe(480);
+    expect(controller.preferredWidth).toBe(520);
     expect(controller.width).toBeUndefined();
-    expect(controller.minWidth).toBeUndefined();
     expect(controller.descriptionSideWidth).toBe(850);
   });
 
@@ -122,7 +123,6 @@ describe('ModalLayoutController', () => {
       expect(controller.mode).toBe(mode);
       expect(controller.columns).toBe(2);
       expect(controller.width).toBe('850px');
-      expect(controller.minWidth).toBe('610px');
     },
   );
 
@@ -135,7 +135,6 @@ describe('ModalLayoutController', () => {
     expect(controller.mode).toBe('three-columns');
     expect(controller.columns).toBe(3);
     expect(controller.width).toBe('1266px');
-    expect(controller.minWidth).toBe('906px');
   });
 
   test('keeps the description beside the text when only the description is long', () => {
@@ -173,6 +172,76 @@ describe('ModalLayoutController', () => {
 
     expect(controller.mode).toBe('three-columns');
   });
+
+  test.each([false, true])(
+    'allows native narrowing back to stacked sections and widening again with description %s',
+    (hasDescription) => {
+      const controller = createController(hasDescription);
+
+      expand(controller);
+      expect(controller.columns).toBe(2);
+
+      measure(controller, { modalWidth: 500, overflowing: true });
+      expect(controller.mode).toBe('stacked');
+
+      setContent(controller, { hasDescription });
+      measure(controller, { modalWidth: 500, overflowing: true });
+      expect(controller.mode).toBe('stacked');
+
+      measure(controller, { modalWidth: 850 });
+
+      expect(controller.mode).toBe(
+        hasDescription ? 'description-side' : 'text-columns',
+      );
+    },
+  );
+
+  test('follows manual widths through three, two and one column in both directions', () => {
+    const controller = createController(true);
+
+    useThreeColumns(controller);
+
+    for (const [modalWidth, columns] of [
+      [850, 2],
+      [500, 1],
+      [850, 2],
+      [1000, 3],
+    ]) {
+      measure(controller, {
+        modalWidth,
+        overflowing: true,
+        textColumnOverflowing: true,
+      });
+
+      expect(controller.columns).toBe(columns);
+    }
+  });
+
+  test('caps a manual width at the available viewport width', () => {
+    const controller = createController(true);
+
+    useThreeColumns(controller);
+    measure(controller, { modalWidth: 1200, viewportWidth: 600 });
+    expect(controller.mode).toBe('stacked');
+
+    measure(controller, {
+      modalWidth: 1200,
+      viewportWidth: 1440,
+      textColumnOverflowing: true,
+    });
+
+    expect(controller.mode).toBe('three-columns');
+  });
+
+  test.each([0, -1, NaN, Infinity])(
+    'ignores invalid manual width %s',
+    (modalWidth) => {
+      const controller = createController(true);
+
+      measure(controller, { overflowing: true, modalWidth });
+      expect(controller.mode).toBe('description-side');
+    },
+  );
 
   test('ignores stale geometry before updating the window width or overflow state', () => {
     const controller = createController(true);
@@ -236,7 +305,6 @@ describe('ModalLayoutController', () => {
     measure(controller, { textColumnOverflowing: true, viewportWidth: 800 });
 
     expect(controller.mode).toBe('description-side');
-    expect(controller.minWidth).toBe('610px');
 
     measure(controller, { viewportWidth: 1440, textColumnOverflowing: true });
     expect(controller.mode).toBe('three-columns');
@@ -249,7 +317,6 @@ describe('ModalLayoutController', () => {
 
     expect(controller.mode).toBe('stacked');
     expect(controller.width).toBeUndefined();
-    expect(controller.minWidth).toBeUndefined();
 
     measure(controller, { viewportWidth: 1440 });
 
@@ -404,7 +471,6 @@ describe('ModalLayoutController', () => {
 
     expect(controller.mode).toBe('stacked');
     expect(controller.width).toBeUndefined();
-    expect(controller.minWidth).toBeUndefined();
 
     setContent(controller);
     measure(controller);

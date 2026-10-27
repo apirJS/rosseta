@@ -1,6 +1,6 @@
 import { mount, unmount } from 'svelte';
 import tailwindStyles from '../../ui/styles/app.css?inline';
-import Overlay from '../../ui/injected/screen-overlay/Overlay.svelte';
+import ScreenSelectionOverlay from '../../ui/injected/screen-overlay/ScreenSelectionOverlay.svelte';
 import { CSS_MAX_Z_INDEX } from '../../ui/shared/constants/ui';
 
 const SCROLL_KEYS = new Set([
@@ -86,7 +86,7 @@ export class OverlayHandler {
       host.style.opacity = '1';
     };
 
-    const app = mount(Overlay, {
+    const app = mount(ScreenSelectionOverlay, {
       target: appContainer,
       props: {
         viewportImg: rawImage,

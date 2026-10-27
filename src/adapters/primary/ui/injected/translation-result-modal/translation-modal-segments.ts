@@ -17,7 +17,6 @@ function sourceLanguage(code: string | null): SegmentPayload['language'] {
     : { code: 'unknown', name: '' };
 }
 
-/** Live rows use array positions until the final validated block grouping arrives. */
 export function mapDraftSegments(
   draft: TranslationDraft,
   targetLanguage: SegmentPayload['language'],

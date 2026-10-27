@@ -25,21 +25,12 @@ export class AddApiKeyUseCase implements IAddApiKeyUseCase {
       return failure(AuthError.invalidApiKey(credentialResult.error.message));
     }
 
-    const storageResult = await this.credentialStorage.get();
-
-    if (!storageResult.success) {
-      return failure(storageResult.error);
-    }
-
-    const credentials = storageResult.data ?? Credentials.createEmpty(uuidv4());
-    const updated = credentials.add(credentialResult.data);
-
-    const saveResult = await this.credentialStorage.save(updated);
-
-    if (!saveResult.success) {
-      return failure(saveResult.error);
-    }
-
-    return success(updated);
+    return this.credentialStorage.update((current) =>
+      success(
+        (current ?? Credentials.createEmpty(uuidv4())).add(
+          credentialResult.data,
+        ),
+      ),
+    );
   }
 }

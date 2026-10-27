@@ -8,7 +8,11 @@ import type {
   SettingsPreferences,
 } from '../../../../../../core/domain/settings/SettingsBackup';
 import { failure, success } from '../../../../../../shared/types/Result';
-import { ValidationError } from '../../../../../../shared/errors';
+import {
+  AppError,
+  ErrorCode,
+  ValidationError,
+} from '../../../../../../shared/errors';
 import type { PopupToastController } from '../../toast/PopupToastController.svelte';
 
 const preferences: SettingsPreferences = {
@@ -39,7 +43,6 @@ function setup(overrides: Partial<SettingsDeps> = {}) {
   const deps: SettingsDeps = {
     exportSettings: { execute: vi.fn().mockResolvedValue(success(backup)) },
     importSettings: { execute: vi.fn().mockResolvedValue(success(undefined)) },
-    preferences: () => preferences,
     refresh: vi.fn().mockResolvedValue(undefined),
     toast: { show } as unknown as PopupToastController,
     ...overrides,
@@ -54,8 +57,20 @@ function jsonFile(contents: string): File {
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+
+  const promise = new Promise<T>((finish) => {
+    resolve = finish;
+  });
+
+  return { promise, resolve };
+}
+
 describe('Settings controller', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+
     vi.stubGlobal(
       'URL',
       Object.assign(class extends URL {}, {
@@ -68,17 +83,29 @@ describe('Settings controller', () => {
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  test('exports the current preferences and releases its download URL', async () => {
+  test('exports persisted settings and keeps the URL alive until the download starts', async () => {
     const { controller, deps, show } = setup();
 
+    vi.mocked(HTMLAnchorElement.prototype.click).mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      expect(this.isConnected).toBe(true);
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    });
+
     await controller.exportSettings();
-    expect(deps.exportSettings.execute).toHaveBeenCalledWith(preferences);
+    expect(deps.exportSettings.execute).toHaveBeenCalledWith();
     expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
+    expect(document.querySelector('a[download]')).toBeNull();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:settings');
     expect(controller.busy).toBe(false);
 
@@ -126,7 +153,7 @@ describe('Settings controller', () => {
     expect(show).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'error',
-        description: 'Download unavailable',
+        description: 'An unexpected error occurred.',
       }),
     );
   });
@@ -237,7 +264,150 @@ describe('Settings controller', () => {
     expect(controller.busy).toBe(false);
 
     expect(show).toHaveBeenCalledWith(
-      expect.objectContaining({ description: 'Write failed' }),
+      expect.objectContaining({ description: 'An unexpected error occurred.' }),
     );
+  });
+
+  test('accepts a UTF-8 byte order mark before JSON', async () => {
+    const { controller, deps } = setup();
+
+    await controller.importSettings(
+      jsonFile('\uFEFF' + JSON.stringify(backup)),
+    );
+
+    expect(deps.importSettings.execute).toHaveBeenCalledWith(backup);
+    expect(deps.refresh).toHaveBeenCalledOnce();
+  });
+
+  test('distinguishes a file read failure from malformed JSON', async () => {
+    const { controller, deps, show } = setup();
+    const file = jsonFile('{}');
+
+    vi.mocked(file.text).mockRejectedValue(new Error('File unavailable'));
+    await controller.importSettings(file);
+    expect(deps.importSettings.execute).not.toHaveBeenCalled();
+
+    expect(show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Could not read the selected file. Choose it again.',
+      }),
+    );
+
+    expect(controller.busy).toBe(false);
+  });
+
+  test.each(['import', 'export'] as const)(
+    'uses safe %s failure text instead of technical diagnostics',
+    async (action) => {
+      const error = new AppError({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'private storage details',
+        userMessage: 'Safe failure text',
+      });
+
+      const { controller, deps, show } = setup();
+
+      if (action === 'import') {
+        vi.mocked(deps.importSettings.execute).mockResolvedValue(
+          failure(error),
+        );
+
+        await controller.importSettings(jsonFile('{}'));
+      } else {
+        vi.mocked(deps.exportSettings.execute).mockResolvedValue(
+          failure(error),
+        );
+
+        await controller.exportSettings();
+      }
+
+      expect(show).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Safe failure text' }),
+      );
+    },
+  );
+
+  test('does not start an import if the page closes while reading its file', async () => {
+    const reading = deferred<string>();
+    const file = jsonFile('{}');
+    const { controller, deps, show } = setup();
+
+    vi.mocked(file.text).mockReturnValue(reading.promise);
+
+    const importing = controller.importSettings(file);
+
+    controller.dispose();
+    reading.resolve(JSON.stringify(backup));
+    await importing;
+    expect(deps.importSettings.execute).not.toHaveBeenCalled();
+    expect(deps.refresh).not.toHaveBeenCalled();
+    expect(show).not.toHaveBeenCalled();
+    expect(controller.busy).toBe(false);
+  });
+
+  test('finishes an already submitted import without refreshing or announcing after disposal', async () => {
+    const saving = deferred<ReturnType<typeof success<void>>>();
+
+    const { controller, deps, show } = setup({
+      importSettings: { execute: vi.fn().mockReturnValue(saving.promise) },
+    });
+
+    const importing = controller.importSettings(jsonFile('{}'));
+
+    await vi.waitFor(() =>
+      expect(deps.importSettings.execute).toHaveBeenCalledOnce(),
+    );
+
+    controller.dispose();
+    saving.resolve(success(undefined));
+    await importing;
+    expect(deps.refresh).not.toHaveBeenCalled();
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  test('does not announce a refresh that finishes after leaving the page', async () => {
+    const refreshing = deferred<void>();
+
+    const { controller, deps, show } = setup({
+      refresh: vi.fn().mockReturnValue(refreshing.promise),
+    });
+
+    const importing = controller.importSettings(jsonFile('{}'));
+
+    await vi.waitFor(() => expect(deps.refresh).toHaveBeenCalledOnce());
+    controller.dispose();
+    refreshing.resolve();
+    await importing;
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  test('does not download an export that finishes after leaving the page', async () => {
+    const exporting =
+      deferred<ReturnType<typeof success<SettingsBackupData>>>();
+
+    const { controller, show } = setup({
+      exportSettings: { execute: vi.fn().mockReturnValue(exporting.promise) },
+    });
+
+    const pending = controller.exportSettings();
+
+    controller.dispose();
+    exporting.resolve(success(backup));
+    await pending;
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  test('disposed controllers reject new import and export actions', async () => {
+    const { controller, deps } = setup();
+    const file = jsonFile('{}');
+
+    controller.dispose();
+    controller.dispose();
+    await controller.importSettings(file);
+    await controller.exportSettings();
+    expect(file.text).not.toHaveBeenCalled();
+    expect(deps.importSettings.execute).not.toHaveBeenCalled();
+    expect(deps.exportSettings.execute).not.toHaveBeenCalled();
   });
 });

@@ -23,6 +23,13 @@ describe('Domain: Language', () => {
 
   // ==================== FROM RAW ====================
   describe('fromRaw', () => {
+    test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty'])(
+      'rejects inherited object property %s',
+      (value) => {
+        expect(Language.fromRaw(value).success).toBe(false);
+      },
+    );
+
     test('accepts valid language code', () => {
       const result = Language.fromRaw('ko-KR');
 

@@ -1,4 +1,3 @@
-/** Owns the modal position and the pointer listeners used to move it. */
 export class ModalDragController {
   public x = $state(0);
   public y = $state(0);

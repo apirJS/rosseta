@@ -5,4 +5,7 @@ import type { AppError } from '../../../shared/errors';
 export interface ICredentialStorage {
   save(credentials: Credentials): Promise<Result<void, AppError>>;
   get(): Promise<Result<Credentials | null, AppError>>;
+  update(
+    change: (credentials: Credentials | null) => Result<Credentials, AppError>,
+  ): Promise<Result<Credentials, AppError>>;
 }

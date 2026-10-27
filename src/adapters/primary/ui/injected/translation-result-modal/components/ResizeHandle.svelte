@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { startSectionResize } from './section-resize';
+  import { SectionResizeController } from './SectionResizeController';
 
   interface Props {
     box: HTMLElement;
@@ -13,27 +13,19 @@
   const { box, minHeight, ariaLabel, onresizestart, onresizeend }: Props =
     $props();
 
-  let stopResize: (() => void) | undefined;
+  const controller = new SectionResizeController(() => ({
+    box,
+    minHeight,
+    onresizestart,
+    onresizeend,
+  }));
 
-  onDestroy(() => stopResize?.());
-
-  function handlePointerDown(e: PointerEvent) {
-    if (e.button !== 0) return;
-    stopResize?.();
-    onresizestart?.();
-
-    stopResize = startSectionResize({
-      event: e,
-      box,
-      minHeight,
-      onEnd: onresizeend,
-    });
-  }
+  onDestroy(controller.dispose);
 </script>
 
 <button
   type="button"
   class="resize-handle"
   aria-label={ariaLabel}
-  onpointerdown={handlePointerDown}
+  onpointerdown={controller.start}
 ></button>

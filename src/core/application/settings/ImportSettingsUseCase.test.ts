@@ -1,147 +1,97 @@
 import { describe, expect, test } from 'bun:test';
 import { ImportSettingsUseCase } from './ImportSettingsUseCase';
 import { parseSettingsBackup } from '../../domain/settings/SettingsBackup';
-import { FakeCredentialStorage } from '../../../../tests/fakes/FakeCredentialStorage';
-import { FakeUserPreferencesStorage } from '../../../../tests/fakes/FakeUserPreferencesStorage';
-import { FakeModelStorage } from '../../../../tests/fakes/FakeModelStorage';
-import { FakeCustomProviderStorage } from '../../../../tests/fakes/FakeCustomProviderStorage';
-import { FakeKeySelectionStorage } from '../../../../tests/fakes/FakeKeySelectionStorage';
-import { FakeTranslationStorage } from '../../../../tests/fakes/FakeTranslationStorage';
+import { FakeSettingsBackupStorage } from '../../../../tests/fakes/FakeSettingsBackupStorage';
 import { settingsBackupFixture } from '../../../../tests/settings-backup-fixtures';
 import { ErrorCode, StorageError } from '../../../shared/errors';
 
 function fixture() {
-  const credentials = new FakeCredentialStorage();
-  const preferences = new FakeUserPreferencesStorage();
-  const models = new FakeModelStorage();
-  const providers = new FakeCustomProviderStorage();
-  const keys = new FakeKeySelectionStorage();
-  const history = new FakeTranslationStorage();
+  const backup = settingsBackupFixture();
+  const parsed = parseSettingsBackup(backup);
 
-  const useCase = new ImportSettingsUseCase(
-    credentials,
-    preferences,
-    models,
-    providers,
-    keys,
-    history,
-  );
+  if (!parsed.success) throw parsed.error;
 
-  return {
-    credentials,
-    preferences,
-    models,
-    providers,
-    keys,
-    history,
-    useCase,
-  };
+  const storage = new FakeSettingsBackupStorage(parsed.data);
+
+  return { backup, storage, useCase: new ImportSettingsUseCase(storage) };
 }
 
 describe('Application: ImportSettingsUseCase', () => {
-  test('restores existing domain history and settings without importing capability state', async () => {
-    const backup = settingsBackupFixture();
-    const f = fixture();
+  test('validates and replaces the complete settings once without operational state', async () => {
+    const { backup, storage, useCase } = fixture();
 
-    const result = await f.useCase.execute({
+    const result = await useCase.execute({
       ...backup,
       settings: {
         ...backup.settings,
-        translationCapabilitiesV1: { facts: 'untrusted backup knowledge' },
+        translationCapabilitiesV1: { facts: 'untrusted' },
       },
     });
 
     expect(result.success).toBe(true);
-
-    const history = await f.history.getAll();
+    expect(storage.replacements).toHaveLength(1);
 
     expect(
-      history.success &&
-        history.data.map((translation) => translation.toProps()),
-    ).toEqual(backup.settings.history);
+      Object.hasOwn(storage.replacements[0]!, 'translationCapabilitiesV1'),
+    ).toBe(false);
 
-    const credentials = await f.credentials.get();
+    expect(storage.settings.credentials.getActive()?.id).toBe('key-1');
 
-    expect(credentials.success && credentials.data?.getActive()?.id).toBe(
-      'key-1',
+    expect(storage.settings.history?.map((entry) => entry.toProps())).toEqual(
+      backup.settings.history,
     );
-
-    expect(f.preferences.setCalls).toEqual([backup.settings.preferences]);
-
-    expect(f.models.getStoredModels('openai')).toEqual(
-      backup.settings.models.openai!,
-    );
-
-    expect(await f.keys.getLastUsedId('openai')).toEqual({
-      success: true,
-      data: 'key-1',
-    });
   });
 
-  test('preserves stored history when an older backup omits it and clears it when explicitly empty', async () => {
-    const backup = settingsBackupFixture();
-    const parsed = parseSettingsBackup(backup);
+  test('does not write anything for malformed backup data', async () => {
+    const { backup, storage, useCase } = fixture();
 
-    if (!parsed.success) throw parsed.error;
+    const result = await useCase.execute({
+      ...backup,
+      settings: { ...backup.settings, history: null },
+    });
 
-    const f = fixture();
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.code).toBe(ErrorCode.VALIDATION_INVALID_INPUT);
+    expect(storage.replacements).toEqual([]);
+  });
 
-    f.history.seed(parsed.data.history![0]!);
-
+  test('preserves the distinction between omitted and explicitly empty history', async () => {
+    const { backup, storage, useCase } = fixture();
     const { history: _history, ...settings } = backup.settings;
 
-    expect((await f.useCase.execute({ ...backup, settings })).success).toBe(
-      true,
-    );
-
-    expect(f.history.storedCount).toBe(1);
+    expect((await useCase.execute({ ...backup, settings })).success).toBe(true);
+    expect(storage.replacements[0]!.history).toBeNull();
+    expect(storage.settings.history).toHaveLength(1);
 
     expect(
       (
-        await f.useCase.execute({
+        await useCase.execute({
           ...backup,
           settings: { ...settings, history: [] },
         })
       ).success,
     ).toBe(true);
 
-    expect(f.history.storedCount).toBe(0);
+    expect(storage.settings.history).toEqual([]);
   });
 
-  test('rejects invalid history before mutating settings', async () => {
-    const backup = settingsBackupFixture();
-    const f = fixture();
+  test('propagates replacement failure without reporting success', async () => {
+    const { backup, storage, useCase } = fixture();
+    const error = StorageError.writeFailed('settings');
 
-    const result = await f.useCase.execute({
-      ...backup,
-      settings: { ...backup.settings, history: [{ segments: [] }] },
-    });
-
-    expect(result.success).toBe(false);
-    if (!result.success)
-      expect(result.error.code).toBe(ErrorCode.VALIDATION_INVALID_INPUT);
-    expect(f.preferences.setCalls).toEqual([]);
-    expect(f.history.storedCount).toBe(0);
-    expect(await f.credentials.get()).toEqual({ success: true, data: null });
+    storage.error = error;
+    expect(await useCase.execute(backup)).toEqual({ success: false, error });
+    expect(storage.replacements).toEqual([]);
   });
 
-  test.each([
-    'credentials',
-    'preferences',
-    'models',
-    'providers',
-    'keys',
-    'history',
-  ] as const)('returns a %s persistence failure', async (storage) => {
-    const f = fixture();
-    const error = StorageError.writeFailed(storage);
+  test('converts rejected writes into an application error', async () => {
+    const { backup, storage, useCase } = fixture();
 
-    if (storage === 'providers') f.providers.failNext(error);
-    else f[storage].failNextCallWith(error);
+    storage.replace = async () => {
+      throw new Error('write failed');
+    };
 
-    expect(await f.useCase.execute(settingsBackupFixture())).toEqual({
-      success: false,
-      error,
-    });
+    expect((await useCase.execute(backup)).success).toBe(false);
   });
 });

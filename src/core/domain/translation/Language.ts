@@ -34,7 +34,7 @@ export class Language extends ValueObject {
 
     const trimmed = raw.trim();
 
-    if (trimmed in LANGUAGE_MAP) {
+    if (Object.hasOwn(LANGUAGE_MAP, trimmed)) {
       return success(Language.create(trimmed as LanguageCode));
     }
 

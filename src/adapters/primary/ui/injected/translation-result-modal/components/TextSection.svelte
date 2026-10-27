@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { IndexedSegmentPayload } from '../translation-modal-segments';
   import ResizeHandle from './ResizeHandle.svelte';
+  import TextBlocks from './TextBlocks.svelte';
+  import RomanizationBlocks from './RomanizationBlocks.svelte';
+  import { TextSectionController } from './TextSectionController';
 
   interface Props {
     blocks: IndexedSegmentPayload[][];
@@ -24,80 +27,40 @@
 
   let textBoxEl = $state<HTMLDivElement>();
 
-  let isResizing = $state(false);
-
-  function handleSegmentPointer(e: PointerEvent) {
-    if (isResizing) return;
-
-    const target = (e.target as HTMLElement).closest<HTMLElement>(
-      '[data-seg-index]',
-    );
-
-    if (!target) return;
-
-    const i = Number(target.dataset.segIndex);
-
-    onSegmentIndexHover?.(i);
-  }
-
-  function handleSegmentLeave() {
-    if (isResizing) return;
-    onSegmentIndexHover?.(null);
-  }
+  const controller = new TextSectionController(() => ({
+    blocks,
+    onSegmentIndexHover,
+  }));
 </script>
 
 <div class="text-box" bind:this={textBoxEl}>
   <div
     class="text-content"
     role="group"
-    onpointerenter={handleSegmentPointer}
-    onpointermove={handleSegmentPointer}
-    onpointerleave={handleSegmentLeave}
+    onpointerenter={controller.handleSegmentPointer}
+    onpointermove={controller.handleSegmentPointer}
+    onpointerleave={controller.handleSegmentLeave}
   >
-    {#each blocks as block (block[0].rowKey ?? block[0].index)}
-      <span class="text-block">
-        {#each block as segment (segment.rowKey ?? segment.index)}
-          <span
-            data-seg-index={segment.index}
-            class="text-segment {isMultiLang
-              ? 'lang-gray-' + langColorMap.get(segment.language.code)
-              : ''}"
-            class:seg-highlight={highlightIndex === segment.index}
-          >
-            {segment.text || (pending ? '…' : '')}
-          </span>{' '}
-        {/each}
-      </span>
-    {/each}
-    {#if blocks.length === 0 && pending}
-      <span class="translation-pending">Waiting for text…</span>
-    {/if}
+    <TextBlocks
+      {blocks}
+      {langColorMap}
+      {isMultiLang}
+      {highlightIndex}
+      {pending}
+    />
   </div>
   {#if hasRomanization}
     <div
       class="text-romanization"
       role="group"
-      onpointerenter={handleSegmentPointer}
-      onpointermove={handleSegmentPointer}
-      onpointerleave={handleSegmentLeave}
+      onpointerenter={controller.handleSegmentPointer}
+      onpointermove={controller.handleSegmentPointer}
+      onpointerleave={controller.handleSegmentLeave}
     >
-      {#each blocks as block (block[0].rowKey ?? block[0].index)}
-        {#if block.some((segment) => segment.romanization)}
-          <span class="text-block">
-            {#each block as segment (segment.rowKey ?? segment.index)}
-              {#if segment.romanization}
-                <span
-                  data-seg-index={segment.index}
-                  class="rom-segment"
-                  class:rom-highlight={highlightIndex === segment.index}
-                >
-                  {segment.romanization}
-                </span>{' '}
-              {/if}
-            {/each}
-          </span>
-        {/if}
-      {/each}
+      <RomanizationBlocks
+        blocks={controller.romanizedBlocks}
+        {highlightIndex}
+      />
     </div>
   {/if}
 </div>
@@ -106,7 +69,7 @@
     box={textBoxEl}
     minHeight={60}
     ariaLabel="Resize text section"
-    onresizestart={() => (isResizing = true)}
-    onresizeend={() => (isResizing = false)}
+    onresizestart={controller.startResize}
+    onresizeend={controller.endResize}
   />
 {/if}

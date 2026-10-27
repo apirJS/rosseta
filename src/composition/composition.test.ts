@@ -7,6 +7,7 @@ import { completeTranslation } from '../../tests/background-translation-fixtures
 import { createProviderMutationLock } from './storage';
 import { makeCustomProviderConfig } from '../../tests/fakes/FakeCustomProviderStorage';
 import { success } from '../shared/types/Result';
+import { settingsBackupFixture } from '../../tests/settings-backup-fixtures';
 
 describe('Composition: independent browser contexts', () => {
   beforeEach(resetBrowserMock);
@@ -133,5 +134,33 @@ describe('Composition: independent browser contexts', () => {
     const configs = await popup.customProviderStorage.load();
 
     expect(configs.success && configs.data).toEqual([]);
+  });
+
+  test('a settings import is usable by a fresh background and can be exported unchanged', async () => {
+    const backup = settingsBackupFixture();
+
+    backup.settings.history[0]!.createdAt = new Date().toISOString();
+
+    const popup = createPopupDependencies();
+
+    expect((await popup.importSettingsUseCase.execute(backup)).success).toBe(
+      true,
+    );
+
+    const background = createBackgroundDependencies();
+
+    const resolved =
+      await background.resolveTranslationConfigurationUseCase.execute();
+
+    expect(resolved.success).toBe(true);
+    if (!resolved.success) throw resolved.error;
+    expect(resolved.data.credential.provider).toBe('openai');
+    expect(resolved.data.modelId).toBe('vision-model');
+    expect(resolved.data.targetLanguage.code).toBe('en-US');
+
+    const exported =
+      await createPopupDependencies().exportSettingsUseCase.execute();
+
+    expect(exported.success && exported.data.settings).toEqual(backup.settings);
   });
 });

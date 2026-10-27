@@ -2,7 +2,7 @@
 
 ### Features
 
-* layout behavior opmizations ([#12](https://github.com/apirJS/rosseta/issues/12)) ([f045873](https://github.com/apirJS/rosseta/commit/f04587357f0bf353d0fee416edef70998734fbae))
+- layout behavior opmizations ([#12](https://github.com/apirJS/rosseta/issues/12)) ([f045873](https://github.com/apirJS/rosseta/commit/f04587357f0bf353d0fee416edef70998734fbae))
 
 ## [3.0.0](https://github.com/apirJS/rosseta/compare/v2.2.1...v3.0.0) (2026-10-23)
 

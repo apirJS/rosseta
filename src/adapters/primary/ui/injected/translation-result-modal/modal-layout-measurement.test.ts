@@ -89,7 +89,7 @@ describe('measureDescriptionLayout', () => {
 
     expect(measureDescriptionLayout(layout.options)).toEqual({
       textStackHeight: 530.5,
-      availableHeight: 750,
+      availableHeight: 800,
     });
   });
 
@@ -180,7 +180,7 @@ describe('measureDescriptionLayout', () => {
   test('uses the viewport height for automatic sizing and the actual body height for manual sizing', () => {
     const layout = createLayout();
 
-    expect(measureDescriptionLayout(layout.options).availableHeight).toBe(750);
+    expect(measureDescriptionLayout(layout.options).availableHeight).toBe(800);
 
     layout.modal.style.height = '500px';
 

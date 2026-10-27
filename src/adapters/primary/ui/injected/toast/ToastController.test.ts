@@ -1,7 +1,7 @@
-import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ToastController } from './ToastController.svelte';
 
-describe('UI Controller: ToastController', () => {
+describe('ToastController', () => {
   let controller: ToastController;
 
   beforeEach(() => {
@@ -10,170 +10,245 @@ describe('UI Controller: ToastController', () => {
   });
 
   afterEach(() => {
+    controller.dispose();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  // ── show() ─────────────────────────────────────────────────────
-
-  test('show() adds a toast and returns its id', () => {
-    const id = controller.show({ type: 'success', message: 'Done!' });
-
-    expect(id).toBeTypeOf('string');
-    expect(controller.toasts).toHaveLength(1);
-    expect(controller.toasts[0].type).toBe('success');
-    expect(controller.toasts[0].message).toBe('Done!');
-  });
-
-  test('show() prepends newest toast to top', () => {
+  test('shows the newest notification first with its message and description', () => {
     controller.show({ type: 'info', message: 'First' });
-    controller.show({ type: 'info', message: 'Second' });
 
-    expect(controller.toasts[0].message).toBe('Second');
-    expect(controller.toasts[1].message).toBe('First');
+    const id = controller.show({
+      type: 'success',
+      message: 'Done',
+      description: 'Saved to history',
+    });
+
+    expect(controller.toasts.map((toast) => toast.message)).toEqual([
+      'Done',
+      'First',
+    ]);
+
+    expect(controller.toasts[0]).toMatchObject({
+      id,
+      type: 'success',
+      description: 'Saved to history',
+    });
   });
 
-  test('show() caps at MAX_TOASTS (5)', () => {
-    for (let i = 0; i < 7; i++) {
-      controller.show({ type: 'info', message: `Toast ${i}` });
+  test('keeps five notifications and cancels timers for evicted ones', () => {
+    for (let index = 0; index < 7; index++) {
+      controller.show({ type: 'info', message: `Toast ${index}` });
     }
 
-    expect(controller.toasts).toHaveLength(5);
-    // Newest should be first
-    expect(controller.toasts[0].message).toBe('Toast 6');
+    expect(controller.toasts.map((toast) => toast.message)).toEqual([
+      'Toast 6',
+      'Toast 5',
+      'Toast 4',
+      'Toast 3',
+      'Toast 2',
+    ]);
+
+    expect(vi.getTimerCount()).toBe(5);
   });
 
-  test('show() uses custom id when provided', () => {
-    const id = controller.show({
-      type: 'info',
-      message: 'Hello',
-      id: 'custom-id',
-    });
-
-    expect(id).toBe('custom-id');
-    expect(controller.toasts[0].id).toBe('custom-id');
-  });
-
-  test('show() includes description when provided', () => {
-    controller.show({
-      type: 'error',
-      message: 'Error!',
-      description: 'Something went wrong',
-    });
-
-    expect(controller.toasts[0].description).toBe('Something went wrong');
-  });
-
-  // ── Auto-dismiss ───────────────────────────────────────────────
-
-  test('non-loading toasts auto-dismiss after default 4000ms', () => {
-    controller.show({ type: 'success', message: 'Done!' });
+  test('replaces a repeated ID and cancels its previous expiration', () => {
+    controller.show({ id: 'job', type: 'info', message: 'Old', duration: 10 });
+    controller.show({ id: 'job', type: 'loading', message: 'New' });
+    vi.advanceTimersByTime(5000);
 
     expect(controller.toasts).toHaveLength(1);
-
-    // Advance past auto-dismiss timer
-    vi.advanceTimersByTime(4000);
-    // Toast enters dismissing state
-    expect(controller.toasts[0]?.dismissing).toBe(true);
-
-    // After dismiss animation (250ms), toast is removed
-    vi.advanceTimersByTime(250);
-    expect(controller.toasts).toHaveLength(0);
+    expect(controller.toasts[0]).toMatchObject({ id: 'job', message: 'New' });
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  test('loading toasts do NOT auto-dismiss (duration defaults to 0)', () => {
-    controller.show({ type: 'loading', message: 'Processing...' });
+  test('automatically dismisses a completed notification after four seconds', () => {
+    controller.show({ type: 'success', message: 'Done' });
+    vi.advanceTimersByTime(3999);
+    expect(controller.toasts[0].dismissing).toBeUndefined();
 
-    vi.advanceTimersByTime(10000);
-
-    // Still present
-    expect(controller.toasts).toHaveLength(1);
-    expect(controller.toasts[0].type).toBe('loading');
-  });
-
-  test('custom duration overrides default', () => {
-    controller.show({ type: 'info', message: 'Quick', duration: 1000 });
-
-    vi.advanceTimersByTime(1000);
-    expect(controller.toasts[0]?.dismissing).toBe(true);
-
-    vi.advanceTimersByTime(250);
-    expect(controller.toasts).toHaveLength(0);
-  });
-
-  // ── dismiss() ──────────────────────────────────────────────────
-
-  test('dismiss() sets dismissing=true, then removes after animation', () => {
-    const id = controller.show({ type: 'info', message: 'Bye', duration: 0 });
-
-    controller.dismiss(id);
-
-    // Immediately: dismissing flag is set
+    vi.advanceTimersByTime(1);
     expect(controller.toasts[0].dismissing).toBe(true);
 
-    // After animation delay
     vi.advanceTimersByTime(250);
     expect(controller.toasts).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  test('dismiss() no-ops for unknown id', () => {
-    controller.show({ type: 'info', message: 'Stay', duration: 0 });
-
-    controller.dismiss('nonexistent-id');
+  test('keeps loading notifications until explicitly dismissed', () => {
+    controller.show({ type: 'loading', message: 'Processing' });
+    vi.advanceTimersByTime(60_000);
 
     expect(controller.toasts).toHaveLength(1);
-    expect(controller.toasts[0].dismissing).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  // ── update() ───────────────────────────────────────────────────
+  test('uses explicit durations, including persistent completed notifications', () => {
+    controller.show({ type: 'success', message: 'Persistent', duration: 0 });
+    controller.show({ type: 'loading', message: 'Brief', duration: 100 });
+    vi.advanceTimersByTime(350);
 
-  test('update() modifies an existing toast', () => {
-    const id = controller.show({
-      type: 'loading',
-      message: 'Loading...',
+    expect(controller.toasts.map((toast) => toast.message)).toEqual([
+      'Persistent',
+    ]);
+  });
+
+  test('starts the completed notification timer when loading finishes', () => {
+    const id = controller.show({ type: 'loading', message: 'Processing' });
+
+    controller.update(id, { type: 'success', message: 'Complete' });
+    vi.advanceTimersByTime(4000);
+
+    expect(controller.toasts[0]).toMatchObject({
+      type: 'success',
+      message: 'Complete',
+      dismissing: true,
     });
-
-    controller.update(id, { type: 'success', message: 'Complete!' });
-
-    expect(controller.toasts[0].type).toBe('success');
-    expect(controller.toasts[0].message).toBe('Complete!');
-    // updated type is non-loading, so it gets an auto-dismiss timer
   });
 
-  test('update() resets dismissing state', () => {
+  test('restarts expiration when a notification is updated', () => {
+    const id = controller.show({ type: 'info', message: 'Old', duration: 100 });
+
+    vi.advanceTimersByTime(50);
+    controller.update(id, { message: 'New', duration: 200 });
+    vi.advanceTimersByTime(100);
+    expect(controller.toasts[0].dismissing).toBe(false);
+
+    vi.advanceTimersByTime(100);
+    expect(controller.toasts[0].dismissing).toBe(true);
+  });
+
+  test('updating during dismissal cancels the pending removal', () => {
     const id = controller.show({ type: 'info', message: 'Old', duration: 0 });
 
     controller.dismiss(id);
-    expect(controller.toasts[0].dismissing).toBe(true);
+    vi.advanceTimersByTime(100);
+    controller.update(id, { message: 'Refreshed', duration: 0 });
+    vi.advanceTimersByTime(1000);
 
-    // Update before animation finishes
-    controller.update(id, { message: 'Refreshed' });
+    expect(controller.toasts[0]).toMatchObject({
+      message: 'Refreshed',
+      dismissing: false,
+    });
 
-    expect(controller.toasts[0].dismissing).toBe(false);
-    expect(controller.toasts[0].message).toBe('Refreshed');
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  test('update() no-ops for unknown id', () => {
-    controller.show({ type: 'info', message: 'Stay' });
+  test('showing a replacement during dismissal cancels the pending removal', () => {
+    controller.show({ id: 'job', type: 'info', message: 'Old' });
+    controller.dismiss('job');
+    controller.show({ id: 'job', type: 'loading', message: 'Replacement' });
+    vi.advanceTimersByTime(1000);
 
-    controller.update('nonexistent', { message: 'Changed' });
+    expect(controller.toasts[0].message).toBe('Replacement');
+  });
+
+  test('repeated dismissal preserves the first removal deadline', () => {
+    const id = controller.show({ type: 'info', message: 'Bye', duration: 0 });
+
+    controller.dismiss(id);
+    vi.advanceTimersByTime(200);
+    controller.dismiss(id);
+    vi.advanceTimersByTime(50);
+
+    expect(controller.toasts).toHaveLength(0);
+  });
+
+  test('ignores updates, dismissals and actions for unknown notifications', async () => {
+    controller.show({ type: 'info', message: 'Stay', duration: 0 });
+    controller.update('unknown', { message: 'Changed' });
+    controller.dismiss('unknown');
+    await controller.activate('unknown');
 
     expect(controller.toasts[0].message).toBe('Stay');
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  test('update() from loading to success starts auto-dismiss', () => {
-    const id = controller.show({ type: 'loading', message: 'Processing...' });
+  test('invokes an action once and dismisses its notification', async () => {
+    let finish: (() => void) | undefined;
 
-    // Loading doesn't auto-dismiss
-    vi.advanceTimersByTime(10000);
-    expect(controller.toasts).toHaveLength(1);
+    const onAction = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
 
-    // Update to success → now it should auto-dismiss
-    controller.update(id, { type: 'success', message: 'Done!' });
+    const id = controller.show({ type: 'error', message: 'Failed', onAction });
 
-    vi.advanceTimersByTime(4000);
-    expect(controller.toasts[0]?.dismissing).toBe(true);
+    const action = controller.activate(id);
 
+    await controller.activate(id);
+
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(controller.toasts[0].dismissing).toBe(true);
+    finish?.();
+    await action;
     vi.advanceTimersByTime(250);
     expect(controller.toasts).toHaveLength(0);
+  });
+
+  test.each(['throws', 'rejects'])(
+    'handles an action that %s without an unhandled error',
+    async (failure) => {
+      const error = new Error('Retry failed');
+
+      const log = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+
+      const onAction =
+        failure === 'throws'
+          ? () => {
+              throw error;
+            }
+          : () => Promise.reject(error);
+
+      const id = controller.show({
+        type: 'error',
+        message: 'Failed',
+        onAction,
+      });
+
+      await expect(controller.activate(id)).resolves.toBeUndefined();
+      expect(log).toHaveBeenCalledWith('Failed to run toast action:', error);
+      vi.advanceTimersByTime(250);
+      expect(controller.toasts).toHaveLength(0);
+    },
+  );
+
+  test('clearing cancels expiration and animation timers while allowing reuse', () => {
+    const id = controller.show({ type: 'success', message: 'Dismissing' });
+
+    controller.dismiss(id);
+    controller.show({ type: 'info', message: 'Waiting' });
+    controller.clear();
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(controller.toasts).toHaveLength(0);
+    controller.show({ type: 'loading', message: 'New mount' });
+    expect(controller.toasts[0].message).toBe('New mount');
+  });
+
+  test('disposal cancels timers and ignores later operations', async () => {
+    const action = vi.fn();
+
+    const id = controller.show({
+      type: 'error',
+      message: 'Failed',
+      onAction: action,
+    });
+
+    controller.dismiss(id);
+    controller.dispose();
+    controller.dispose();
+    controller.show({ type: 'success', message: 'Late' });
+    controller.update(id, { message: 'Late' });
+    controller.dismiss(id);
+    await controller.activate(id);
+
+    expect(controller.toasts).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(action).not.toHaveBeenCalled();
   });
 });

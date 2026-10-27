@@ -12,12 +12,12 @@ function columnsWidth(count: number, columnWidth: number): number {
   );
 }
 
-/** Switches overflowing results to columns without bouncing between layouts. */
 export class ModalLayoutController {
   private bodyOverflowed = $state(false);
   private textColumnOverflowed = $state(false);
   private hasDescription = $state(false);
   private viewportWidth = $state(0);
+  private modalWidth = $state<number>();
   private automaticWidth = $state<{ mode: ModalLayoutMode; width: number }>();
   private revision = 0;
 
@@ -46,7 +46,7 @@ export class ModalLayoutController {
   );
 
   public readonly minimumWidth = $derived(
-    this.columns > 1 ? columnsWidth(this.columns, MIN_COLUMN_WIDTH) : 320,
+    this.columns > 1 ? columnsWidth(this.columns, MIN_COLUMN_WIDTH) : 480,
   );
 
   public readonly width = $derived(
@@ -55,12 +55,6 @@ export class ModalLayoutController {
       : this.columns > 1
         ? `${this.preferredWidth}px`
         : undefined,
-  );
-
-  public readonly minWidth = $derived(
-    this.columns > 1
-      ? `${columnsWidth(this.columns, MIN_COLUMN_WIDTH)}px`
-      : undefined,
   );
 
   public setContent(content: {
@@ -108,12 +102,20 @@ export class ModalLayoutController {
     overflowing: boolean;
     textColumnOverflowing: boolean;
     viewportWidth: number;
+    modalWidth?: number;
     availableHeight: number;
     textStackHeight: number;
   }): void {
     if (measurement.renderedMode !== this.mode) return;
 
+    const modalWidth = measurement.modalWidth;
+
     this.viewportWidth = measurement.viewportWidth;
+
+    this.modalWidth =
+      modalWidth !== undefined && Number.isFinite(modalWidth) && modalWidth > 0
+        ? modalWidth
+        : undefined;
 
     // Keep the expanded layout after it removes the original body overflow.
     if (measurement.overflowing) this.bodyOverflowed = true;
@@ -133,6 +135,11 @@ export class ModalLayoutController {
   }
 
   private columnsFit(count: number): boolean {
-    return this.viewportWidth * 0.9 >= columnsWidth(count, MIN_COLUMN_WIDTH);
+    const availableWidth = Math.min(
+      this.viewportWidth * 0.9,
+      this.modalWidth ?? Infinity,
+    );
+
+    return availableWidth >= columnsWidth(count, MIN_COLUMN_WIDTH);
   }
 }

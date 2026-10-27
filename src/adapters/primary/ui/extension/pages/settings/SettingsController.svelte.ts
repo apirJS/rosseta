@@ -1,10 +1,10 @@
 import type { IExportSettingsUseCase } from '../../../../../../core/ports/inbound/settings/IExportSettingsUseCase';
 import type { IImportSettingsUseCase } from '../../../../../../core/ports/inbound/settings/IImportSettingsUseCase';
-import type {
-  SettingsBackupData,
-  SettingsPreferences,
-} from '../../../../../../core/domain/settings/SettingsBackup';
+import type { SettingsBackupData } from '../../../../../../core/domain/settings/SettingsBackup';
 import type { PopupToastController } from '../../toast/PopupToastController.svelte';
+import { AppError } from '../../../../../../shared/errors';
+
+const DOWNLOAD_URL_LIFETIME_MS = 1000;
 
 class SettingsState {
   isExporting = $state(false);
@@ -14,7 +14,6 @@ class SettingsState {
 export interface SettingsDeps {
   exportSettings: IExportSettingsUseCase;
   importSettings: IImportSettingsUseCase;
-  preferences: () => SettingsPreferences;
   refresh: () => Promise<void>;
   toast: PopupToastController;
 }
@@ -22,16 +21,19 @@ export interface SettingsDeps {
 export function createSettingsController(deps: SettingsDeps) {
   const state = new SettingsState();
   const busy = $derived(state.isExporting || state.isImporting);
+  let disposed = false;
 
   async function exportSettings() {
-    if (busy) return;
+    if (disposed || busy) return;
     state.isExporting = true;
 
     try {
-      const result = await deps.exportSettings.execute(deps.preferences());
+      const result = await deps.exportSettings.execute();
+
+      if (disposed) return;
 
       if (!result.success) {
-        showError('export', result.error.message);
+        showError('export', result.error.userMessage);
 
         return;
       }
@@ -39,24 +41,36 @@ export function createSettingsController(deps: SettingsDeps) {
       downloadBackup(result.data);
       deps.toast.show({ type: 'success', message: 'Settings exported' });
     } catch (error) {
-      showError(
-        'export',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      showError('export', AppError.fromUnknown(error).userMessage);
     } finally {
       state.isExporting = false;
     }
   }
 
   async function importSettings(file: File) {
-    if (busy) return;
+    if (disposed || busy) return;
     state.isImporting = true;
 
     try {
+      let contents: string;
+
+      try {
+        contents = await file.text();
+      } catch {
+        showError(
+          'import',
+          'Could not read the selected file. Choose it again.',
+        );
+
+        return;
+      }
+
+      if (disposed) return;
+
       let data: unknown;
 
       try {
-        data = JSON.parse(await file.text()) as unknown;
+        data = JSON.parse(contents.replace(/^\uFEFF/, '')) as unknown;
       } catch {
         showError('import', 'Choose a valid JSON settings file.');
 
@@ -65,8 +79,10 @@ export function createSettingsController(deps: SettingsDeps) {
 
       const result = await deps.importSettings.execute(data);
 
+      if (disposed) return;
+
       if (!result.success) {
-        showError('import', result.error.message);
+        showError('import', result.error.userMessage);
 
         return;
       }
@@ -82,22 +98,23 @@ export function createSettingsController(deps: SettingsDeps) {
         return;
       }
 
+      if (disposed) return;
+
       deps.toast.show({
         type: 'success',
         message: 'Settings imported',
-        description: 'Your settings and translation history are now active.',
+        description: 'Your imported settings are now active.',
       });
     } catch (error) {
-      showError(
-        'import',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      showError('import', AppError.fromUnknown(error).userMessage);
     } finally {
       state.isImporting = false;
     }
   }
 
   function showError(action: 'export' | 'import', description: string) {
+    if (disposed) return;
+
     deps.toast.show({
       type: 'error',
       message: `Could not ${action} settings`,
@@ -112,6 +129,9 @@ export function createSettingsController(deps: SettingsDeps) {
     },
     exportSettings,
     importSettings,
+    dispose() {
+      disposed = true;
+    },
   };
 }
 
@@ -120,15 +140,24 @@ function downloadBackup(backup: SettingsBackupData) {
     type: 'application/json',
   });
 
+  const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
+  let started = false;
 
   try {
-    const link = document.createElement('a');
-
     link.href = url;
     link.download = `rosseta-settings-${new Date().toISOString().slice(0, 10)}.json`;
+    link.hidden = true;
+    document.body.append(link);
     link.click();
+    started = true;
   } finally {
-    URL.revokeObjectURL(url);
+    link.remove();
+
+    if (started) {
+      setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_LIFETIME_MS);
+    } else {
+      URL.revokeObjectURL(url);
+    }
   }
 }

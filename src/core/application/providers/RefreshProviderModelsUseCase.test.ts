@@ -351,10 +351,13 @@ describe('Application: RefreshProviderModelsUseCase', () => {
     const reading = deferred();
     const release = deferred();
     const originalRead = storage.getModels.bind(storage);
+    let reads = 0;
 
     storage.getModels = async (id) => {
-      reading.resolve();
-      await release.promise;
+      if (++reads === 2) {
+        reading.resolve();
+        await release.promise;
+      }
 
       return originalRead(id);
     };
@@ -475,6 +478,65 @@ describe('Application: RefreshProviderModelsUseCase', () => {
     expect(storage.getStoredModels(provider)).toEqual([]);
     expect(preferencesStorage.stored?.selectedModels).toEqual({});
   });
+
+  test.each(['key', 'endpoint', 'catalog', 'selection'] as const)(
+    'does not overwrite imported settings after the %s changes during networking',
+    async (changed) => {
+      const provider = 'custom-import-during-fetch';
+
+      seedKey(provider);
+
+      await customProviderStorage.save(
+        makeCustomProviderConfig({ id: provider }),
+      );
+
+      const fetch = new DeferredModelFetchService();
+      const pending = createUseCase(fetch).execute(provider);
+
+      await fetch.started;
+
+      if (changed === 'key') {
+        const key = ApiKey.createWithProvider('imported-key', provider);
+
+        if (!key.success) throw key.error;
+
+        const credential = Credential.create('imported-id', key.data, provider);
+
+        if (!credential.success) throw credential.error;
+
+        credentialStorage.seedWith(
+          Credentials.createEmpty('imported').add(credential.data),
+        );
+      }
+
+      if (changed === 'endpoint')
+        await customProviderStorage.save(
+          makeCustomProviderConfig({
+            id: provider,
+            baseURL: 'https://imported.example/v1',
+          }),
+        );
+      if (changed === 'selection')
+        seedPreferences({ [provider]: 'imported-selection' });
+      if (changed === 'catalog')
+        storage.seedModels(provider, [
+          { id: 'imported-model', name: 'Imported', source: 'manual' },
+        ]);
+      fetch.resolveModels([{ id: 'stale-response', name: 'Stale' }]);
+
+      const result = await pending;
+
+      expect(result.success).toBe(false);
+
+      expect(
+        storage
+          .getStoredModels(provider)
+          .some((model) => model.id === 'stale-response'),
+      ).toBe(false);
+
+      expect(capabilityStorage.resetNamespaceCalls).toEqual([]);
+    },
+  );
 
   test('returns lock acquisition failure without persisting models or resetting compatibility', async () => {
     const error = StorageError.writeFailed('provider mutation lock');

@@ -48,6 +48,14 @@ function validateHeaders(
         new DomainError(`Header "${name}" contains control characters`),
       );
     }
+
+    if (Array.from(value).some((character) => character.charCodeAt(0) > 0xff)) {
+      return failure(
+        new DomainError(
+          `Header "${name}" contains characters unsupported by HTTP headers`,
+        ),
+      );
+    }
   }
 
   return success(undefined);
@@ -118,10 +126,13 @@ export class CustomProviderConfig extends ValueObject {
   static create(
     props: CustomProviderConfigProps,
   ): Result<CustomProviderConfig, DomainError> {
-    if (!isCustomProviderId(props.id)) {
+    if (
+      !isCustomProviderId(props.id) ||
+      !props.id.slice(CUSTOM_PROVIDER_ID_PREFIX.length).trim()
+    ) {
       return failure(
         new DomainError(
-          `Provider id must start with "${CUSTOM_PROVIDER_ID_PREFIX}"`,
+          `Provider id must start with "${CUSTOM_PROVIDER_ID_PREFIX}" and include an identifier`,
         ),
       );
     }
@@ -137,6 +148,34 @@ export class CustomProviderConfig extends ValueObject {
     if (!URL_PATTERN.test(baseURL)) {
       return failure(
         new DomainError('Base URL must start with http:// or https://'),
+      );
+    }
+
+    let parsedURL: URL;
+
+    try {
+      parsedURL = new URL(baseURL);
+    } catch {
+      return failure(
+        new DomainError('Base URL must be a valid HTTP or HTTPS URL'),
+      );
+    }
+
+    if (
+      (parsedURL.protocol !== 'http:' && parsedURL.protocol !== 'https:') ||
+      !parsedURL.hostname ||
+      containsControlCharacter(baseURL)
+    ) {
+      return failure(
+        new DomainError('Base URL must be a valid HTTP or HTTPS URL'),
+      );
+    }
+
+    if (parsedURL.username || parsedURL.password) {
+      return failure(
+        new DomainError(
+          'Base URL cannot contain a username or password; use headers for authentication',
+        ),
       );
     }
 

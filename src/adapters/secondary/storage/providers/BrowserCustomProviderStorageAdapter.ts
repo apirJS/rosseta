@@ -7,17 +7,30 @@ import { success, failure, type Result } from '../../../../shared/types/Result';
 import { StorageError, type AppError } from '../../../../shared/errors';
 import * as browser from 'webextension-polyfill';
 import { z } from 'zod';
+import { BrowserProviderMutationLock } from './BrowserProviderMutationLock';
 
 const STORAGE_KEY = 'customProviders';
 const LEGACY_STORAGE_KEY = 'customProviderConfig';
+
+const StringRecordSchema = z.custom<Record<string, string>>((value) => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    return false;
+
+  const prototype = Object.getPrototypeOf(value);
+
+  return (
+    (prototype === Object.prototype || prototype === null) &&
+    Object.values(value).every((entry) => typeof entry === 'string')
+  );
+});
 
 const CustomProviderConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   baseURL: z.string(),
   type: z.enum(['openai-compatible', 'anthropic']).optional(),
-  headers: z.record(z.string(), z.string()).optional(),
-  queryParams: z.record(z.string(), z.string()).optional(),
+  headers: StringRecordSchema.optional(),
+  queryParams: StringRecordSchema.optional(),
 });
 
 const CustomProvidersSchema = z.object({
@@ -55,6 +68,15 @@ export class BrowserCustomProviderStorageAdapter implements ICustomProviderStora
   }
 
   async save(config: CustomProviderConfig): Promise<Result<void, AppError>> {
+    return new BrowserProviderMutationLock().run(
+      'settings-custom-providers',
+      () => this.saveConfig(config),
+    );
+  }
+
+  private async saveConfig(
+    config: CustomProviderConfig,
+  ): Promise<Result<void, AppError>> {
     const loadResult = await this.load();
 
     if (!loadResult.success) {
@@ -72,10 +94,20 @@ export class BrowserCustomProviderStorageAdapter implements ICustomProviderStora
   async replaceAll(
     configs: CustomProviderConfig[],
   ): Promise<Result<void, AppError>> {
-    return this.persist(configs);
+    return new BrowserProviderMutationLock().run(
+      'settings-custom-providers',
+      () => this.persist(configs),
+    );
   }
 
   async remove(id: string): Promise<Result<void, AppError>> {
+    return new BrowserProviderMutationLock().run(
+      'settings-custom-providers',
+      () => this.removeConfig(id),
+    );
+  }
+
+  private async removeConfig(id: string): Promise<Result<void, AppError>> {
     const loadResult = await this.load();
 
     if (!loadResult.success) {

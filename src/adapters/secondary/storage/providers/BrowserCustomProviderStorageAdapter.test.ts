@@ -35,6 +35,28 @@ describe('Adapter: BrowserCustomProviderStorageAdapter', () => {
 
   beforeEach(() => resetBrowserMock());
 
+  test('preserves literal prototype-like header and query keys through storage reads', async () => {
+    const config = createConfig({
+      headers: JSON.parse('{"__proto__":"literal-header"}'),
+      queryParams: JSON.parse('{"__proto__":"literal-query"}'),
+    });
+
+    expect((await adapter.save(config)).success).toBe(true);
+
+    const loaded = await adapter.load();
+
+    expect(loaded.success).toBe(true);
+    if (!loaded.success) throw loaded.error;
+
+    expect(Object.entries(loaded.data[0]!.headers!)).toEqual([
+      ['__proto__', 'literal-header'],
+    ]);
+
+    expect(Object.entries(loaded.data[0]!.queryParams!)).toEqual([
+      ['__proto__', 'literal-query'],
+    ]);
+  });
+
   test('load() returns an empty list when nothing stored', async () => {
     const result = await adapter.load();
 

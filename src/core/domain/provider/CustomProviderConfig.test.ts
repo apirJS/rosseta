@@ -17,6 +17,63 @@ function baseProps(
 }
 
 describe('Domain: CustomProviderConfig', () => {
+  test.each(['custom-', 'custom- ', 'custom-\t'])(
+    'rejects an empty custom identifier %s',
+    (id) => {
+      expect(CustomProviderConfig.create(baseProps({ id })).success).toBe(
+        false,
+      );
+    },
+  );
+
+  test.each([
+    'https://%',
+    'http://[invalid',
+    'https://example.com:99999',
+    'https://exa\nmple.com',
+  ])('rejects an unusable endpoint %s', (baseURL) => {
+    expect(CustomProviderConfig.create(baseProps({ baseURL })).success).toBe(
+      false,
+    );
+  });
+
+  test.each([
+    'https://user:password@example.com/v1',
+    'http://user@example.com',
+  ])('rejects URL credentials that browser fetch cannot send', (baseURL) => {
+    expect(CustomProviderConfig.create(baseProps({ baseURL })).success).toBe(
+      false,
+    );
+  });
+
+  test.each([
+    'http://localhost:8080/v1',
+    'https://api.example.com/v1?mode=vision',
+    'http://[::1]:3000/v1',
+  ])('keeps valid local and remote endpoints %s', (baseURL) => {
+    expect(CustomProviderConfig.create(baseProps({ baseURL })).success).toBe(
+      true,
+    );
+  });
+
+  test.each(['日本語', 'Bearer 😀'])(
+    'rejects header values that cannot be represented as HTTP header bytes',
+    (value) => {
+      expect(
+        CustomProviderConfig.create(
+          baseProps({ headers: { 'X-Token': value } }),
+        ).success,
+      ).toBe(false);
+    },
+  );
+
+  test('keeps valid Latin-1 header values', () => {
+    expect(
+      CustomProviderConfig.create(baseProps({ headers: { 'X-Label': 'café' } }))
+        .success,
+    ).toBe(true);
+  });
+
   test('creates a valid config', () => {
     const result = CustomProviderConfig.create(baseProps());
 

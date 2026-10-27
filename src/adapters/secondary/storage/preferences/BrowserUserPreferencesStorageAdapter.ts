@@ -8,6 +8,7 @@ import { StorageError, type AppError } from '../../../../shared/errors';
 import * as browser from 'webextension-polyfill';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
+import { BrowserProviderMutationLock } from '../providers/BrowserProviderMutationLock';
 
 const STORAGE_KEY = 'userPreferences';
 
@@ -23,9 +24,20 @@ export class BrowserUserPreferencesStorageAdapter implements IUserPreferencesSto
   async set(
     preferences: Partial<UserPreferencesProps>,
   ): Promise<Result<void, AppError>> {
+    return new BrowserProviderMutationLock().run('preferences', () =>
+      this.write(preferences),
+    );
+  }
+
+  private async write(
+    preferences: Partial<UserPreferencesProps>,
+  ): Promise<Result<void, AppError>> {
     try {
       const existingResult = await this.get();
-      const existing = existingResult.success ? existingResult.data : null;
+
+      if (!existingResult.success) return failure(existingResult.error);
+
+      const existing = existingResult.data;
       const existingProps = existing?.toProps() ?? { id: uuidv4() };
       const merged = { ...existingProps, ...preferences };
 

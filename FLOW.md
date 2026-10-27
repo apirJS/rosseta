@@ -4947,76 +4947,13 @@ Translation uses saved configuration without fetching a model list first. Model-
 
 Model management sends `FETCH_MODELS`. [FetchModelsHandler](src/adapters/primary/background/providers/FetchModelsHandler.ts) converts the result to plain data for the browser message. [RefreshProviderModelsUseCase](src/core/application/providers/RefreshProviderModelsUseCase.ts) carries out the refresh:
 
-Source: [RefreshProviderModelsUseCase.ts:37–94](src/core/application/providers/RefreshProviderModelsUseCase.ts#L37-L94).
-
-<!-- source: src/core/application/providers/RefreshProviderModelsUseCase.ts:37-94 -->
-
-```typescript
-  async execute(provider: string): Promise<Result<StoredModel[], AppError>> {
-    const config = await this.resolveConfig(provider);
-
-    if (!config.success) return failure(config.error);
-
-    const apiKey = await this.resolveApiKey(provider);
-
-    if (!apiKey.success) return failure(apiKey.error);
-
-    const fetched = await this.deps.modelFetchService.fetchModels(
-      provider,
-      apiKey.data,
-      config.data?.baseURL,
-      config.data?.headers,
-      config.data?.queryParams,
-      config.data?.type,
-    );
-
-    if (!fetched.success) return failure(fetched.error);
-
-    // Network latency never holds the lock. Recheck existence only after
-    // acquiring the same provider boundary used by staged deletion.
-    return this.deps.mutationLock.run(provider, () =>
-      this.commitCatalog(provider, fetched.data),
-    );
-  }
-
-  private async commitCatalog(
-    provider: string,
-    models: ModelInfo[],
-  ): Promise<Result<StoredModel[], AppError>> {
-    const current = await this.ensureProviderStillExists(provider);
-
-    if (!current.success) return failure(current.error);
-
-    const saved = await this.persistCatalog(provider, models);
-
-    if (!saved.success) return failure(saved.error);
-
-    await this.reconcileSelection(provider, saved.data);
-
-    const reset = await this.deps.capabilityStorage.resetNamespace(provider);
-
-    if (!reset.success) {
-      const userMessage =
-        'Models were updated, but compatibility could not be reset. Try fetching models again.';
-
-      return failure(
-        new AppError({
-          code: reset.error.code,
-          message: userMessage,
-          userMessage,
-        }),
-      );
-    }
-
-    return success(saved.data);
-  }
-```
+The use case reads the provider configuration, chosen credential, selected model and current catalog under the provider mutation lock. It releases the lock for networking, then reads those values again before committing. A changed endpoint, key, selection or model list rejects the late response instead of overwriting newly imported settings or another catalog update. No secret values are included in that error.
 
 The ordering matters:
 
 1. Find the existing built-in or custom provider and a matching credential. Fetching models does not advance the round-robin key cursor used by translation.
 2. Fetch through [ModelFetchService](src/adapters/secondary/providers/catalogs/ModelFetchService.ts), keeping the custom endpoint, headers, query parameters and protocol.
-3. Acquire the provider's update lock and check again that a custom provider still exists.
+3. Acquire the provider's update lock and check that the provider still exists and its configuration, chosen key, model selection and model list match the pre-fetch snapshot.
 4. Merge the fetched models with manually added models. A manual entry wins when the IDs match. Save the model list.
 5. Use the pure model-selection rule to fix the saved model selection if needed.
 6. Clear remembered compatibility for that provider.
@@ -5193,7 +5130,25 @@ export interface SettingsBackupData {
 }
 ```
 
-Import first validates the whole backup and builds the domain objects. It then writes providers, credentials, preferences, models, optional history, key-selection mode and cursors, in that order. It stops at the first failure and does not undo earlier writes. Read the use case before changing this sequence. Replacing history applies the 90-day rule. The backup format is saved data that older versions may need to read, so it cannot be treated as a display label.
+### Export/import validation and persistence
+
+[ExportSettingsUseCase](src/core/application/settings/ExportSettingsUseCase.ts) and [ImportSettingsUseCase](src/core/application/settings/ImportSettingsUseCase.ts) depend on one [ISettingsBackupStorage](src/core/ports/outbound/ISettingsBackupStorage.ts). Composition supplies [BrowserSettingsBackupStorage](src/adapters/secondary/storage/settings/BrowserSettingsBackupStorage.ts). This keeps browser persistence outside core and avoids coordinating seven independent writes in an application action.
+
+Export reads all persisted values in one browser storage snapshot. It validates present data without invoking the normal adapters' repair/delete paths, so corrupt saved values fail export without changing them or silently producing an incomplete file. Unsaved popup state is not substituted for persisted preferences. An empty installation uses domain defaults. A rotation cursor pointing at a deleted key is omitted from the exported copy; auto-balance with fewer than two remaining keys exports the effective manual fallback. These adjustments do not mutate live storage. The exported object owns its arrays/maps, and the version-one format remains unchanged.
+
+Import validates the entire file before writing. It rejects malformed records, null history, empty history segment arrays, duplicate IDs, blank model IDs, unsupported providers, dangling active/cursor references, insufficient auto-balance keys, inherited enum properties and invalid dates. Legacy version-one history may have independently grouped source and translated arrays; it does not need a response-schema migration. Missing history means preserve the existing history; an explicit empty array means clear it. Operational compatibility records are never imported or exported.
+
+The browser adapter serializes imports, acquires affected provider locks in a fixed order, then takes the custom-provider, credential, preference and history write boundaries. It rereads storage while protected and sends one scoped storage set for providers, credentials, preferences, model lists, key mode/cursors and optional history. Removed model/cursor keys receive null tombstones in that same write; snapshot reads ignore those tombstones, and ordinary readers can remove them later. This avoids a successful set followed by a failing cleanup remove. It never clears the whole browser store, so compatibility and unrelated keys survive. The existing inclusive 90-day retention rule applies to exported/imported history; exporting does not prune the saved copy.
+
+A failed read, lock acquisition or write returns failure. Import does not attempt a blind rollback that could overwrite a concurrent history save. Provider refresh checks its pre-fetch snapshot before committing a late response. Credential collection updates, preference merges, custom-provider list updates and history writes share their corresponding import boundaries, so an earlier read-modify-write cannot resume afterward with an older collection. The adapter's [tests](src/adapters/secondary/storage/settings/BrowserSettingsBackupStorage.test.ts) cover a failed bulk write preserving prior data, scoped prefix replacement, malformed stored values, omitted/empty history, retention boundaries and concurrent provider/history work. The [composition test](src/composition/composition.test.ts) imports through popup dependencies and resolves the result in fresh background dependencies.
+
+### Settings file and popup lifetime
+
+[SettingsController](src/adapters/primary/ui/extension/pages/settings/SettingsController.svelte.ts) prevents overlapping import/export actions. It accepts a UTF-8 BOM, distinguishes unreadable files from invalid JSON, and uses safe application error messages. Leaving the page invalidates pending file reads before they can submit an import and suppresses late downloads/toasts. Already submitted persistence finishes; it is not undone when a component unmounts. Successful import refreshes popup state and reports refresh failures as already-saved settings. Legacy backups no longer claim that omitted history was replaced.
+
+Downloads click a temporary anchor attached to the document, remove that anchor immediately and revoke successful object URLs after a short delay. Failed downloads revoke immediately. The [controller tests](src/adapters/primary/ui/extension/pages/settings/SettingsController.test.ts) cover cleanup, rejected operations, busy state, BOM input and disposal during reading, persistence and refresh. The form resets the file input after handling so the same file can be selected again.
+
+Custom provider creation validates a real HTTP(S) URL, rejects URL credentials and invalid header byte values, and requires an identifier after the custom prefix. Those same rules apply to imports and UI-created providers. Prototype-like header/query names remain literal own properties rather than disappearing during object construction.
 
 <a id="section-25"></a>
 
@@ -5867,7 +5822,7 @@ Source: [BrowserProviderMutationLock.test.ts:125–170](src/adapters/secondary/s
 
 This simulates Web Locks behavior without starting separate browser contexts. Queue tests show that adapter instances in one JavaScript environment run updates one at a time. They do not establish cross-context locking when Web Locks are unavailable.
 
-[RefreshProviderModelsUseCase.test.ts](src/core/application/providers/RefreshProviderModelsUseCase.test.ts) starts deletion after refresh has passed its existence check. Deletion must wait, then clear the model list and selection. Other tests reverse the order, delete during fetching and check that networking does not hold the update lock. [RemoveCustomProviderUseCase.test.ts](src/core/application/providers/RemoveCustomProviderUseCase.test.ts) checks cleanup of keys, models, preferences, key-selection state and compatibility information.
+[RefreshProviderModelsUseCase.test.ts](src/core/application/providers/RefreshProviderModelsUseCase.test.ts) starts deletion after refresh has entered its commit check. Deletion must wait, then clear the model list and selection. Other tests reverse the order, delete during fetching and check that networking does not hold the update lock. [RemoveCustomProviderUseCase.test.ts](src/core/application/providers/RemoveCustomProviderUseCase.test.ts) checks cleanup of keys, models, preferences, key-selection state and compatibility information.
 
 ### History retention removes saved data, not just visible rows
 

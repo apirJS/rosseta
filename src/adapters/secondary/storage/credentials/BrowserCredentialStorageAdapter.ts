@@ -8,6 +8,7 @@ import { StorageError, type AppError } from '../../../../shared/errors';
 import { isAnyProvider } from '../../../../core/domain/credential/Provider';
 import * as browser from 'webextension-polyfill';
 import { z } from 'zod';
+import { BrowserProviderMutationLock } from '../providers/BrowserProviderMutationLock';
 
 const STORAGE_KEY = 'credentials';
 const LEGACY_STORAGE_KEY = 'credential';
@@ -26,6 +27,24 @@ const CredentialsPropsSchema = z.object({
 });
 
 export class BrowserCredentialStorageAdapter implements ICredentialStorage {
+  async update(
+    change: (credentials: Credentials | null) => Result<Credentials, AppError>,
+  ): Promise<Result<Credentials, AppError>> {
+    return new BrowserProviderMutationLock().run('credentials', async () => {
+      const current = await this.get();
+
+      if (!current.success) return current;
+
+      const updated = change(current.data);
+
+      if (!updated.success) return updated;
+
+      const saved = await this.save(updated.data);
+
+      return saved.success ? updated : failure(saved.error);
+    });
+  }
+
   async save(credentials: Credentials): Promise<Result<void, AppError>> {
     try {
       await browser.storage.local.set({

@@ -28,6 +28,7 @@ import {
   createCommandStorage,
   createCustomProviderStorage,
   createProviderMutationLock,
+  createSettingsBackupStorage,
 } from './storage';
 
 export function createPopupDependencies() {
@@ -38,6 +39,7 @@ export function createPopupDependencies() {
   const modelStorage = createModelStorage();
   const commandStorage = createCommandStorage();
   const customProviderStorage = createCustomProviderStorage();
+  const settingsBackupStorage = createSettingsBackupStorage();
 
   return {
     credentialStorage,
@@ -94,20 +96,7 @@ export function createPopupDependencies() {
 
     getShortcutUseCase: new GetShortcutUseCase(commandStorage),
 
-    exportSettingsUseCase: new ExportSettingsUseCase(
-      credentialStorage,
-      modelStorage,
-      customProviderStorage,
-      keySelectionStorage,
-      translationStorage,
-    ),
-    importSettingsUseCase: new ImportSettingsUseCase(
-      credentialStorage,
-      userPreferencesStorage,
-      modelStorage,
-      customProviderStorage,
-      keySelectionStorage,
-      translationStorage,
-    ),
+    exportSettingsUseCase: new ExportSettingsUseCase(settingsBackupStorage),
+    importSettingsUseCase: new ImportSettingsUseCase(settingsBackupStorage),
   };
 }

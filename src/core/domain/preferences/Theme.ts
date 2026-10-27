@@ -40,7 +40,7 @@ export class Theme extends ValueObject {
       return failure(new DomainError('Theme must be a non-empty string'));
     }
 
-    if (raw in THEME_OPTIONS) {
+    if (Object.hasOwn(THEME_OPTIONS, raw)) {
       return success(Theme.create(raw as ThemeValue));
     }
 

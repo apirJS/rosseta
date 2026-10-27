@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import {
     getAuthStateContext,
     getCustomProvidersStateContext,
@@ -27,12 +28,6 @@
   const controller = createSettingsController({
     exportSettings: settings.exportSettings,
     importSettings: settings.importSettings,
-    preferences: () => ({
-      theme: preferences.state.theme.value,
-      targetLanguage: preferences.state.targetLanguage.code,
-      selectedModels: { ...preferences.state.selectedModels },
-      includeDescription: preferences.state.includeDescription,
-    }),
     refresh: async () => {
       const providersResult = await customProviders.hydrate();
 
@@ -50,6 +45,8 @@
     },
     toast,
   });
+
+  onDestroy(controller.dispose);
 </script>
 
 <PageShell

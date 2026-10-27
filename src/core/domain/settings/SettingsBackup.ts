@@ -74,6 +74,12 @@ function asRecord(
     return failure(new DomainError(`${label} must be an object`));
   }
 
+  const prototype = Object.getPrototypeOf(value);
+
+  if (prototype !== Object.prototype && prototype !== null) {
+    return failure(new DomainError(`${label} must be a plain object`));
+  }
+
   return success(value as Record<string, unknown>);
 }
 
@@ -85,17 +91,25 @@ function asStringRecord(
 
   if (!recordResult.success) return recordResult;
 
-  const output: Record<string, string> = {};
+  const entries: Array<[string, string]> = [];
 
   for (const [key, entry] of Object.entries(recordResult.data)) {
     if (typeof entry !== 'string') {
       return failure(new DomainError(`${label}.${key} must be a string`));
     }
 
-    output[key] = entry;
+    entries.push([key, entry]);
   }
 
-  return success(output);
+  return success(Object.fromEntries(entries));
+}
+
+function isSerializedDate(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+
+  const date = new Date(value);
+
+  return Number.isFinite(date.getTime()) && date.toISOString() === value;
 }
 
 function optionalStringRecord(
@@ -111,8 +125,8 @@ function parseSegments(
   value: unknown,
   label: string,
 ): Result<TextSegment[], DomainError> {
-  if (!Array.isArray(value)) {
-    return failure(new DomainError(`${label} must be an array`));
+  if (!Array.isArray(value) || value.length === 0) {
+    return failure(new DomainError(`${label} must be a non-empty array`));
   }
 
   const segments: TextSegment[] = [];
@@ -131,7 +145,7 @@ function parseSegments(
       (record.romanization !== null &&
         typeof record.romanization !== 'string') ||
       typeof record.blockIndex !== 'number' ||
-      !Number.isInteger(record.blockIndex) ||
+      !Number.isSafeInteger(record.blockIndex) ||
       record.blockIndex < 0
     ) {
       return failure(new DomainError(`Invalid segment at ${label}[${index}]`));
@@ -168,6 +182,10 @@ export function parseSettingsBackup(
     return failure(
       new DomainError('This is not a supported Rosseta settings file'),
     );
+  }
+
+  if (!isSerializedDate(root.exportedAt)) {
+    return failure(new DomainError('exportedAt must be an ISO timestamp'));
   }
 
   const settingsResult = asRecord(root.settings, 'settings');
@@ -285,7 +303,7 @@ export function parseSettingsBackup(
     }
 
     if (!providerIds.has(record.provider) || !isAnyProvider(record.provider)) {
-      continue;
+      return failure(new DomainError(`Unknown provider at apiKeys[${index}]`));
     }
 
     if (credentialIds.has(record.id)) {
@@ -309,11 +327,16 @@ export function parseSettingsBackup(
     return failure(new DomainError('activeKeyId must be a string or null'));
   }
 
-  const activeKeyId =
-    typeof settings.activeKeyId === 'string' &&
-    credentialIds.has(settings.activeKeyId)
-      ? settings.activeKeyId
-      : null;
+  if (
+    settings.activeKeyId !== null &&
+    !credentialIds.has(settings.activeKeyId)
+  ) {
+    return failure(
+      new DomainError('activeKeyId does not reference an imported API key'),
+    );
+  }
+
+  const activeKeyId = settings.activeKeyId;
 
   const credentialsResult = Credentials.fromProps({
     id: 'settings-import',
@@ -336,11 +359,25 @@ export function parseSettingsBackup(
 
   if (!selectedModelsResult.success) return selectedModelsResult;
 
-  const selectedModels = Object.fromEntries(
-    Object.entries(selectedModelsResult.data).filter(([provider]) =>
-      providerIds.has(provider),
-    ),
-  );
+  for (const [provider, modelId] of Object.entries(selectedModelsResult.data)) {
+    if (!providerIds.has(provider)) {
+      return failure(
+        new DomainError(
+          `Unknown provider at preferences.selectedModels.${provider}`,
+        ),
+      );
+    }
+
+    if (!modelId.trim()) {
+      return failure(
+        new DomainError(
+          `preferences.selectedModels.${provider} cannot be empty`,
+        ),
+      );
+    }
+  }
+
+  const selectedModels = selectedModelsResult.data;
 
   if (
     typeof preferencesRaw.theme !== 'string' ||
@@ -383,7 +420,7 @@ export function parseSettingsBackup(
 
   for (const [provider, entries] of Object.entries(modelsResult.data)) {
     if (!providerIds.has(provider)) {
-      continue;
+      return failure(new DomainError(`Unknown provider at models.${provider}`));
     }
 
     if (!Array.isArray(entries)) {
@@ -391,6 +428,8 @@ export function parseSettingsBackup(
     }
 
     models[provider] = [];
+
+    const modelIds = new Set<string>();
 
     for (const [index, entry] of entries.entries()) {
       const recordResult = asRecord(entry, `models.${provider}[${index}]`);
@@ -411,15 +450,25 @@ export function parseSettingsBackup(
         );
       }
 
+      const id = record.id.trim();
+
+      if (modelIds.has(id)) {
+        return failure(
+          new DomainError(`Duplicate model id at models.${provider}: ${id}`),
+        );
+      }
+
+      modelIds.add(id);
+
       models[provider].push({
-        id: record.id.trim(),
+        id,
         name: record.name.trim(),
         source: record.source,
       });
     }
   }
 
-  const historyRaw = settings.history ?? [];
+  const historyRaw = settings.history === undefined ? [] : settings.history;
 
   if (!Array.isArray(historyRaw)) {
     return failure(new DomainError('history must be an array'));
@@ -439,7 +488,7 @@ export function parseSettingsBackup(
       typeof record.id !== 'string' ||
       !record.id.trim() ||
       typeof record.description !== 'string' ||
-      typeof record.createdAt !== 'string'
+      !isSerializedDate(record.createdAt)
     ) {
       return failure(
         new DomainError(`Invalid translation at history[${index}]`),
@@ -497,12 +546,19 @@ export function parseSettingsBackup(
 
   const autoProvider = modeResult.data.autoBalanceProvider;
 
-  const keySelectionMode =
+  if (
     autoProvider &&
-    providerIds.has(autoProvider) &&
-    credentialsResult.data.getByProvider(autoProvider).length >= 2
-      ? modeResult.data
-      : KeySelectionMode.manual();
+    (!providerIds.has(autoProvider) ||
+      credentialsResult.data.getByProvider(autoProvider).length < 2)
+  ) {
+    return failure(
+      new DomainError(
+        'Auto-balance requires an imported provider with at least two API keys',
+      ),
+    );
+  }
+
+  const keySelectionMode = modeResult.data;
 
   const lastUsedResult = asStringRecord(
     keySelectionResult.data.lastUsedKeyIds,
@@ -514,13 +570,26 @@ export function parseSettingsBackup(
   const lastUsedKeyIds: Record<string, string> = {};
 
   for (const [provider, credentialId] of Object.entries(lastUsedResult.data)) {
-    if (!providerIds.has(provider)) continue;
+    if (!providerIds.has(provider)) {
+      return failure(
+        new DomainError(
+          `Unknown provider at keySelection.lastUsedKeyIds.${provider}`,
+        ),
+      );
+    }
 
     const credential = credentialsResult.data.items.find(
       (candidate) => candidate.id === credentialId,
     );
 
-    if (!credential || credential.provider !== provider) continue;
+    if (!credential || credential.provider !== provider) {
+      return failure(
+        new DomainError(
+          `Invalid API key reference at keySelection.lastUsedKeyIds.${provider}`,
+        ),
+      );
+    }
+
     lastUsedKeyIds[provider] = credentialId;
   }
 

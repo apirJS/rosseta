@@ -703,7 +703,7 @@ The background sends that data URL to the selected tab in `MOUNT_OVERLAY`. No LL
 
 ## 7. Selecting and cropping the image
 
-[OverlayHandler](src/adapters/primary/content/capture/OverlayHandler.ts) receives the captured screenshot, creates the page-covering Shadow DOM host, blocks scrolling and mounts [ScreenSelectionOverlay](src/adapters/primary/ui/injected/screen-overlay/ScreenSelectionOverlay.svelte). The component renders the screenshot and [SelectionRectangle](src/adapters/primary/ui/injected/screen-overlay/SelectionRectangle.svelte), binds pointer events and connects mount/unmount to the controller. Existing extension styles and the `--selection-frame` token supply its appearance.
+[OverlayHandler](src/adapters/primary/content/capture/OverlayHandler.ts) receives the captured screenshot, creates the page-covering Shadow DOM host, blocks scrolling and mounts [ScreenSelectionOverlay](src/adapters/primary/ui/injected/screen-overlay/ScreenSelectionOverlay.svelte). The component renders the screenshot and [SelectionRectangle](src/adapters/primary/ui/injected/screen-overlay/SelectionRectangle.svelte), binds pointer events and connects mount/unmount to the controller. The dashed outline uses the existing `--selection-frame` token. The extension theme defines its variables on both `:root` and `:host` so the isolated Shadow DOM receives them.
 
 [OverlayController](src/adapters/primary/ui/injected/screen-overlay/OverlayController.svelte.ts) owns screenshot readiness and submission. It decodes before announcing readiness, tries a blob URL for display and releases that URL when disposed. A blob arriving after disposal is revoked immediately. Decode failure closes the overlay; blob conversion failure leaves the original screenshot usable.
 

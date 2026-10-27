@@ -27,33 +27,12 @@
     border-style: solid;
     border-color: rgba(0, 0, 0, 0.4);
     pointer-events: none;
-    background-image:
-      linear-gradient(var(--selection-frame), var(--selection-frame)),
-      linear-gradient(var(--selection-frame), var(--selection-frame)),
-      linear-gradient(var(--selection-frame), var(--selection-frame)),
-      linear-gradient(var(--selection-frame), var(--selection-frame)),
-      linear-gradient(var(--selection-frame), var(--selection-frame)),
-      linear-gradient(var(--selection-frame), var(--selection-frame)),
-      linear-gradient(var(--selection-frame), var(--selection-frame)),
-      linear-gradient(var(--selection-frame), var(--selection-frame));
-    background-position:
-      top left,
-      top left,
-      top right,
-      top right,
-      bottom left,
-      bottom left,
-      bottom right,
-      bottom right;
-    background-repeat: no-repeat;
-    background-size:
-      min(20px, 33.333333%) 1.5px,
-      1.5px min(20px, 33.333333%),
-      min(20px, 33.333333%) 1.5px,
-      1.5px min(20px, 33.333333%),
-      min(20px, 33.333333%) 1.5px,
-      1.5px min(20px, 33.333333%),
-      min(20px, 33.333333%) 1.5px,
-      1.5px min(20px, 33.333333%);
+  }
+
+  .selection-box::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1.5px dashed var(--selection-frame);
   }
 </style>
